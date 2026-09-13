@@ -1143,25 +1143,28 @@ function renderRenewalStep(){
     const newTramId=renewalData.newTramId||'NA202510048216S';
     const pmData=renewalData.pmChecklist||{};
     const newEndDate=pmData.endDate||'2025-10-14';
-    const xlsxName=`${safeName}_Renewal_20250714_${c.serial}.xlsm`;
+    const xlsxName=`${safeName}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
     const sectorEmail=getSectorEmail(c.sector);
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All validations passed. The Excel file is ready and the email is composed for Contractor Support.</p>
-      <div class="section-title">Excel File — <code>Request Form Template ECM Consulting v4.3.xlsm</code></div>
-      <div class="confirm-row">✅ <b>Onboardings tab populated — row 2</b><br>
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All validations passed. Generate the Excel file and send the renewal email to Contractor Support.</p>
+      <div class="section-title">Excel File — <code>Request Form Template_Contractor Team.xlsm</code></div>
+      <div class="confirm-row">
+        📄 <b>Onboardings tab will be populated — row 2</b><br>
         Filename: <b>${xlsxName}</b><br>
-        Saved to: PM's local machine · Source: Box folder <code>414382194963</code> (Request Form Template ECM Consulting v4.3.xlsm)</div>
+        Saved to: PM's local machine (browser download)<br>
+        Source: Box folder <code>308916282342</code> (Request Form Template_Contractor Team.xlsm)
+      </div>
+      <div id="excelStatus" style="margin-bottom:12px"></div>
       <div class="section-title">Email Preview — Recipient determined by Sector: <b>${c.sector}</b></div>
-      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table. Please provide the sector-to-email mapping (OQ-21a).</div>`:''}
+      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table.</div>`:''}
       <div class="email-preview">To: ${sectorEmail}
-Subject: ${newTramId} ${c.serial} ${c.poNumber} ${c.name} ${c.client} RENEWAL
+Subject: ${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL
 
 Can you please help with this renewal?
 
-Attachment: ${xlsxName}
-
-[PROTOTYPE — no real email sent]</div>`;
+Attachment: ${xlsxName}</div>`;
     footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-green" onclick="renewalSubmit()">✓ Confirm &amp; Send</button>`;
+      <button class="btn btn-primary" id="btnDownloadExcel" onclick="downloadExcel('${c.serial}')">⬇ Download Excel File</button>
+      <button class="btn btn-green" id="btnConfirmSend" onclick="renewalSubmit()" style="display:none">✓ Excel Downloaded — Confirm &amp; Send</button>`;
 
   // ── STEP 7 (was 6): COMPLETE ────────────────────────────────────────────
   } else if(renewalStep===7){
@@ -1193,6 +1196,78 @@ Attachment: ${xlsxName}
 function renewalNext(){renewalStep++;renderRenewalStep();}
 function renewalBack(){renewalStep--;renderRenewalStep();}
 function renewalSubmit(){renewalStep=7;renderRenewalStep();}
+
+async function downloadExcel(contractorId){
+  const statusEl = document.getElementById('excelStatus');
+  const btnDown  = document.getElementById('btnDownloadExcel');
+  const btnSend  = document.getElementById('btnConfirmSend');
+
+  if(!API_BASE){
+    // Prototype mode — simulate download
+    if(statusEl) statusEl.innerHTML=`<div class="confirm-row">⚠ <b>Prototype mode</b> — no backend connected. In production this downloads the real populated .xlsm file.</div>`;
+    if(btnDown)  btnDown.style.display='none';
+    if(btnSend)  btnSend.style.display='inline-flex';
+    return;
+  }
+
+  if(btnDown) btnDown.disabled=true;
+  if(statusEl) statusEl.innerHTML=`<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">⏳ Generating Excel file from template…</div>`;
+
+  try {
+    const c = renewalData.contractor;
+    const pm = renewalData.pmChecklist || {};
+
+    const resp = await fetch(API_BASE + '/api/generate-excel', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contractor_id: contractorId,
+        pm_checklist: {
+          ...pm,
+          contractor_name: c.name,
+          client:          c.client,
+          vendor:          c.vendor,
+          scope_of_work:   c.skillDescription,
+          manager_email:   c.pmIntranetId || pm.managerEmail || '',
+          tram_id_new:     renewalData.newTramId || c.tramId || '',
+          end_date:        pm.endDate || c.endDate || '',
+          comments:        [pm.bizJust1||'',pm.bizJust2||'',pm.bizJust3||'',pm.bizJust4||''].filter(Boolean).join('\n'),
+          user:            'current_user',
+        }
+      })
+    });
+
+    if(!resp.ok){
+      const err = await resp.json().catch(()=>({detail:resp.statusText}));
+      throw new Error(err.detail || resp.statusText);
+    }
+
+    // Trigger browser download
+    const blob     = await resp.blob();
+    const filename = resp.headers.get('X-Filename') || 'renewal.xlsm';
+    const sha256   = resp.headers.get('X-SHA256')   || '';
+    const missing  = resp.headers.get('X-Missing-Fields') || '';
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement('a');
+    a.href         = url;
+    a.download     = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    let warn = missing ? `<br>⚠ Missing fields: <b>${missing}</b>` : '';
+    if(statusEl) statusEl.innerHTML=`<div class="confirm-row">✅ <b>${filename}</b> downloaded to your machine.<br>SHA-256: <code>${sha256.slice(0,8)}…${sha256.slice(-4)}</code>${warn}</div>`;
+    if(btnDown)  btnDown.style.display='none';
+    if(btnSend)  btnSend.style.display='inline-flex';
+
+    await postAudit('EXCEL_GENERATED', contractorId, `File: ${filename} · SHA-256: ${sha256.slice(0,8)}`, 'success');
+
+  } catch(e) {
+    if(statusEl) statusEl.innerHTML=`<div class="dq-warn">❌ Excel generation failed: ${e.message}</div>`;
+    if(btnDown)  btnDown.disabled=false;
+  }
+}
 
 // PM Checklist validation — required fields before advancing to attestations
 function pmChecklistNext(){

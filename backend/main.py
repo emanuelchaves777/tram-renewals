@@ -7,6 +7,7 @@ Endpoints:
   POST /api/refresh             — re-ingest from Box
   POST /api/refresh-taxonomy    — reload taxonomy from Box
   GET  /api/jrs/{jrs_value}     — validate a single JRS string
+  POST /api/generate-excel      — generate populated renewal .xlsm
   POST /api/audit               — append an audit record
   GET  /api/audit               — retrieve audit log
 
@@ -19,12 +20,14 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
-from config import CORS_ORIGIN, SECTOR_EMAIL_MAP, SECTOR_EMAIL_DEFAULT
+from config import CORS_ORIGIN, SECTOR_EMAIL_MAP, SECTOR_EMAIL_DEFAULT, BOX_FOLDER_ID
 from box_client import get_client
 import ingestion
 import jrs_validation
+import excel_generation
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +58,11 @@ class AuditRecord(BaseModel):
     contractor: str | None = None
     detail:     str | None = None
     outcome:    str = "success"
+
+
+class ExcelRequest(BaseModel):
+    contractor_id: str          # serial / TalentID to look up in ingestion cache
+    pm_checklist:  dict         # all PM checklist fields from Step 2 of renewal workflow
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -178,6 +186,95 @@ def get_sector_email(sector: str):
     key = sector.strip().lower()
     email = SECTOR_EMAIL_MAP.get(key, SECTOR_EMAIL_DEFAULT)
     return {"sector": sector, "email": email}
+
+
+# ── Excel Generation ─────────────────────────────────────────────────────────
+
+@app.post("/api/generate-excel")
+def generate_excel(req: ExcelRequest):
+    """
+    Generate the populated renewal .xlsm file.
+    Returns the file as a downloadable attachment.
+
+    The frontend triggers a browser download — the file lands on the PM's machine.
+    """
+    # Find contractor in cache
+    contractor = None
+    if _ingestion_result:
+        all_records = (
+            _ingestion_result.get("contractors", []) +
+            _ingestion_result.get("dq_exceptions", [])
+        )
+        contractor = next(
+            (c for c in all_records if c.get("serial") == req.contractor_id),
+            None
+        )
+
+    # Fall back to minimal record built from pm_checklist if not in cache
+    if not contractor:
+        contractor = {
+            "serial":           req.contractor_id,
+            "name":             req.pm_checklist.get("contractor_name", req.contractor_id),
+            "client":           req.pm_checklist.get("client", ""),
+            "vendor":           req.pm_checklist.get("vendor", ""),
+            "tramId":           req.pm_checklist.get("tram_id_new", ""),
+            "skillDescription": req.pm_checklist.get("scope_of_work", ""),
+            "pmIntranetId":     req.pm_checklist.get("manager_email", ""),
+            "endDate":          req.pm_checklist.get("end_date", ""),
+        }
+
+    # Download template from Box
+    try:
+        client = get_client()
+        template_bytes = excel_generation.download_template(client, BOX_FOLDER_ID)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not download template from Box: {str(e)}. "
+                   "Ensure the template file is uploaded to the Consulting NA Box folder."
+        )
+
+    # Generate the populated file
+    result = excel_generation.generate_renewal_excel(
+        contractor=contractor,
+        pm_checklist=req.pm_checklist,
+        template_bytes=template_bytes,
+    )
+
+    # Warn if mandatory fields are missing but do not block — let user decide
+    if result["missing_mandatory"]:
+        _append_audit(
+            user=req.pm_checklist.get("user", "unknown"),
+            action="EXCEL_MANDATORY_FIELDS_MISSING",
+            contractor=req.contractor_id,
+            detail=f"Missing fields: {', '.join(result['missing_mandatory'])}",
+            outcome="warning",
+        )
+
+    # Record successful generation
+    _append_audit(
+        user=req.pm_checklist.get("user", "unknown"),
+        action="EXCEL_GENERATED",
+        contractor=req.contractor_id,
+        detail=(
+            f"File: {result['filename']} · "
+            f"{result['fields_written']} fields written · "
+            f"SHA-256: {result['sha256'][:8]}...{result['sha256'][-4:]}"
+        ),
+        outcome="success",
+    )
+
+    # Return file as download
+    return Response(
+        content=result["file_bytes"],
+        media_type="application/vnd.ms-excel.sheet.macroEnabled.12",
+        headers={
+            "Content-Disposition": f'attachment; filename="{result["filename"]}"',
+            "X-Filename":          result["filename"],
+            "X-SHA256":            result["sha256"],
+            "X-Missing-Fields":    ",".join(result["missing_mandatory"]),
+        },
+    )
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
