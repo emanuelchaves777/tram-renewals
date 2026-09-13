@@ -1,0 +1,10 @@
+*.txt
+*.json
+*.xlsb
+*.xlsm
+*.xlsx
+docs/
+strategic-solution-plan.md
+solution-launch-playbook.md
+backend/.env
+backend/__pycache__/
