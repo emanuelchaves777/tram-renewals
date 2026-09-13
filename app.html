@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRAM Subcontractor Renewal & Offboarding — Prototype</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.5;background:#f3f4f6;color:#1f2937}
+  .banner{background:#1d4ed8;color:#fff;text-align:center;padding:6px 12px;font-size:12px;letter-spacing:.04em}
+  .banner b{color:#fde68a}
+  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 24px;display:flex;align-items:center;gap:16px}
+  header .logo{font-weight:700;font-size:16px;color:#1d4ed8;letter-spacing:-.5px}
+  header .title{font-size:14px;color:#374151;font-weight:600}
+  header .role-badge{margin-left:auto;background:#dbeafe;color:#1e40af;border-radius:4px;padding:3px 10px;font-size:12px;font-weight:600}
+  nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px;display:flex;gap:0}
+  nav button{padding:10px 18px;border:none;background:none;cursor:pointer;font-size:13px;color:#6b7280;border-bottom:3px solid transparent;font-weight:500;transition:.15s}
+  nav button.active{color:#1d4ed8;border-bottom-color:#1d4ed8;font-weight:700}
+  nav button:hover:not(.active){color:#374151}
+  .main{max-width:1280px;margin:0 auto;padding:24px}
+  /* Cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:.15s}
+  .card:hover{border-color:#6366f1;box-shadow:0 2px 8px rgba(99,102,241,.15)}
+  .card.active-filter{border-color:#1d4ed8;background:#eff6ff}
+  .card .num{font-size:28px;font-weight:700;line-height:1}
+  .card .lbl{font-size:11px;color:#6b7280;margin-top:4px;text-transform:uppercase;letter-spacing:.04em}
+  .card.red .num{color:#dc2626}
+  .card.orange .num{color:#ea580c}
+  .card.yellow .num{color:#d97706}
+  .card.blue .num{color:#2563eb}
+  .card.green .num{color:#16a34a}
+  .card.purple .num{color:#7c3aed}
+  .card.teal .num{color:#0d9488}
+  .card.gray .num{color:#6b7280}
+  /* Staleness */
+  .freshness-bar{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:13px}
+  .freshness-bar .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .dot-ok{background:#16a34a}
+  .dot-warn{background:#d97706}
+  .dot-stale{background:#dc2626}
+  .freshness-bar span{color:#6b7280}
+  .freshness-bar b{color:#1f2937}
+  /* Filters */
+  .filters{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px}
+  .filters-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .filters-row input,.filters-row select{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;color:#374151;background:#fff;outline:none;min-width:140px}
+  .filters-row input:focus,.filters-row select:focus{border-color:#6366f1}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  .btn-primary{background:#1d4ed8;color:#fff}
+  .btn-primary:hover{background:#1e40af}
+  .btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
+  .btn-secondary:hover{background:#e5e7eb}
+  .btn-danger{background:#dc2626;color:#fff}
+  .btn-danger:hover{background:#b91c1c}
+  .btn-warn{background:#d97706;color:#fff}
+  .btn-warn:hover{background:#b45309}
+  .btn-green{background:#16a34a;color:#fff}
+  .btn-green:hover{background:#15803d}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  /* Table */
+  .table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#f9fafb;padding:10px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
+  th:hover{background:#f3f4f6}
+  td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f9fafb}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+  .badge-red{background:#fee2e2;color:#b91c1c}
+  .badge-orange{background:#ffedd5;color:#c2410c}
+  .badge-yellow{background:#fef3c7;color:#92400e}
+  .badge-green{background:#dcfce7;color:#15803d}
+  .badge-blue{background:#dbeafe;color:#1e40af}
+  .badge-purple{background:#ede9fe;color:#6d28d9}
+  .badge-gray{background:#f3f4f6;color:#6b7280}
+  .badge-warn{background:#fef9c3;color:#713f12}
+  /* Detail Panel */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:flex-start;justify-content:flex-end}
+  .overlay.open{display:flex}
+  .panel{background:#fff;width:680px;max-width:98vw;height:100vh;overflow-y:auto;padding:0;box-shadow:-4px 0 24px rgba(0,0,0,.18);display:flex;flex-direction:column}
+  .panel-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:1}
+  .panel-header h2{font-size:16px;font-weight:700;flex:1}
+  .panel-body{padding:20px;flex:1}
+  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+  .info-item label{display:block;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  .info-item span{font-size:13px;color:#1f2937;font-weight:500}
+  .dq-warn{background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:8px}
+  /* Modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:#fff;border-radius:10px;width:720px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.22)}
+  .modal-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:1}
+  .modal-header h2{font-size:16px;font-weight:700;flex:1}
+  .modal-body{padding:20px}
+  .modal-footer{padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#fff}
+  /* Form */
+  .form-group{margin-bottom:14px}
+  .form-group label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+  .form-group input,.form-group select,.form-group textarea{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:13px;color:#374151;outline:none}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#6366f1}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .attest-box{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin-bottom:12px;background:#f9fafb}
+  .attest-box label{display:flex;gap:10px;cursor:pointer;font-size:13px;color:#374151;line-height:1.5}
+  .attest-box input[type=checkbox]{width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#1d4ed8}
+  .attest-box.checked{border-color:#16a34a;background:#f0fdf4}
+  /* JRS Validation */
+  .jrs-result{border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px}
+  .jrs-active{background:#dcfce7;border:1px solid #86efac;color:#15803d}
+  .jrs-warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e}
+  .jrs-error{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c}
+  .jrs-blocked{background:#ede9fe;border:1px solid #c4b5fd;color:#6d28d9}
+  /* TRAM Reconciliation */
+  .recon-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+  .recon-table th{background:#f9fafb;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;border-bottom:2px solid #e5e7eb}
+  .recon-table td{padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  .recon-match{color:#16a34a;font-weight:600}
+  .recon-mismatch{color:#dc2626;font-weight:600}
+  /* Timeline */
+  .timeline{list-style:none}
+  .timeline li{display:flex;gap:12px;margin-bottom:14px}
+  .tl-dot{width:10px;height:10px;border-radius:50%;background:#6366f1;margin-top:5px;flex-shrink:0}
+  .tl-dot.green{background:#16a34a}
+  .tl-dot.orange{background:#ea580c}
+  .tl-dot.red{background:#dc2626}
+  .tl-dot.blue{background:#2563eb}
+  .tl-content .tl-time{font-size:11px;color:#9ca3af}
+  .tl-content .tl-action{font-size:13px;font-weight:600;color:#1f2937}
+  .tl-content .tl-detail{font-size:12px;color:#6b7280}
+  /* Progress Steps */
+  .steps{display:flex;gap:0;margin-bottom:20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+  .step{flex:1;padding:10px 8px;text-align:center;font-size:12px;font-weight:600;color:#9ca3af;border-right:1px solid #e5e7eb;position:relative}
+  .step:last-child{border-right:none}
+  .step.done{background:#dcfce7;color:#15803d}
+  .step.active{background:#dbeafe;color:#1e40af}
+  .step.blocked{background:#fee2e2;color:#b91c1c}
+  /* DQ Page */
+  .dq-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px}
+  .dq-card h3{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .dq-card p{font-size:13px;color:#6b7280;margin-bottom:8px}
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+  .tag-error{background:#fee2e2;color:#b91c1c}
+  .tag-warn{background:#fef3c7;color:#92400e}
+  .tag-info{background:#dbeafe;color:#1e40af}
+  hr.divider{border:none;border-top:1px solid #e5e7eb;margin:16px 0}
+  .confirm-row{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:8px;font-size:13px}
+  .confirm-row b{color:#15803d}
+  .email-preview{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;font-size:13px;font-family:monospace;white-space:pre-wrap;line-height:1.6}
+  .field-changed{background:#fef9c3}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+  .sd-green{background:#16a34a}
+  .sd-red{background:#dc2626}
+  .sd-yellow{background:#d97706}
+  .sd-blue{background:#2563eb}
+</style>
+</head>
+<body>
+
+<div class="banner">⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.</div>
+
+<header>
+  <div class="logo">IBM</div>
+  <div class="title">Subcontractor Renewal &amp; Offboarding</div>
+  <div class="role-badge">👤 A. Martinez — renewal_user</div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
+  <button onclick="showTab('renewal',this)">Renewal Workflow</button>
+  <button onclick="showTab('offboarding',this)">Offboarding Workflow</button>
+  <button onclick="showTab('dq',this)">Data Quality</button>
+  <button onclick="showTab('audit',this)">Audit Trail</button>
+</nav>
+
+<div class="main">
+
+<!-- ═══════════════════════════════════════════
+     TAB: DASHBOARD
+═══════════════════════════════════════════ -->
+<div id="tab-dashboard">
+
+  <div class="freshness-bar">
+    <div class="dot dot-warn"></div>
+    <div>
+      <b>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</b>
+      <span style="margin-left:12px">Tab: Compiled</span>
+      <span style="margin-left:12px">Report date: 09 Jul 2025</span>
+      <span style="margin-left:12px">Ingested: 14 Jul 2025 08:42 UTC</span>
+      <span style="margin-left:12px;color:#d97706;font-weight:600">⚠ Dataset is 5 days old — review before submitting</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="refreshFromBox()">↻ Refresh from Box</button>
+  </div>
+
+  <div class="cards" id="bucketCards">
+    <div class="card red" onclick="filterBucket('past-due',this)" title="Past due">
+      <div class="num" id="cnt-past">3</div>
+      <div class="lbl">Past Due</div>
+    </div>
+    <div class="card orange" onclick="filterBucket('0-7',this)" title="0–7 days">
+      <div class="num" id="cnt-07">4</div>
+      <div class="lbl">Next 7 Days</div>
+    </div>
+    <div class="card yellow" onclick="filterBucket('8-14',this)" title="8–14 days">
+      <div class="num" id="cnt-814">5</div>
+      <div class="lbl">8–14 Days</div>
+    </div>
+    <div class="card blue" onclick="filterBucket('15-30',this)" title="15–30 days">
+      <div class="num" id="cnt-1530">6</div>
+      <div class="lbl">15–30 Days</div>
+    </div>
+    <div class="card green" onclick="filterBucket('31-60',this)" title="31–60 days">
+      <div class="num" id="cnt-3160">8</div>
+      <div class="lbl">31–60 Days</div>
+    </div>
+    <div class="card purple" onclick="filterBucket('60+',this)" title=">60 days">
+      <div class="num" id="cnt-60p">12</div>
+      <div class="lbl">Over 60 Days</div>
+    </div>
+    <div class="card teal" onclick="filterBucket('renewal-ip',this)" title="Renewal in progress">
+      <div class="num" id="cnt-rip">7</div>
+      <div class="lbl">Renewal In Progress</div>
+    </div>
+    <div class="card teal" onclick="filterBucket('offboard-ip',this)" title="Offboarding in progress">
+      <div class="num" id="cnt-oip">2</div>
+      <div class="lbl">Offboarding In Progress</div>
+    </div>
+    <div class="card gray" onclick="filterBucket('dq',this)" title="Data quality">
+      <div class="num" id="cnt-dq">4</div>
+      <div class="lbl">DQ Exceptions</div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filters-row">
+      <input id="f-contact" type="text" placeholder="Project contact name or email" oninput="applyFilters()">
+      <input id="f-contractor" type="text" placeholder="Contractor name or email" oninput="applyFilters()">
+      <input id="f-client" type="text" placeholder="Client" oninput="applyFilters()">
+      <input id="f-project" type="text" placeholder="Project" oninput="applyFilters()">
+      <select id="f-bucket" onchange="applyFilters()">
+        <option value="">All Buckets</option>
+        <option value="past-due">Past Due</option>
+        <option value="0-7">Next 7 Days</option>
+        <option value="8-14">8–14 Days</option>
+        <option value="15-30">15–30 Days</option>
+        <option value="31-60">31–60 Days</option>
+        <option value="60+">Over 60 Days</option>
+        <option value="renewal-ip">Renewal In Progress</option>
+        <option value="offboard-ip">Offboarding In Progress</option>
+      </select>
+      <select id="f-jrs" onchange="applyFilters()">
+        <option value="">All JRS Statuses</option>
+        <option value="active">JRS Active</option>
+        <option value="warn">JRS Warning</option>
+        <option value="invalid">JRS Invalid</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="clearFilters()">✕ Clear All</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)" title="Sort">Exp. Date ↕</th>
+          <th onclick="sortTable(1)" title="Sort">Days ↕</th>
+          <th onclick="sortTable(2)">Contractor ↕</th>
+          <th onclick="sortTable(3)">Serial / CNUM</th>
+          <th onclick="sortTable(4)">Client ↕</th>
+          <th onclick="sortTable(5)">Project</th>
+          <th onclick="sortTable(6)">Project Contact</th>
+          <th onclick="sortTable(7)">Vendor</th>
+          <th onclick="sortTable(8)">Band</th>
+          <th onclick="sortTable(9)">JRS (TRAM)</th>
+          <th onclick="sortTable(10)">Work Location</th>
+          <th onclick="sortTable(11)">TRAM Request ID</th>
+          <th>Renewal</th>
+          <th>Offboard</th>
+          <th>DQ</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB: RENEWAL WORKFLOW
+═══════════════════════════════════════════ -->
+<div id="tab-renewal" style="display:none">
+  <div id="renewal-content"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB: OFFBOARDING WORKFLOW
+═══════════════════════════════════════════ -->
+<div id="tab-offboarding" style="display:none">
+  <div id="offboarding-content"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB: DATA QUALITY
+═══════════════════════════════════════════ -->
+<div id="tab-dq" style="display:none">
+  <h2 style="margin-bottom:16px;font-size:18px">Data Quality Panel</h2>
+
+  <div class="dq-card">
+    <h3><span class="tag tag-error">BLOCKING</span> Missing Required Header</h3>
+    <p>The column <code>JR/S (TRAM)</code> could not be resolved in the current source file. This field is required for TRAM reconciliation. Renewal workflows are not blocked but TRAM comparison will show "header missing" for this field.</p>
+    <p style="font-size:12px;color:#9ca3af">Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · Detected at ingestion · Header row line 1</p>
+  </div>
+
+  <div class="dq-card">
+    <h3><span class="tag tag-warn">WARNING</span> Invalid Date Value</h3>
+    <p>Contractor <b>B. Torres</b> (TalentID: SYN-0042) has an unparseable value in <code>Expected End Date</code>: <code>"TBD"</code>. This record is placed in the "Unknown" bucket and cannot be actioned until the date is corrected in the source report.</p>
+    <p style="font-size:12px;color:#9ca3af">Row 47 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
+  </div>
+
+  <div class="dq-card">
+    <h3><span class="tag tag-warn">WARNING</span> Duplicate Contractor Identifier</h3>
+    <p>TalentID <b>SYN-0019</b> appears in two rows with different contractor names: <b>C. Nguyen</b> and <b>C. Nguyen-Tran</b>. Both records are shown in the dashboard with a duplicate flag. The first occurrence (row 22) is used for display. Verify the source report.</p>
+    <p style="font-size:12px;color:#9ca3af">Rows 22, 55 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
+  </div>
+
+  <div class="dq-card">
+    <h3><span class="tag tag-warn">WARNING</span> Missing TRAM Request ID</h3>
+    <p>Contractor <b>P. Okafor</b> (TalentID: SYN-0088) has no value in <code>TRAM Request ID</code>. Dashboard display is not affected, but the renewal workflow cannot proceed until a TRAM Request ID is available.</p>
+    <p style="font-size:12px;color:#9ca3af">Row 103 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
+  </div>
+
+  <div class="dq-card">
+    <h3><span class="tag tag-warn">WARNING</span> Unrecognized JRS Value</h3>
+    <p>Contractor <b>R. Singh</b> (TalentID: SYN-0067) has JRS value <code>"AI Strategy &amp; Transformation"</code> which does not match any entry in the current taxonomy cache (pub: TAX-2025-Q2). JRS validation will surface this during renewal.</p>
+    <p style="font-size:12px;color:#9ca3af">Row 78 · Taxonomy publication: TAX-2025-Q2</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB: AUDIT TRAIL
+═══════════════════════════════════════════ -->
+<div id="tab-audit" style="display:none">
+  <h2 style="margin-bottom:4px;font-size:18px">Audit Trail</h2>
+  <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Read-only. Showing 15 most recent events (synthetic). All times UTC.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Contractor</th>
+          <th>Detail</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>2025-07-14 09:31:02</td><td>a.martinez</td><td>EMAIL_SENT</td><td>SYN-0023</td><td>Renewal email sent · TRAM-R-88821 · File: TRAM_Renewal_SYN0023_Williams_20250714.xlsx</td><td><span class="badge badge-green">success</span></td></tr>
+        <tr><td>2025-07-14 09:30:44</td><td>a.martinez</td><td>EXCEL_GENERATED</td><td>SYN-0023</td><td>Template populated · 14 fields · SHA-256: a3f1...9d02</td><td><span class="badge badge-green">success</span></td></tr>
+        <tr><td>2025-07-14 09:28:11</td><td>a.martinez</td><td>TRAM_SUBMISSION_COMPLETED</td><td>SYN-0023</td><td>New TRAM ID: TRAM-R-88821 · Method: assisted_manual</td><td><span class="badge badge-green">success</span></td></tr>
+        <tr><td>2025-07-14 09:26:55</td><td>a.martinez</td><td>TRAM_CORRECTION_APPROVED</td><td>SYN-0023</td><td>Field: work_location_city · Old: "Austin" · New: "Dallas" · Reason: "Updated per project move"</td><td><span class="badge badge-blue">recorded</span></td></tr>
+        <tr><td>2025-07-14 09:25:30</td><td>a.martinez</td><td>TRAM_MISMATCH_DETECTED</td><td>SYN-0023</td><td>Field: work_location_city — Source: Dallas · TRAM: Austin</td><td><span class="badge badge-warn">mismatch</span></td></tr>
+        <tr><td>2025-07-14 09:24:00</td><td>a.martinez</td><td>JRS_REPLACEMENT_ACCEPTED</td><td>SYN-0023</td><td>Original: "Data &amp; Analytics Specialist" (deleted) → Accepted: "Data Analytics Consultant" · Rule: ONE_REPLACEMENT · Taxonomy: TAX-2025-Q2</td><td><span class="badge badge-green">accepted</span></td></tr>
+        <tr><td>2025-07-14 09:23:40</td><td>a.martinez</td><td>JRS_VALIDATION_RUN</td><td>SYN-0023</td><td>Outcome: ONE_REPLACEMENT · Taxonomy pub: TAX-2025-Q2</td><td><span class="badge badge-warn">proposed</span></td></tr>
+        <tr><td>2025-07-14 09:22:10</td><td>a.martinez</td><td>ATTESTATION_COMPLETED</td><td>SYN-0023</td><td>All 3 attestations confirmed · Version: ATTEST-v2.1 · Hash: b7c2...1a44</td><td><span class="badge badge-green">success</span></td></tr>
+        <tr><td>2025-07-14 09:21:00</td><td>a.martinez</td><td>RENEWAL_STARTED</td><td>SYN-0023</td><td>K. Williams · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</td><td><span class="badge badge-blue">started</span></td></tr>
+        <tr><td>2025-07-14 09:18:50</td><td>a.martinez</td><td>CONTRACTOR_RECORD_VIEWED</td><td>SYN-0023</td><td>K. Williams · Acme Financial</td><td><span class="badge badge-gray">info</span></td></tr>
+        <tr><td>2025-07-14 08:55:00</td><td>a.martinez</td><td>DUPLICATE_REQUEST_DETECTED</td><td>SYN-0056</td><td>Active renewal TRAM-R-88799 already in progress. New request blocked.</td><td><span class="badge badge-red">blocked</span></td></tr>
+        <tr><td>2025-07-14 08:42:31</td><td>system</td><td>INGESTION_COMPLETED</td><td>—</td><td>File: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · 247 rows accepted · 4 rejected · 1 header warning</td><td><span class="badge badge-green">success</span></td></tr>
+        <tr><td>2025-07-14 08:42:05</td><td>system</td><td>INGESTION_STARTED</td><td>—</td><td>File: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · Box folder: /Contractor-Mgmt/Reports</td><td><span class="badge badge-blue">started</span></td></tr>
+        <tr><td>2025-07-13 16:04:22</td><td>a.martinez</td><td>JRS_ESCALATED</td><td>SYN-0067</td><td>JRS "AI Strategy &amp; Transformation" not found in taxonomy. Escalated to process owner. Renewal blocked.</td><td><span class="badge badge-purple">escalated</span></td></tr>
+        <tr><td>2025-07-13 14:12:05</td><td>a.martinez</td><td>USER_SESSION_STARTED</td><td>—</td><td>Role: renewal_user · Auth: IBM SSO</td><td><span class="badge badge-green">success</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ═══════════════════════════════════════════
+     DETAIL PANEL (slide-in)
+═══════════════════════════════════════════ -->
+<div class="overlay" id="detailOverlay" onclick="closeDetail(event)">
+  <div class="panel" id="detailPanel">
+    <div class="panel-header">
+      <h2 id="detailTitle">Contractor Detail</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeDetailPanel()">✕ Close</button>
+    </div>
+    <div class="panel-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     RENEWAL MODAL
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="renewalModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="renewalModalTitle">Renewal Workflow</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeRenewalModal()">✕ Close</button>
+    </div>
+    <div class="modal-body" id="renewalModalBody"></div>
+    <div class="modal-footer" id="renewalModalFooter"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     OFFBOARDING MODAL
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="offboardModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="offboardModalTitle">Offboarding Workflow</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeOffboardModal()">✕ Close</button>
+    </div>
+    <div class="modal-body" id="offboardModalBody"></div>
+    <div class="modal-footer" id="offboardModalFooter"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// API CONFIGURATION
+// Set API_BASE to your deployed backend URL once it is live.
+// Leave empty ('') to use synthetic data only (prototype mode).
+// Example: const API_BASE = 'https://tram-renewals-production.up.railway.app';
+// ═══════════════════════════════════════════════
+const API_BASE = 'https://tram-renewals-production.up.railway.app';
+
+// ── API helpers ───────────────────────────────
+async function apiFetch(path, options={}) {
+  const url = API_BASE + path;
+  const res = await fetch(url, {
+    headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+    ...options
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({detail: res.statusText}));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.json();
+}
+
+// Called on page load — tries to load real data; falls back to synthetic
+async function loadData() {
+  if (!API_BASE) {
+    // No backend configured — use synthetic data
+    renderTable(CONTRACTORS);
+    updateBucketCounts(CONTRACTORS);
+    return;
+  }
+  try {
+    showLoadingBanner('Loading contractor data from Box…');
+    const data = await apiFetch('/api/contractors');
+    const all = [...data.contractors, ...data.dq_exceptions];
+    updateFreshnessBar(data.meta);
+    renderTable(all);
+    updateBucketCounts(all);
+    hideBanner();
+  } catch(e) {
+    showErrorBanner('Could not load live data: ' + e.message + ' — showing prototype data.');
+    renderTable(CONTRACTORS);
+    updateBucketCounts(CONTRACTORS);
+  }
+}
+
+async function refreshFromBox() {
+  if (!API_BASE) {
+    alert('[PROTOTYPE] No backend connected.\nSet API_BASE in app.html after deploying the backend.\n\nSee backend/DEPLOYMENT.md for instructions.');
+    return;
+  }
+  try {
+    showLoadingBanner('Refreshing from Box…');
+    await apiFetch('/api/refresh', {method:'POST'});
+    await loadData();
+  } catch(e) {
+    showErrorBanner('Refresh failed: ' + e.message);
+  }
+}
+
+async function refreshTaxonomy() {
+  if (!API_BASE) {
+    alert('[PROTOTYPE] No backend connected. Taxonomy refresh requires the live backend.');
+    return;
+  }
+  try {
+    showLoadingBanner('Reloading JRS taxonomy from Box…');
+    await apiFetch('/api/refresh-taxonomy', {method:'POST'});
+    showLoadingBanner('Taxonomy loaded. Re-ingesting contractors…');
+    await apiFetch('/api/refresh', {method:'POST'});
+    await loadData();
+  } catch(e) {
+    showErrorBanner('Taxonomy refresh failed: ' + e.message);
+  }
+}
+
+async function postAudit(action, contractor, detail, outcome='success') {
+  if (!API_BASE) return;  // silent no-op in prototype mode
+  try {
+    await apiFetch('/api/audit', {
+      method: 'POST',
+      body: JSON.stringify({user:'current_user', action, contractor, detail, outcome})
+    });
+  } catch(_) {}  // audit failures are non-blocking
+}
+
+function showLoadingBanner(msg) {
+  const b = document.querySelector('.banner');
+  b.style.background = '#1d4ed8';
+  b.innerHTML = `⏳ ${msg}`;
+}
+function showErrorBanner(msg) {
+  const b = document.querySelector('.banner');
+  b.style.background = '#b91c1c';
+  b.innerHTML = `⚠ ${msg}`;
+}
+function hideBanner() {
+  const b = document.querySelector('.banner');
+  b.style.background = '#1d4ed8';
+  b.innerHTML = `⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.`;
+}
+
+function updateFreshnessBar(meta) {
+  const dot = document.querySelector('.freshness-bar .dot');
+  dot.className = 'dot ' + (meta.is_stale ? 'dot-warn' : 'dot-ok');
+  document.querySelector('.freshness-bar b').textContent = meta.filename;
+  const spans = document.querySelectorAll('.freshness-bar span');
+  if (spans[0]) spans[0].textContent = 'Tab: Compiled';
+  if (spans[1]) spans[1].textContent = 'Report date: ' + meta.report_date;
+  if (spans[2]) spans[2].textContent = 'Ingested: ' + meta.ingested_at.replace('T',' ').replace('Z',' UTC');
+  if (spans[3]) {
+    spans[3].textContent = meta.is_stale
+      ? `⚠ Dataset is ${meta.staleness_days} days old — review before submitting`
+      : `✓ Dataset is current`;
+    spans[3].style.color = meta.is_stale ? '#d97706' : '#16a34a';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SYNTHETIC DATA — No real contractor information
+// Used when API_BASE is empty (prototype mode)
+// ═══════════════════════════════════════════════
+const TODAY = new Date('2025-07-14');
+function daysFrom(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr);
+  if(isNaN(d)) return null;
+  return Math.floor((d-TODAY)/(1000*60*60*24));
+}
+function bucket(days){
+  if(days===null) return 'unknown';
+  if(days<0) return 'past-due';
+  if(days<=7) return '0-7';
+  if(days<=14) return '8-14';
+  if(days<=30) return '15-30';
+  if(days<=60) return '31-60';
+  return '60+';
+}
+function bucketBadge(b){
+  const map={'past-due':['badge-red','Past Due'],'0-7':['badge-orange','Next 7 Days'],'8-14':['badge-yellow','8–14 Days'],'15-30':['badge-blue','15–30 Days'],'31-60':['badge-green','31–60 Days'],'60+':['badge-purple','60+ Days'],'unknown':['badge-gray','Unknown'],'renewal-ip':['badge-blue','Renewal In Progress'],'offboard-ip':['badge-orange','Offboard In Progress']};
+  const m=map[b]||['badge-gray',b];
+  return `<span class="badge ${m[0]}">${m[1]}</span>`;
+}
+function jrsBadge(s){const map={active:['badge-green','✓ Active'],warn:['badge-yellow','⚠ Warning'],invalid:['badge-red','✗ Invalid']};const m=map[s]||['badge-gray','–'];return `<span class="badge ${m[0]}">${m[1]}</span>`;}
+function renewalBadge(s){if(!s||s==='–') return '<span class="badge badge-gray">–</span>';if(s==='In Progress') return '<span class="badge badge-blue">In Progress</span>';if(s==='Submitted') return '<span class="badge badge-green">Submitted</span>';return `<span class="badge badge-gray">${s}</span>`;}
+function offboardBadge(s){if(!s||s==='–') return '<span class="badge badge-gray">–</span>';if(s==='In Progress') return '<span class="badge badge-orange">In Progress</span>';return `<span class="badge badge-gray">${s}</span>`;}
+
+// Field mapping aligned to confirmed report headers:
+// Geography, Market/GMT, Country, HR LOB, TalentID/Serial, Contractor Full Name,
+// Client Name-PO, Project Name-PO, Vendor, PO Number, TRAM Request ID,
+// TRAM Requester (Submitter), Contractor Assignee, Project Contact (TRAM),
+// PM Notes ID, PM Intranet ID, Sector, TalentID/CNUM, Actual Band,
+// Skill Description, Work Location, Contractor Notes ID, Contractor Intranet Address,
+// CSA ID, JR/S (TRAM)
+const CONTRACTORS = [
+  {
+    serial:'CVWMBY',cnum:'CVWMBYCA3',name:'S. Deshmukh',email:'sdeshmukh.syn@example.ibm.com',
+    geography:'Americas',market:'Canada',country:'Canada',hrLob:'Consulting',sector:'Public',
+    client:'Dept of National Defence',project:'MISL',
+    vendor:'Manpower Services Canada Ltd',poNumber:'4701032135',
+    tramId:'NA202503048216S',tramRequester:'cbrum.syn@example.ibm.com',
+    contractorAssignee:'T. Chikumbi',
+    contact:'Noah Innes',contactEmail:'noah.innes.syn@example.ibm.com',
+    pmNotesId:'chabs.syn',pmIntranetId:'chabs.syn@example.ibm.com',
+    band:'8',
+    skillDescription:'SAP Supply Chain Management – HANA Extended Warehouse Management (EWM). Integrates packaged technology into client HANA business environment.',
+    workLocation:'Ottawa',csaId:'S2TQN6',
+    jrsTram:'Package Consultant-SAP HANA SCM EWM',jrsStatus:'active',
+    endDate:'2025-07-10',renewal:'–',offboard:'–',dq:false,scenario:'jrs_one_replace'
+  },
+  {
+    serial:'BXMKPQ',cnum:'BXMKPQCA1',name:'A. Tremblay',email:'atremblay.syn@example.ibm.com',
+    geography:'Americas',market:'Canada',country:'Canada',hrLob:'Consulting',sector:'Financial Services',
+    client:'Royal Capital Bank',project:'Core Modernization',
+    vendor:'CGI Federal Inc',poNumber:'4701033201',
+    tramId:'NA202503051002S',tramRequester:'lsmith.syn@example.ibm.com',
+    contractorAssignee:'M. Bouchard',
+    contact:'Linda Smith',contactEmail:'linda.smith.syn@example.ibm.com',
+    pmNotesId:'jmorris.syn',pmIntranetId:'jmorris.syn@example.ibm.com',
+    band:'7',
+    skillDescription:'Application development and integration on IBM Cloud Pak for Business Automation. Delivers workflow automation solutions for financial-services clients.',
+    workLocation:'Montreal',csaId:'S3RPL2',
+    jrsTram:'Application Developer',jrsStatus:'active',
+    endDate:'2025-07-18',renewal:'–',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'DQNWRT',cnum:'DQNWRTUS2',name:'R. Okafor',email:'rokafor.syn@example.ibm.com',
+    geography:'Americas',market:'US-East',country:'United States',hrLob:'Consulting',sector:'Healthcare',
+    client:'HealthFirst Network',project:'Patient Data Platform',
+    vendor:'Apex Systems LLC',poNumber:'4700988123',
+    tramId:'NA202504012345S',tramRequester:'pchang.syn@example.ibm.com',
+    contractorAssignee:'F. Deschamps',
+    contact:'P. Chang',contactEmail:'p.chang.syn@example.ibm.com',
+    pmNotesId:'klee.syn',pmIntranetId:'klee.syn@example.ibm.com',
+    band:'8',
+    skillDescription:'Cloud Solution Architecture on AWS and IBM Cloud. Designs hybrid-cloud integration patterns for healthcare data interoperability.',
+    workLocation:'Boston',csaId:'S4TKM9',
+    jrsTram:'Cloud Solution Architect',jrsStatus:'active',
+    endDate:'2025-07-19',renewal:'–',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'HPKSTR',cnum:'HPKSTRUS5',name:'J. Nakamura',email:'jnakamura.syn@example.ibm.com',
+    geography:'Americas',market:'US-West',country:'United States',hrLob:'Consulting',sector:'Financial Services',
+    client:'Acme Financial',project:'Risk Analytics',
+    vendor:'Infosys BPM Ltd',poNumber:'4701099456',
+    tramId:'NA202503029871S',tramRequester:'sadams.syn@example.ibm.com',
+    contractorAssignee:'S. Adams',
+    contact:'S. Adams',contactEmail:'s.adams.syn@example.ibm.com',
+    pmNotesId:'rwilson.syn',pmIntranetId:'rwilson.syn@example.ibm.com',
+    band:'8',
+    skillDescription:'Cybersecurity architecture and zero-trust network design. Leads risk-analytics security program for tier-1 financial institution.',
+    workLocation:'New York',csaId:'S5VNQ1',
+    jrsTram:'Security Architect',jrsStatus:'active',
+    endDate:'2025-07-12',renewal:'–',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'MQZRVB',cnum:'MQZRVBCA4',name:'A. Osei',email:'aosei.syn@example.ibm.com',
+    geography:'Americas',market:'Canada',country:'Canada',hrLob:'Consulting',sector:'Retail',
+    client:'RetailCo',project:'Loyalty Platform',
+    vendor:'Randstad Technologies',poNumber:'4700876234',
+    tramId:'NA202502078812S',tramRequester:'jrivera.syn@example.ibm.com',
+    contractorAssignee:'J. Rivera',
+    contact:'J. Rivera',contactEmail:'j.rivera.syn@example.ibm.com',
+    pmNotesId:'bturner.syn',pmIntranetId:'bturner.syn@example.ibm.com',
+    band:'7',
+    skillDescription:'AI strategy design and digital transformation roadmapping. Leads loyalty-platform modernization initiative.',
+    workLocation:'Toronto',csaId:'S6WOP3',
+    jrsTram:'AI Strategy & Transformation',jrsStatus:'invalid',
+    endDate:'2025-07-20',renewal:'–',offboard:'–',dq:true,scenario:'jrs_not_found'
+  },
+  {
+    serial:'NRYTLW',cnum:'NRYTLWDE1',name:'S. Petrov',email:'spetrov.syn@example.ibm.com',
+    geography:'EMEA',market:'Germany',country:'Germany',hrLob:'Consulting',sector:'Energy',
+    client:'EnergyWorld',project:'SCADA Modernization',
+    vendor:'Hays AG',poNumber:'4701156789',
+    tramId:'EU202503041123S',tramRequester:'tyamamoto.syn@example.ibm.com',
+    contractorAssignee:'T. Yamamoto',
+    contact:'T. Yamamoto',contactEmail:'t.yamamoto.syn@example.ibm.com',
+    pmNotesId:'gmuller.syn',pmIntranetId:'gmuller.syn@example.ibm.com',
+    band:'9',
+    skillDescription:'Enterprise IT architecture and OT/IT convergence for industrial SCADA systems. Leads critical-infrastructure modernization programme.',
+    workLocation:'Frankfurt',csaId:'S7XPR4',
+    jrsTram:'IT Architect',jrsStatus:'warn',
+    endDate:'2025-07-22',renewal:'–',offboard:'–',dq:false,scenario:'jrs_multi_replace'
+  },
+  {
+    serial:'PKLWMN',cnum:'PKLWMNUS3',name:'C. Nguyen',email:'cnguyen.syn@example.ibm.com',
+    geography:'Americas',market:'US-Central',country:'United States',hrLob:'Consulting',sector:'Industrial',
+    client:'Global Logistics Inc',project:'Warehouse Automation',
+    vendor:'Apex Systems LLC',poNumber:'4700765432',
+    tramId:'NA202503055678S',tramRequester:'rpatel.syn@example.ibm.com',
+    contractorAssignee:'R. Patel',
+    contact:'R. Patel',contactEmail:'r.patel.syn@example.ibm.com',
+    pmNotesId:'hwong.syn',pmIntranetId:'hwong.syn@example.ibm.com',
+    band:'6',
+    skillDescription:'DevOps and CI/CD pipeline engineering on Red Hat OpenShift. Automates warehouse management system deployments.',
+    workLocation:'Dallas',csaId:'S8YQS5',
+    jrsTram:'DevOps Specialist',jrsStatus:'active',
+    endDate:'2025-07-25',renewal:'In Progress',offboard:'–',dq:true,scenario:'jrs_active'
+  },
+  {
+    serial:'QTMNBR',cnum:'QTMNBRUS7',name:'L. Ferreira',email:'lferreira.syn@example.ibm.com',
+    geography:'Americas',market:'US-East',country:'United States',hrLob:'Consulting',sector:'Technology',
+    client:'TechGiant Corp',project:'Platform Engineering',
+    vendor:'Kforce Inc',poNumber:'4701234567',
+    tramId:'NA202504022234S',tramRequester:'asingh.syn@example.ibm.com',
+    contractorAssignee:'A. Singh',
+    contact:'A. Singh',contactEmail:'a.singh.syn@example.ibm.com',
+    pmNotesId:'dpark.syn',pmIntranetId:'dpark.syn@example.ibm.com',
+    band:'8',
+    skillDescription:'Cloud platform engineering and Kubernetes orchestration. Leads platform reliability and infrastructure-as-code practice.',
+    workLocation:'Austin',csaId:'S9ZRT6',
+    jrsTram:'Cloud Solution Architect',jrsStatus:'active',
+    endDate:'2025-08-10',renewal:'In Progress',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'RVWKNP',cnum:'RVWKNPUS9',name:'D. Mensah',email:'dmensah.syn@example.ibm.com',
+    geography:'Americas',market:'US-East',country:'United States',hrLob:'Consulting',sector:'Banking',
+    client:'CityBank',project:'Digital Transformation',
+    vendor:'TEKsystems Inc',poNumber:'4700654321',
+    tramId:'NA202503068901S',tramRequester:'lchen.syn@example.ibm.com',
+    contractorAssignee:'L. Chen',
+    contact:'L. Chen',contactEmail:'l.chen.syn@example.ibm.com',
+    pmNotesId:'mjohnson.syn',pmIntranetId:'mjohnson.syn@example.ibm.com',
+    band:'6',
+    skillDescription:'Business analysis and requirements engineering for digital banking transformation. Delivers stakeholder workshops and process blueprints.',
+    workLocation:'Atlanta',csaId:'T1ASU7',
+    jrsTram:'Business Analyst',jrsStatus:'active',
+    endDate:'2025-08-20',renewal:'–',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'SXLPQT',cnum:'',name:'P. Okafor',email:'pokafor.syn@example.ibm.com',
+    geography:'Americas',market:'US-West',country:'United States',hrLob:'Consulting',sector:'Retail',
+    client:'RetailCo',project:'CRM Migration',
+    vendor:'Robert Half Technology',poNumber:'4700543210',
+    tramId:'',tramRequester:'jrivera.syn@example.ibm.com',
+    contractorAssignee:'J. Rivera',
+    contact:'J. Rivera',contactEmail:'j.rivera.syn@example.ibm.com',
+    pmNotesId:'kwilliams.syn',pmIntranetId:'kwilliams.syn@example.ibm.com',
+    band:'6',
+    skillDescription:'CRM platform migration and Salesforce implementation. Manages data migration from legacy on-premise CRM.',
+    workLocation:'Los Angeles',csaId:'T2BTV8',
+    jrsTram:'CRM Specialist',jrsStatus:'active',
+    endDate:'2025-09-01',renewal:'–',offboard:'–',dq:true,scenario:'missing_tram'
+  },
+  {
+    serial:'TWMQVN',cnum:'TWMQVNUS4',name:'Y. Hassan',email:'yhassan.syn@example.ibm.com',
+    geography:'Americas',market:'US-Central',country:'United States',hrLob:'Consulting',sector:'Insurance',
+    client:'InsureCo',project:'Claims Automation',
+    vendor:'Infosys BPM Ltd',poNumber:'4701345678',
+    tramId:'NA202503079012S',tramRequester:'sadams.syn@example.ibm.com',
+    contractorAssignee:'S. Adams',
+    contact:'S. Adams',contactEmail:'s.adams.syn@example.ibm.com',
+    pmNotesId:'troberts.syn',pmIntranetId:'troberts.syn@example.ibm.com',
+    band:'7',
+    skillDescription:'Business process consulting and RPA implementation for insurance claims workflows. Leads automation CoE practice.',
+    workLocation:'Chicago',csaId:'T3CUW9',
+    jrsTram:'Process Consultant',jrsStatus:'active',
+    endDate:'2025-09-15',renewal:'–',offboard:'In Progress',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'UVNRPK',cnum:'UVNRPKCA2',name:'T. Laurent',email:'tlaurent.syn@example.ibm.com',
+    geography:'Americas',market:'Canada',country:'Canada',hrLob:'Consulting',sector:'Financial Services',
+    client:'Acme Financial',project:'NextGen Core Banking',
+    vendor:'Manpower Services Canada Ltd',poNumber:'4701456789',
+    tramId:'NA202504031234S',tramRequester:'lchen.syn@example.ibm.com',
+    contractorAssignee:'L. Chen',
+    contact:'L. Chen',contactEmail:'l.chen.syn@example.ibm.com',
+    pmNotesId:'fblanc.syn',pmIntranetId:'fblanc.syn@example.ibm.com',
+    band:'6',
+    skillDescription:'Software quality assurance and test automation for core-banking modernization. Builds regression and performance test suites.',
+    workLocation:'Toronto',csaId:'T4DVX1',
+    jrsTram:'Quality Assurance Lead',jrsStatus:'active',
+    endDate:'2025-10-01',renewal:'–',offboard:'–',dq:false,scenario:'jrs_active'
+  },
+  {
+    serial:'WXMPQV',cnum:'WXMPQVCA6',name:'C. Nguyen-Tran',email:'cnguyentran.syn@example.ibm.com',
+    geography:'Americas',market:'Canada',country:'Canada',hrLob:'Consulting',sector:'Healthcare',
+    client:'HealthFirst Network',project:'Analytics Refresh',
+    vendor:'CGI Federal Inc',poNumber:'4700876543',
+    tramId:'NA202503044567S',tramRequester:'asingh.syn@example.ibm.com',
+    contractorAssignee:'A. Singh',
+    contact:'A. Singh',contactEmail:'a.singh.syn@example.ibm.com',
+    pmNotesId:'mbaker.syn',pmIntranetId:'mbaker.syn@example.ibm.com',
+    band:'7',
+    skillDescription:'Data science and machine learning model development for healthcare analytics. Builds predictive models for patient outcomes.',
+    workLocation:'Vancouver',csaId:'T5EWY2',
+    jrsTram:'Data Scientist',jrsStatus:'active',
+    endDate:'2025-09-05',renewal:'–',offboard:'–',dq:true,scenario:'jrs_active'
+  },
+];
+CONTRACTORS.forEach(c=>{
+  c.id = c.serial; // use TalentID/Serial as the unique key throughout
+  const d=daysFrom(c.endDate);
+  c.days=d;
+  c.bucket=bucket(d);
+  if(c.renewal==='In Progress') c.bucket='renewal-ip';
+  if(c.offboard==='In Progress') c.bucket='offboard-ip';
+});
+
+let activeBucketFilter='';
+let sortCol=-1,sortDir=1;
+
+function renderTable(data){
+  const tbody=document.getElementById('tableBody');
+  if(!tbody) return;
+  tbody.innerHTML=data.map(c=>{
+    // days remaining cell — coloured by urgency
+    let daysCell;
+    if(c.days===null) daysCell='<span style="color:#9ca3af">?</span>';
+    else if(c.days<0) daysCell=`<span style="color:#dc2626;font-weight:700;background:#fee2e2;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+    else if(c.days<=7) daysCell=`<span style="color:#c2410c;font-weight:700;background:#ffedd5;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+    else if(c.days<=14) daysCell=`<span style="color:#92400e;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+    else daysCell=`<span style="color:#374151">${c.days}d</span>`;
+    const dqCell=c.dq?'<span class="badge badge-warn">⚠</span>':'';
+    // expiration date — bold red if past due
+    const expDate=c.endDate
+      ? (c.days!==null&&c.days<0
+          ? `<b style="color:#dc2626">${c.endDate}</b>`
+          : `<b>${c.endDate}</b>`)
+      : '<span style="color:#9ca3af">–</span>';
+    return `<tr style="cursor:pointer" onclick="openDetail('${c.serial}')">
+      <td>${expDate}</td>
+      <td>${daysCell}</td>
+      <td><b>${c.name}</b></td>
+      <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
+      <td>${c.client}</td>
+      <td>${c.project}</td>
+      <td>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></td>
+      <td style="font-size:12px">${c.vendor}</td>
+      <td style="text-align:center">${c.band}</td>
+      <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram}</span></td>
+      <td style="font-size:12px">${c.workLocation}</td>
+      <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
+      <td>${renewalBadge(c.renewal)}</td>
+      <td>${offboardBadge(c.offboard)}</td>
+      <td>${dqCell}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="btn btn-primary btn-sm" onclick="openRenewalModal('${c.serial}')" ${c.renewal==='In Progress'?'disabled title="Renewal already in progress"':''}>Renewal</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="openOffboardModal('${c.serial}')" ${c.offboard==='In Progress'?'disabled title="Offboarding already in progress"':''}>Offboard</button>
+      </td></tr>`;
+  }).join('');
+}
+function getFilteredData(){
+  let data=[...CONTRACTORS];
+  const contact=(document.getElementById('f-contact')||{}).value||'';
+  const contractor=(document.getElementById('f-contractor')||{}).value||'';
+  const client=(document.getElementById('f-client')||{}).value||'';
+  const project=(document.getElementById('f-project')||{}).value||'';
+  const bkt=(document.getElementById('f-bucket')||{}).value||'';
+  const jrsSt=(document.getElementById('f-jrs')||{}).value||'';
+  const active=activeBucketFilter||bkt;
+  if(contact) data=data.filter(c=>c.contact.toLowerCase().includes(contact.toLowerCase())||c.contactEmail.toLowerCase().includes(contact.toLowerCase()));
+  if(contractor) data=data.filter(c=>c.name.toLowerCase().includes(contractor.toLowerCase())||c.email.toLowerCase().includes(contractor.toLowerCase())||c.serial.toLowerCase().includes(contractor.toLowerCase()));
+  if(client) data=data.filter(c=>c.client.toLowerCase().includes(client.toLowerCase()));
+  if(project) data=data.filter(c=>c.project.toLowerCase().includes(project.toLowerCase()));
+  if(active) data=data.filter(c=>c.bucket===active||(active==='dq'&&c.dq));
+  if(jrsSt) data=data.filter(c=>c.jrsStatus===jrsSt);
+  if(sortCol>=0){
+    // col order: endDate(0), days(1), name(2), serial(3), client(4), project(5),
+    //            contact(6), vendor(7), band(8), jrsTram(9), workLocation(10), tramId(11)
+    const keys=['endDate','days','name','serial','client','project','contact','vendor','band','jrsTram','workLocation','tramId'];
+    const k=keys[sortCol];
+    data.sort((a,b)=>{const av=a[k]??'';const bv=b[k]??'';return (av<bv?-1:av>bv?1:0)*sortDir;});
+  }
+  return data;
+}
+function applyFilters(){renderTable(getFilteredData());}
+function clearFilters(){
+  ['f-contact','f-contractor','f-client','f-project','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
+  activeBucketFilter='';
+  document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));
+  renderTable(CONTRACTORS);
+}
+function filterBucket(b,card){
+  if(activeBucketFilter===b){activeBucketFilter='';card.classList.remove('active-filter');}
+  else{activeBucketFilter=b;document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));card.classList.add('active-filter');}
+  applyFilters();
+}
+function sortTable(col){if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}applyFilters();}
+
+function showTab(name,btn){
+  ['dashboard','renewal','offboarding','dq','audit'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el) el.style.display=t===name?'block':'none';});
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(name==='renewal') renderRenewalTab();
+  if(name==='offboarding') renderOffboardingTab();
+}
+
+// ── DETAIL PANEL ──────────────────────────────
+function openDetail(serial){
+  const c=CONTRACTORS.find(x=>x.serial===serial);if(!c) return;
+  document.getElementById('detailTitle').textContent=c.name+' — Record Detail';
+  const daysLabel=c.days===null?'Unknown (date missing)':c.days<0?`<b style="color:#dc2626">${Math.abs(c.days)} days past due</b>`:`${c.days} days`;
+  document.getElementById('detailBody').innerHTML=`
+    ${c.dq?`<div class="dq-warn">⚠ This record has data-quality warnings. Review before actioning.</div>`:''}
+
+    <div class="section-title">Expiration</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Expected End Date</label><span style="font-size:15px;font-weight:700;color:${c.days!==null&&c.days<0?'#dc2626':c.days<=7?'#c2410c':'#1f2937'}">${c.endDate||'–'}</span></div>
+      <div class="info-item"><label>Days Remaining</label><span>${daysLabel}</span></div>
+    </div>
+
+    <div class="section-title">Contractor Identity</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Full Name</label><span>${c.name}</span></div>
+      <div class="info-item"><label>Email (Intranet Address)</label><span>${c.email}</span></div>
+      <div class="info-item"><label>TalentID / Serial</label><span><code>${c.serial}</code></span></div>
+      <div class="info-item"><label>TalentID / CNUM</label><span><code>${c.cnum||'–'}</code></span></div>
+      <div class="info-item"><label>Actual Band</label><span>${c.band}</span></div>
+      <div class="info-item"><label>HR LOB</label><span>${c.hrLob}</span></div>
+    </div>
+
+    <div class="section-title">Assignment &amp; Account</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Client Name (PO)</label><span>${c.client}</span></div>
+      <div class="info-item"><label>Project Name (PO)</label><span>${c.project}</span></div>
+      <div class="info-item"><label>Geography</label><span>${c.geography}</span></div>
+      <div class="info-item"><label>Market / GMT</label><span>${c.market}</span></div>
+      <div class="info-item"><label>Country</label><span>${c.country}</span></div>
+      <div class="info-item"><label>Sector</label><span>${c.sector}</span></div>
+      <div class="info-item"><label>Work Location</label><span>${c.workLocation}</span></div>
+      <div class="info-item"><label>Vendor</label><span>${c.vendor}</span></div>
+      <div class="info-item"><label>PO Number</label><span>${c.poNumber}</span></div>
+      <div class="info-item"><label>CSA ID</label><span>${c.csaId}</span></div>
+    </div>
+
+    <div class="section-title">People</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Project Contact (TRAM)</label><span>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></span></div>
+      <div class="info-item"><label>Contractor Assignee</label><span>${c.contractorAssignee}</span></div>
+      <div class="info-item"><label>PM Notes ID</label><span>${c.pmNotesId}</span></div>
+      <div class="info-item"><label>PM Intranet ID</label><span>${c.pmIntranetId}</span></div>
+    </div>
+
+    <div class="section-title">Role &amp; JRS</div>
+    <div class="info-grid">
+      <div class="info-item"><label>JR/S (TRAM)</label><span>${c.jrsTram}</span></div>
+      <div class="info-item"><label>JRS Taxonomy Status</label><span>${jrsBadge(c.jrsStatus)}</span></div>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 12px;margin-top:6px;font-size:13px;color:#374151">
+      <b>Skill Description:</b><br>${c.skillDescription}
+    </div>
+
+    <div class="section-title">TRAM &amp; Purchasing</div>
+    <div class="info-grid">
+      <div class="info-item"><label>TRAM Request ID</label><span>${c.tramId||'<span class="badge badge-red">Missing</span>'}</span></div>
+      <div class="info-item"><label>TRAM Requester (Submitter)</label><span>${c.tramRequester}</span></div>
+      <div class="info-item"><label>Renewal Status</label><span>${renewalBadge(c.renewal)}</span></div>
+      <div class="info-item"><label>Offboard Status</label><span>${offboardBadge(c.offboard)}</span></div>
+    </div>
+
+    <div class="section-title">Source Lineage</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Source File</label><span>CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</span></div>
+      <div class="info-item"><label>Report Date</label><span>2025-06-20</span></div>
+      <div class="info-item"><label>Ingested</label><span>2025-07-14 08:42 UTC</span></div>
+    </div>
+    <hr class="divider">
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='In Progress'?'disabled':''}>Initiate Renewal</button>
+      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='In Progress'?'disabled':''}>Initiate Offboarding</button>
+    </div>`;
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail(e){if(e.target===document.getElementById('detailOverlay')) closeDetailPanel();}
+function closeDetailPanel(){document.getElementById('detailOverlay').classList.remove('open');}
+
+// ── RENEWAL MODAL ─────────────────────────────
+let renewalStep=0;
+let renewalData={};
+function openRenewalModal(id){
+  const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
+  if(c.renewal==='In Progress'){
+    alert('⚠ DUPLICATE DETECTED\n\nAn active renewal request already exists for this contractor. A new request cannot be submitted.\n\nThis event has been recorded in the audit log.');
+    return;
+  }
+  if(!c.tramId){
+    alert('⚠ Missing TRAM Request ID\n\nThis contractor has no TRAM Request ID. The renewal workflow cannot proceed. This data-quality issue is flagged in the DQ panel.');
+    return;
+  }
+  renewalData={c,step:1,attest:[false,false,false],jrsAccepted:false,tramResolved:false};
+  renewalStep=1;
+  document.getElementById('renewalModal').classList.add('open');
+  renderRenewalStep();
+}
+function closeRenewalModal(){document.getElementById('renewalModal').classList.remove('open');}
+
+function renderRenewalStep(){
+  const {c}=renewalData;
+  document.getElementById('renewalModalTitle').textContent=`Renewal — ${c.name} (${c.id})`;
+  // Steps: 1=Review, 2=PM Checklist, 3=Attest, 4=JRS Validate, 5=TRAM Recon, 6=Excel & Email, 7=Complete
+  const steps=['Review','PM Checklist','Attest','JRS Validate','TRAM Recon','Excel & Email','Complete'];
+  const stepsHtml=`<div class="steps">${steps.map((s,i)=>{let cls='';if(i+1<renewalStep) cls='done';else if(i+1===renewalStep) cls='active';return `<div class="step ${cls}">${i+1<renewalStep?'✓ ':''}${s}</div>`;}).join('')}</div>`;
+  let body='',footer='';
+
+  // ── STEP 1: TRAM / SYSTEM DATA REVIEW ──────────────────────────────────
+  if(renewalStep===1){
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:16px">Review prepopulated fields from the source report. Propose changes where authorized. All changes are auditable.</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Contractor Full Name</label><input value="${c.name}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>TalentID / Serial</label><input value="${c.serial}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Client Name (PO)</label><input value="${c.client}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Project Name (PO)</label><input value="${c.project}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>JR/S (TRAM)</label><input value="${c.jrsTram}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Actual Band</label><input value="${c.band}"></div>
+        <div class="form-group"><label>Current End Date</label><input value="${c.endDate}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Proposed New End Date <span style="color:#dc2626">*</span></label><input id="newEndDate" type="date" value="2025-10-14"></div>
+        <div class="form-group"><label>Work Location</label><input id="workCity" value="${c.workLocation}"></div>
+        <div class="form-group"><label>Country</label><input value="${c.country}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Prior TRAM Request ID</label><input value="${c.tramId}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Project Contact (TRAM)</label><input value="${c.contact}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Vendor</label><input value="${c.vendor}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Contractor Assignee</label><input value="${c.contractorAssignee}" readonly style="background:#f9fafb"></div>
+      </div>`;
+    footer=`<button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="renewalNext()">Next: PM Checklist →</button>`;
+
+  // ── STEP 2: PM CHECKLIST ────────────────────────────────────────────────
+  } else if(renewalStep===2){
+    body=stepsHtml+`
+      <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Complete the PM review checklist. All fields are reviewed with the PM before submitting. Required fields are marked <span style="color:#dc2626">*</span>.</p>
+
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#1e40af">
+        <b>Subcontractor:</b> ${c.name} &nbsp;|&nbsp; <b>Serial:</b> ${c.serial} &nbsp;|&nbsp; <b>Client:</b> ${c.client} &nbsp;|&nbsp; <b>Project:</b> ${c.project}
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group"><label>Rate Cap ($/hr) <span style="color:#dc2626">*</span></label><input id="pmRateCap" type="number" min="0" step="0.01" placeholder="e.g. 125.00"></div>
+        <div class="form-group"><label>Bill Rate to Client ($/hr) <span style="color:#dc2626">*</span></label><input id="pmBillRate" type="number" min="0" step="0.01" placeholder="e.g. 150.00"></div>
+        <div class="form-group"><label>Project GP% <span style="color:#dc2626">*</span></label><input id="pmGP" type="number" min="0" max="100" step="0.1" placeholder="e.g. 28.5"></div>
+        <div class="form-group"><label>Contract Type (IBM ↔ Vendor) <span style="color:#dc2626">*</span></label>
+          <select id="pmContractType"><option value="">— Select —</option><option>T&amp;M (Time &amp; Materials)</option><option>FP (Fixed Price)</option><option>Rate Card</option><option>Max Price</option></select></div>
+        <div class="form-group"><label>Confirmed Start Date <span style="color:#dc2626">*</span></label><input id="pmStartDate" type="date" value="${c.endDate}"></div>
+        <div class="form-group"><label>Confirmed End Date <span style="color:#dc2626">*</span></label><input id="pmEndDate" type="date"></div>
+        <div class="form-group" style="grid-column:span 2"><label>Confirmed JR/S (Job Role &amp; Specialty) <span style="color:#dc2626">*</span></label><input id="pmJRS" value="${c.jrsTram}" placeholder="Confirm or correct JR/S"></div>
+        <div class="form-group"><label>Confirmed Band <span style="color:#dc2626">*</span></label><input id="pmBand" value="${c.band}" placeholder="Confirm or correct band"></div>
+        <div class="form-group"><label>Confirmed Home &amp; Work Location <span style="color:#dc2626">*</span></label><input id="pmLocation" value="${c.workLocation}" placeholder="Home city / Work city"></div>
+      </div>
+
+      <div class="form-group" style="margin-top:4px">
+        <label>Niche Skills (3–5 key skills) <span style="color:#dc2626">*</span></label>
+        <textarea id="pmSkills" rows="2" placeholder="List 3–5 niche skills that justify this subcontractor (e.g. SAP HANA EWM, OT/IT convergence, SCADA integration)">${c.skillDescription}</textarea>
+      </div>
+
+      <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-top:4px">
+        <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Business Justification <span style="color:#dc2626">*</span> — Include all four points below to avoid approval delays</p>
+
+        <div class="form-group">
+          <label style="display:flex;gap:6px;align-items:baseline">
+            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">1</span>
+            Confirmation that no Domestic or GD resources are available with the required skills <span style="color:#dc2626">*</span>
+          </label>
+          <textarea id="bj1" rows="2" placeholder="e.g. Internal bench review completed on [date]. No available IBMers identified with SAP HANA EWM expertise at Band 8 in the Ottawa market."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex;gap:6px;align-items:baseline">
+            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">2</span>
+            Explanation of GP% if below 25% — include contract type, pricing structure, or other constraint <span style="color:#6b7280;font-size:11px">(required if GP &lt; 25%)</span>
+          </label>
+          <textarea id="bj2" rows="2" placeholder="e.g. GP is 18% due to fixed-price contract with client rate card. Margin is capped by MSA terms signed in 2022. No ability to renegotiate mid-engagement."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex;gap:6px;align-items:baseline">
+            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">3</span>
+            Justification for continuing a 12-month contract rather than converting to regular employee <span style="color:#6b7280;font-size:11px">(required for multi-year contractors)</span>
+          </label>
+          <textarea id="bj3" rows="2" placeholder="e.g. This is a niche SAP HANA EWM specialist required only for the duration of the ERP implementation. Project ends Q4 2025. IBM headcount plan does not include a permanent role."></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label style="display:flex;gap:6px;align-items:baseline">
+            <span style="background:#f3f4f6;color:#6b7280;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">4</span>
+            Any other insight from a contract perspective <span style="color:#6b7280;font-size:11px">(optional)</span>
+          </label>
+          <textarea id="bj4" rows="2" placeholder="e.g. Client has specifically requested this contractor by name in the SOW. Replacement would require a 3-month ramp-up and is not feasible mid-delivery."></textarea>
+        </div>
+      </div>`;
+    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
+      <button class="btn btn-primary" onclick="pmChecklistNext()">Next: Attestations →</button>`;
+
+  // ── STEP 3: ATTESTATIONS ────────────────────────────────────────────────
+  } else if(renewalStep===3){
+    const attTexts=[
+      'I confirm that I completed the required internal talent and bench review using the approved process and did not identify an available internal resource who meets the documented requirements for this assignment.',
+      'I confirm that I reviewed the information in this renewal request and that it is complete and accurate to the best of my knowledge. Any required corrections have been entered in the appropriate fields.',
+      'I confirm that I am authorized to initiate this renewal request for the selected assignment.'
+    ];
+    const attLabels=['Attestation 1: Internal Talent Review','Attestation 2: Information Accuracy','Attestation 3: Authorization'];
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All three attestations are mandatory. They are not pre-selected. They are versioned and audited. <b>Version: ATTEST-v2.1</b></p>
+      ${attTexts.map((t,i)=>`<div class="attest-box" id="attBox${i}"><label><input type="checkbox" id="att${i}" onchange="toggleAtt(${i})"> <span><b>${attLabels[i]}</b><br>${t}</span></label></div>`).join('')}`;
+    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
+      <button class="btn btn-primary" id="attNextBtn" onclick="renewalNext()" disabled>Next: JRS Validation →</button>`;
+
+  // ── STEP 4 (was 3): JRS VALIDATION ─────────────────────────────────────
+  } else if(renewalStep===4){
+    const sc=c.scenario;
+    let jrsHtml='';
+    if(sc==='jrs_active'){
+      jrsHtml=`<div class="jrs-result jrs-active">✅ <b>JRS is ACTIVE</b><br>"${c.jrsTram}" found in "Consulting Short List" tab, Column A of IBM Consulting Taxonomy Shortlist M389.<br><span style="font-size:11px">Rule: active_match · Tab: Consulting Short List · Column A (JR/S) · Publication: M389 September</span></div>`;
+      if(!renewalData.jrsAccepted){renewalData.jrsAccepted=true;renewalData.finalJRS=c.jrsTram;setTimeout(renderRenewalStep,60);}
+    } else if(sc==='jrs_one_replace'){
+      jrsHtml=`<div class="jrs-result jrs-warn">⚠ <b>JRS not in active list — replacement found in Change Log</b><br>
+        Searched "Consulting Short List" Column A (JR/S): <b>not found</b>.<br>
+        Searched "Change Log" Column A (Previous Value): <b>found</b>.<br>
+        Column B (Current Value / Action: Rename) → Replacement: <b>"Data Analytics Consultant"</b><br>
+        <span style="font-size:11px">Rule: ONE_REPLACEMENT · Tab: Change Log · Col A → Col B · Publication: M389 September · NOT auto-applied.</span>
+        <div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-green btn-sm" onclick="acceptJRS('Data Analytics Consultant')">Accept Replacement</button><button class="btn btn-secondary btn-sm" onclick="rejectJRS()">Review Manually</button></div>
+      </div>`;
+    } else if(sc==='jrs_multi_replace'){
+      jrsHtml=`<div class="jrs-result jrs-blocked">🛑 <b>Multiple replacements found in Change Log — human selection required</b><br>
+        "Consulting Short List" Column A: <b>not found</b>.<br>
+        "Change Log" Column A found — Column B shows multiple possible replacements:<br>
+        1. "Enterprise Architecture Specialist"&nbsp;&nbsp;2. "Solution Architecture Lead"<br>
+        Automated selection is not permitted. Escalate to CSP team for sector: <b>${c.sector}</b>.<br>
+        <span style="font-size:11px">Rule: MULTI_REPLACEMENT · Tab: Change Log · Publication: M389 September</span>
+        <div style="margin-top:10px"><button class="btn btn-warn btn-sm" onclick="escalateJRS()">Escalate to CSP Team (${c.sector})</button></div>
+      </div>`;
+    } else if(sc==='jrs_not_found'){
+      jrsHtml=`<div class="jrs-result jrs-error">🛑 <b>JRS not found in active list or Change Log</b><br>
+        "Consulting Short List" Column A (JR/S): <b>not found</b>.<br>
+        "Change Log" Column A (Previous Value): <b>not found</b>.<br>
+        This JRS does not exist in IBM Consulting Taxonomy M389. Escalate to CSP team for sector: <b>${c.sector}</b>.<br>
+        <span style="font-size:11px">Rule: NOT_FOUND · Both tabs searched · Publication: M389 September · Audit record written.</span>
+        <div style="margin-top:10px"><button class="btn btn-danger btn-sm" onclick="escalateJRS()">Escalate to CSP Team (${c.sector})</button></div>
+      </div>`;
+    }
+    const canContinue=renewalData.jrsAccepted&&(sc==='jrs_active'||sc==='jrs_one_replace');
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">JRS validated against IBM Consulting Taxonomy Shortlist M389 September. Lookup: "Consulting Short List" Column A first; if not found, "Change Log" Column A → Column B.</p>
+      <div class="info-grid" style="margin-bottom:14px">
+        <div class="info-item"><label>JR/S (TRAM) from Report</label><span>${c.jrsTram}</span></div>
+        <div class="info-item"><label>Taxonomy File</label><span>M389 September · Consulting Short List / Change Log</span></div>
+      </div>${jrsHtml}
+      ${renewalData.jrsAccepted?`<div class="confirm-row">✅ <b>JRS validated.</b> Final JRS: "${renewalData.finalJRS}"</div>`:''}`;
+    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
+      <button class="btn btn-primary" onclick="renewalNext()" ${canContinue?'':'disabled'}>Next: TRAM Reconciliation →</button>`;
+
+  // ── STEP 5 (was 4): TRAM RECONCILIATION ────────────────────────────────
+  } else if(renewalStep===5){
+    const cm=!renewalData.tramResolved;
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Comparing reviewed values against TRAM record (${c.tramId}). Mismatches must be resolved. Silent overwrite is not permitted.</p>
+      <table class="recon-table"><thead><tr><th>Field</th><th>Source Report</th><th>TRAM Current</th><th>Status</th><th>Action</th></tr></thead><tbody>
+        <tr><td>Contractor Name</td><td>${c.name}</td><td>${c.name}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
+        <tr><td>Client</td><td>${c.client}</td><td>${c.client}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
+        <tr><td>JR/S (TRAM)</td><td>${renewalData.finalJRS||c.jrsTram}</td><td>${c.jrsTram}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
+        <tr><td>Band</td><td>${c.band}</td><td>${c.band}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
+        <tr class="${cm?'field-changed':''}"><td>Work Location City</td><td>Dallas</td><td>Austin</td>
+          <td><span class="${cm?'recon-mismatch':'recon-match'}">${cm?'✗ Mismatch':'✓ Resolved'}</span></td>
+          <td>${cm?`<button class="btn btn-warn btn-sm" onclick="resolveCity()">Review &amp; Accept</button>`:'<span style="color:#16a34a;font-size:12px">Approved</span>'}</td></tr>
+        <tr><td>Spend Type</td><td>Contingent</td><td>Contingent</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
+      </tbody></table>
+      ${cm?`<div class="dq-warn">⚠ Unresolved mismatch: <b>Work Location City</b>. Submission blocked until resolved.</div>`:''}
+      ${renewalData.tramResolved?`<div class="confirm-row">✅ All fields reconciled. TRAM ready for submission.</div>`:''}`;
+    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
+      <button class="btn btn-primary" onclick="renewalNext()" ${renewalData.tramResolved?'':'disabled'}>Next: Excel &amp; Email →</button>`;
+
+  // ── STEP 6 (was 5): EXCEL & EMAIL ──────────────────────────────────────
+  } else if(renewalStep===6){
+    const safeName=c.name.replace('. ','_');
+    const newTramId=renewalData.newTramId||'NA202510048216S';
+    const pmData=renewalData.pmChecklist||{};
+    const newEndDate=pmData.endDate||'2025-10-14';
+    const xlsxName=`${safeName}_Renewal_20250714_${c.serial}.xlsm`;
+    const sectorEmail=getSectorEmail(c.sector);
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All validations passed. The Excel file is ready and the email is composed for Contractor Support.</p>
+      <div class="section-title">Excel File — <code>Request Form Template ECM Consulting v4.3.xlsm</code></div>
+      <div class="confirm-row">✅ <b>Onboardings tab populated — row 2</b><br>
+        Filename: <b>${xlsxName}</b><br>
+        Saved to: PM's local machine · Source: Box folder <code>414382194963</code> (Request Form Template ECM Consulting v4.3.xlsm)</div>
+      <div class="section-title">Email Preview — Recipient determined by Sector: <b>${c.sector}</b></div>
+      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table. Please provide the sector-to-email mapping (OQ-21a).</div>`:''}
+      <div class="email-preview">To: ${sectorEmail}
+Subject: ${newTramId} ${c.serial} ${c.poNumber} ${c.name} ${c.client} RENEWAL
+
+Can you please help with this renewal?
+
+Attachment: ${xlsxName}
+
+[PROTOTYPE — no real email sent]</div>`;
+    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
+      <button class="btn btn-green" onclick="renewalSubmit()">✓ Confirm &amp; Send</button>`;
+
+  // ── STEP 7 (was 6): COMPLETE ────────────────────────────────────────────
+  } else if(renewalStep===7){
+    const safeName=c.name.replace('. ','_');
+    body=stepsHtml+`
+      <div class="confirm-row" style="margin-bottom:16px">✅ <b>Renewal submitted.</b><br>
+        TRAM New ID: TRAM-R-88821 · Method: assisted_manual<br>
+        Excel: TRAM_Renewal_${c.serial}_${safeName}_20250714.xlsx<br>
+        Email: Confirmed · Msg ID: SYN-MSG-9942 · 2025-07-14 09:31 UTC</div>
+      <div class="section-title">Audit Timeline</div>
+      <ul class="timeline">
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:21:00</div><div class="tl-action">RENEWAL_STARTED</div><div class="tl-detail">Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</div></div></li>
+        <li><div class="tl-dot"></div><div class="tl-content"><div class="tl-time">09:21:30</div><div class="tl-action">RENEWAL_FIELD_CHANGED</div><div class="tl-detail">Work Location City: Austin → Dallas</div></div></li>
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:21:50</div><div class="tl-action">PM_CHECKLIST_COMPLETED</div><div class="tl-detail">Rate cap · Bill rate · GP% · Contract type · JRS · Band · Location · Skills · Business justification captured</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:22:10</div><div class="tl-action">ATTESTATION_COMPLETED</div><div class="tl-detail">All 3 · ATTEST-v2.1 · Hash: b7c2...1a44</div></div></li>
+        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">09:23:40</div><div class="tl-action">JRS_VALIDATION_RUN</div><div class="tl-detail">Outcome: ${c.scenario==='jrs_active'?'ACTIVE':'ONE_REPLACEMENT'} · TAX-2025-Q2</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:24:00</div><div class="tl-action">JRS accepted</div><div class="tl-detail">Final JR/S: "${renewalData.finalJRS||c.jrsTram}"</div></div></li>
+        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">09:25:30</div><div class="tl-action">TRAM_MISMATCH_DETECTED</div><div class="tl-detail">work_location_city: Dallas vs Austin</div></div></li>
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:26:55</div><div class="tl-action">TRAM_CORRECTION_APPROVED</div><div class="tl-detail">Austin → Dallas · Reason: Updated per project move</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:28:11</div><div class="tl-action">TRAM_SUBMISSION_COMPLETED</div><div class="tl-detail">TRAM-R-88821 · assisted_manual</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:30:44</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">SHA-256: a3f1...9d02</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:31:02</div><div class="tl-action">EMAIL_SENT</div><div class="tl-detail">Msg: SYN-MSG-9942</div></div></li>
+      </ul>`;
+    footer=`<button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
+  }
+  document.getElementById('renewalModalBody').innerHTML=body;
+  document.getElementById('renewalModalFooter').innerHTML=footer;
+}
+function renewalNext(){renewalStep++;renderRenewalStep();}
+function renewalBack(){renewalStep--;renderRenewalStep();}
+function renewalSubmit(){renewalStep=7;renderRenewalStep();}
+
+// PM Checklist validation — required fields before advancing to attestations
+function pmChecklistNext(){
+  const required=[
+    {id:'pmRateCap',   label:'Rate Cap'},
+    {id:'pmBillRate',  label:'Bill Rate to Client'},
+    {id:'pmGP',        label:'Project GP%'},
+    {id:'pmContractType', label:'Contract Type'},
+    {id:'pmStartDate', label:'Start Date'},
+    {id:'pmEndDate',   label:'End Date'},
+    {id:'pmJRS',       label:'Confirmed JR/S'},
+    {id:'pmBand',      label:'Confirmed Band'},
+    {id:'pmLocation',  label:'Work Location'},
+    {id:'pmSkills',    label:'Niche Skills'},
+    {id:'bj1',         label:'Business Justification 1 (Domestic/GD resource review)'},
+  ];
+  const missing=required.filter(f=>{const el=document.getElementById(f.id);return !el||!el.value.trim();});
+  if(missing.length){
+    alert('Please complete the following required fields before proceeding:\n\n• '+missing.map(f=>f.label).join('\n• '));
+    return;
+  }
+  // Capture PM checklist values into renewalData for use in later steps
+  renewalData.pmChecklist={
+    rateCap:    document.getElementById('pmRateCap').value,
+    billRate:   document.getElementById('pmBillRate').value,
+    gp:         document.getElementById('pmGP').value,
+    contractType: document.getElementById('pmContractType').value,
+    startDate:  document.getElementById('pmStartDate').value,
+    endDate:    document.getElementById('pmEndDate').value,
+    jrs:        document.getElementById('pmJRS').value,
+    band:       document.getElementById('pmBand').value,
+    location:   document.getElementById('pmLocation').value,
+    skills:     document.getElementById('pmSkills').value,
+    bj1:        document.getElementById('bj1').value,
+    bj2:        document.getElementById('bj2').value,
+    bj3:        document.getElementById('bj3').value,
+    bj4:        document.getElementById('bj4').value,
+  };
+  renewalStep++;
+  renderRenewalStep();
+}
+function toggleAtt(i){
+  renewalData.attest[i]=document.getElementById('att'+i).checked;
+  document.getElementById('attBox'+i).classList.toggle('checked',renewalData.attest[i]);
+  const btn=document.getElementById('attNextBtn');
+  if(btn) btn.disabled=!renewalData.attest.every(Boolean);
+}
+function acceptJRS(name){renewalData.jrsAccepted=true;renewalData.finalJRS=name;renderRenewalStep();}
+function rejectJRS(){alert('Enter the correct JRS in the field above and contact the process owner for guidance.');}
+// ── SECTOR → CSP EMAIL ROUTING ─────────────────────────────────────────
+// Confirmed routing rules:
+//   indcontr@cr.ibm.com   → Industrial sectors
+//   commsctr@cr.ibm.com   → Communications / Technology sectors
+//   pubcontr@cr.ibm.com   → Public sector
+//   fsscontr@cr.ibm.com   → Financial Services / Banking / Insurance sectors
+//   gbstccon@cr.ibm.com   → Everything else (default fallback)
+// Rule: always include the sector name in the email subject (already in the subject format)
+const SECTOR_EMAIL_MAP = {
+  // Public
+  'Public':                   'pubcontr@cr.ibm.com',
+  'Government':               'pubcontr@cr.ibm.com',
+  'Education':                'pubcontr@cr.ibm.com',
+  'Healthcare':               'pubcontr@cr.ibm.com',  // Public-adjacent — defaulting pubcontr; confirm if separate
+  // Financial Services / Banking / Insurance
+  'Financial Services':       'fsscontr@cr.ibm.com',
+  'Banking':                  'fsscontr@cr.ibm.com',
+  'Insurance':                'fsscontr@cr.ibm.com',
+  'Capital Markets':          'fsscontr@cr.ibm.com',
+  // Industrial
+  'Industrial':               'indcontr@cr.ibm.com',
+  'Manufacturing':            'indcontr@cr.ibm.com',
+  'Automotive':               'indcontr@cr.ibm.com',
+  'Energy':                   'indcontr@cr.ibm.com',
+  'Chemicals & Petroleum':    'indcontr@cr.ibm.com',
+  // Communications / Technology
+  'Technology':               'commsctr@cr.ibm.com',
+  'Communications':           'commsctr@cr.ibm.com',
+  'Telecommunications':       'commsctr@cr.ibm.com',
+  'Media':                    'commsctr@cr.ibm.com',
+  // Retail / Consumer / Distribution → default
+  'Retail':                   'gbstccon@cr.ibm.com',
+  'Consumer':                 'gbstccon@cr.ibm.com',
+  'Distribution':             'gbstccon@cr.ibm.com',
+};
+function getSectorEmail(sector){
+  // Exact match first
+  if(SECTOR_EMAIL_MAP[sector]) return SECTOR_EMAIL_MAP[sector];
+  // Fallback for any unrecognised sector
+  return 'gbstccon@cr.ibm.com';
+}
+function getSectorEmailLabel(sector){
+  const email=getSectorEmail(sector);
+  const labels={
+    'pubcontr@cr.ibm.com':'Public Sector CSP (pubcontr)',
+    'fsscontr@cr.ibm.com':'Financial Services CSP (fsscontr)',
+    'indcontr@cr.ibm.com':'Industrial CSP (indcontr)',
+    'commsctr@cr.ibm.com':'Communications/Tech CSP (commsctr)',
+    'gbstccon@cr.ibm.com':'General/Default CSP (gbstccon)',
+  };
+  return labels[email]||email;
+}
+
+function escalateJRS(){
+  alert('JRS case escalated to CSP team for this sector (OQ-30 resolved: routing by sector).\nRenewal blocked until the CSP team provides a confirmed JRS value.\nAudit record written.\n\n[PROTOTYPE — no real escalation sent]');
+  closeRenewalModal();
+}
+function resolveCity(){
+  const reason=prompt('Approve Work Location City correction\n\nSource: Dallas  →  TRAM: Austin\n\nEnter reason for accepting "Dallas":','Updated per project move — confirmed');
+  if(reason){renewalData.tramResolved=true;renderRenewalStep();}
+}
+
+// ── OFFBOARDING MODAL ─────────────────────────
+let offboardStep=0;
+let offboardData={};
+function openOffboardModal(id){
+  const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
+  if(c.offboard==='In Progress'){
+    alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor. A new request cannot be submitted.\n\nThis event has been recorded in the audit log.');
+    return;
+  }
+  offboardData={c,step:1};
+  document.getElementById('offboardModal').classList.add('open');
+  renderOffboardStep();
+}
+function closeOffboardModal(){document.getElementById('offboardModal').classList.remove('open');}
+
+function renderOffboardStep(){
+  const {c}=offboardData;
+  document.getElementById('offboardModalTitle').textContent=`Offboarding — ${c.name} (${c.id})`;
+  const steps=['Review','Confirm','Submitted'];
+  const stepsHtml=`<div class="steps">${steps.map((s,i)=>{let cls='';if(i+1<offboardData.step) cls='done';else if(i+1===offboardData.step) cls='active';return `<div class="step ${cls}">${i+1<offboardData.step?'✓ ':''}${s}</div>`;}).join('')}</div>`;
+  let body='',footer='';
+  if(offboardData.step===1){
+    // Confirmed offboarding fields (OQ-06): Sector, Manager Email (PM), Contractor Name,
+    // PO Number, Serial Number, Last day (mm/dd/yyyy), Reason For Termination,
+    // Laptop (yes/no), Laptop returned (yes/no), Comments
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Prepopulated from source report. All fields marked * are required.</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Contractor Name *</label><input value="${c.name}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Serial Number *</label><input value="${c.serial}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Sector *</label><input value="${c.sector}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>Manager Email (PM) *</label><input value="${c.pmIntranetId}" placeholder="PM email"></div>
+        <div class="form-group"><label>PO Number *</label><input value="${c.poNumber}" readonly style="background:#f9fafb"></div>
+        <div class="form-group"><label>TRAM Request ID *</label><input value="${c.tramId||''}" ${!c.tramId?'placeholder="MISSING — required" style="border-color:#dc2626"':'readonly style="background:#f9fafb"'}></div>
+        <div class="form-group"><label>Last Day (mm/dd/yyyy) *</label><input id="offTermDate" type="date"></div>
+        <div class="form-group"><label>Reason For Termination *</label>
+          <select id="offReason"><option value="">— Select —</option><option>Assignment Completed</option><option>Mutual Agreement</option><option>Performance</option><option>Budget Reduction</option><option>Other</option></select></div>
+        <div class="form-group"><label>Laptop (yes/no) *</label>
+          <select id="offLaptop"><option value="">— Select —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+        <div class="form-group"><label>Laptop Returned (yes/no)</label>
+          <select id="offLaptopRet"><option value="">— Select —</option><option value="Yes">Yes</option><option value="No">No</option><option value="N/A">N/A</option></select></div>
+      </div>
+      <div class="form-group"><label>Comments</label><textarea id="offComments" rows="2" placeholder="Optional additional information"></textarea></div>`;
+    footer=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="offboardNext()">Next: Review &amp; Email Preview →</button>`;
+  } else if(offboardData.step===2){
+    const sectorEmail=getSectorEmail(c.sector);
+    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Review the summary and email preview before submitting. This action cannot be undone.</p>
+      <div class="confirm-row"><b>Contractor:</b> ${c.name} · <b>Serial:</b> ${c.serial}<br><b>Sector:</b> ${c.sector} · <b>PO:</b> ${c.poNumber}<br><b>TRAM:</b> ${c.tramId||'[MISSING]'}<br><b>Requested by:</b> A. Martinez | 2025-07-14</div>
+      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn" style="margin-top:10px">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table (OQ-21a pending).</div>`:''}
+      <div class="section-title" style="margin-top:12px">Email Preview — Recipient: <b>${c.sector}</b> CSP Team</div>
+      <div class="email-preview">To: ${sectorEmail}
+Subject: ${c.tramId} ${c.serial} ${c.poNumber} ${c.name} ${c.client} OFFBOARDING
+
+Can you please help with this offboarding?
+
+[PROTOTYPE — no real email sent]</div>`;
+    footer=`<button class="btn btn-secondary" onclick="offboardBack()">← Back</button>
+      <button class="btn btn-danger" onclick="offboardSubmit()">✓ Confirm &amp; Submit Offboarding</button>`;
+  } else if(offboardData.step===3){
+    const sectorEmail=getSectorEmail(c.sector);
+    body=stepsHtml+`<div class="confirm-row" style="margin-bottom:16px">
+      ✅ <b>Offboarding submitted.</b><br>
+      Sent to: ${sectorEmail} (${c.sector} CSP team)<br>
+      Message ID: SYN-MSG-9943 · 2025-07-14 09:45 UTC<br>
+      Audit: OFFBOARDING_SUBMITTED</div>
+      <p style="font-size:13px;color:#6b7280">Status will update to "Offboarding In Progress" in the dashboard on the next source refresh.</p>`;
+    footer=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Close</button>`;
+  }
+  document.getElementById('offboardModalBody').innerHTML=body;
+  document.getElementById('offboardModalFooter').innerHTML=footer;
+}
+function offboardNext(){
+  const r=document.getElementById('offReason');
+  const t=document.getElementById('offTermDate');
+  const l=document.getElementById('offLaptop');
+  if(t&&!t.value){alert('Please enter the contractor\'s last day.');return;}
+  if(r&&!r.value){alert('Please select a reason for termination.');return;}
+  if(l&&!l.value){alert('Please indicate whether the contractor has a laptop (yes/no).');return;}
+  offboardData.step++;renderOffboardStep();
+}
+function offboardBack(){offboardData.step--;renderOffboardStep();}
+function offboardSubmit(){offboardData.step=3;renderOffboardStep();}
+
+// ── TAB CONTENT ───────────────────────────────
+function renderRenewalTab(){
+  document.getElementById('renewal-content').innerHTML=`
+    <h2 style="font-size:18px;margin-bottom:8px">Renewal Workflow</h2>
+    <p style="color:#6b7280;font-size:13px;margin-bottom:16px">Select a contractor from the <b>Dashboard</b> and click <b>Renewal</b>, or click a scenario card below to demo a specific JRS validation outcome.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      ${CONTRACTORS.slice(0,6).map(c=>`
+        <div class="dq-card" style="cursor:pointer" onclick="openRenewalModal('${c.id}')">
+          <h3 style="font-size:14px">${c.name}</h3>
+          <p style="margin-bottom:4px">${c.client} · ${c.project}</p>
+          <p style="margin-bottom:4px">${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram}</span></p>
+          <p style="margin-bottom:4px">End: ${c.endDate||'–'} · ${bucketBadge(c.bucket)}</p>
+          <p style="font-size:11px;color:#6b7280;margin-top:4px">Scenario: <b>${c.scenario.replace('_',' ')}</b></p>
+        </div>`).join('')}
+    </div>`;
+}
+function renderOffboardingTab(){
+  document.getElementById('offboarding-content').innerHTML=`
+    <h2 style="font-size:18px;margin-bottom:8px">Offboarding Workflow</h2>
+    <p style="color:#6b7280;font-size:13px;margin-bottom:16px">Select a contractor from the <b>Dashboard</b> or click a card below. The card with "Offboarding In Progress" demonstrates duplicate detection.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      ${CONTRACTORS.slice(0,5).map(c=>`
+        <div class="dq-card" style="cursor:pointer" onclick="openOffboardModal('${c.id}')">
+          <h3 style="font-size:14px">${c.name}</h3>
+          <p style="margin-bottom:4px">${c.client} · ${c.project}</p>
+          <p style="margin-bottom:4px">End: ${c.endDate||'–'} · ${bucketBadge(c.bucket)}</p>
+          ${c.offboard==='In Progress'?'<p><span class="badge badge-orange">⚠ In Progress — Duplicate test</span></p>':''}
+          ${!c.tramId?'<p><span class="badge badge-red">⚠ Missing TRAM ID</span></p>':''}
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── INIT ──────────────────────────────────────
+renderRenewalTab();
+renderOffboardingTab();
+loadData();   // tries real API first; falls back to synthetic data
+</script>
+
+</body>
+</html>
