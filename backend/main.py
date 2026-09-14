@@ -28,6 +28,7 @@ from box_client import get_client
 import ingestion
 import jrs_validation
 import excel_generation
+import email_sender
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,15 @@ class AuditRecord(BaseModel):
 class ExcelRequest(BaseModel):
     contractor_id: str          # serial / TalentID to look up in ingestion cache
     pm_checklist:  dict         # all PM checklist fields from Step 2 of renewal workflow
+
+
+class SendEmailRequest(BaseModel):
+    contractor_id:      str
+    tram_id_new:        str
+    excel_filename:     str
+    excel_bytes_base64: str     # base64-encoded .xlsm file
+    email_type:         str = "renewal"   # "renewal" or "offboarding"
+    offboard_data:      dict = {}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -275,6 +285,85 @@ def generate_excel(req: ExcelRequest):
             "X-Missing-Fields":    ",".join(result["missing_mandatory"]),
         },
     )
+
+
+# ── Email Send ───────────────────────────────────────────────────────────────
+
+@app.post("/api/send-email")
+def send_email(req: SendEmailRequest):
+    """
+    Send the renewal or offboarding email via Microsoft Graph.
+
+    The frontend passes the already-generated excel file as base64.
+    This keeps the flow stateless — no server-side file storage needed.
+    """
+    import base64
+
+    # Resolve contractor record
+    contractor = None
+    if _ingestion_result:
+        all_records = (
+            _ingestion_result.get("contractors", []) +
+            _ingestion_result.get("dq_exceptions", [])
+        )
+        contractor = next(
+            (c for c in all_records if c.get("serial") == req.contractor_id),
+            None
+        )
+    if not contractor:
+        contractor = {"serial": req.contractor_id, "name": req.contractor_id}
+
+    # Check Graph credentials configured
+    if not email_sender.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Microsoft Graph email credentials not configured. "
+                "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL "
+                "in Railway environment variables. "
+                "See backend/DEPLOYMENT.md Step 5 for setup instructions."
+            ),
+        )
+
+    try:
+        excel_bytes = base64.b64decode(req.excel_bytes_base64)
+
+        if req.email_type == "offboarding":
+            result = email_sender.send_offboarding_email(
+                contractor=contractor,
+                offboard_data=req.offboard_data,
+            )
+        else:
+            result = email_sender.send_renewal_email(
+                contractor=contractor,
+                tram_id_new=req.tram_id_new,
+                excel_filename=req.excel_filename,
+                excel_bytes=excel_bytes,
+            )
+
+        _append_audit(
+            user="current_user",
+            action="EMAIL_SENT",
+            contractor=req.contractor_id,
+            detail=(
+                f"To: {result['to']} · "
+                f"Subject: {result['subject']} · "
+                f"MsgID: {result['message_id']}"
+            ),
+            outcome="success",
+        )
+
+        return result
+
+    except Exception as e:
+        _append_audit(
+            user="current_user",
+            action="EMAIL_FAILED",
+            contractor=req.contractor_id,
+            detail=str(e),
+            outcome="error",
+        )
+        raise HTTPException(status_code=500, detail=f"Email send failed: {str(e)}")
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
