@@ -1166,29 +1166,46 @@ Attachment: ${xlsxName}</div>`;
       <button class="btn btn-primary" id="btnDownloadExcel" onclick="downloadExcel('${c.serial}')">⬇ Download Excel File</button>
       <button class="btn btn-green" id="btnConfirmSend" onclick="renewalSubmit()" style="display:none">✓ Excel Downloaded — Confirm &amp; Send</button>`;
 
-  // ── STEP 7 (was 6): COMPLETE ────────────────────────────────────────────
+  // ── STEP 7: COMPLETE + OPEN IN OUTLOOK ──────────────────────────────────
   } else if(renewalStep===7){
-    const safeName=c.name.replace('. ','_');
+    const newTramId  = renewalData.newTramId || c.tramId || '–';
+    const sectorEmail= getSectorEmail(c.sector);
+    const xlsxName   = renewalData.excelFilename || `${c.name.replace('. ','_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
+    const subject    = encodeURIComponent(`${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL`);
+    const emailBody  = encodeURIComponent(`Can you please help with this renewal?\n\nAttachment: ${xlsxName}`);
+    const mailtoLink = `mailto:${sectorEmail}?subject=${subject}&body=${emailBody}`;
+    const now        = new Date().toLocaleTimeString('en-US',{hour12:false});
+
     body=stepsHtml+`
-      <div class="confirm-row" style="margin-bottom:16px">✅ <b>Renewal submitted.</b><br>
-        TRAM New ID: TRAM-R-88821 · Method: assisted_manual<br>
-        Excel: TRAM_Renewal_${c.serial}_${safeName}_20250714.xlsx<br>
-        Email: Confirmed · Msg ID: SYN-MSG-9942 · 2025-07-14 09:31 UTC</div>
+      <div class="confirm-row" style="margin-bottom:16px">
+        ✅ <b>Excel file downloaded.</b> Attach it manually to the email below.<br>
+        File: <b>${xlsxName}</b>
+      </div>
+      <div class="section-title">📧 Send Email to Contractor Support</div>
+      <div class="email-preview" style="margin-bottom:12px">To: ${sectorEmail}
+Subject: ${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL
+
+Can you please help with this renewal?
+
+Attachment: ${xlsxName}</div>
+      <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:16px">
+        💡 <b>Click "Open in Outlook" below.</b> Outlook opens with the email pre-filled.<br>
+        Attach <b>${xlsxName}</b> from your Downloads folder, then click Send.
+      </div>
       <div class="section-title">Audit Timeline</div>
       <ul class="timeline">
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:21:00</div><div class="tl-action">RENEWAL_STARTED</div><div class="tl-detail">Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</div></div></li>
-        <li><div class="tl-dot"></div><div class="tl-content"><div class="tl-time">09:21:30</div><div class="tl-action">RENEWAL_FIELD_CHANGED</div><div class="tl-detail">Work Location City: Austin → Dallas</div></div></li>
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:21:50</div><div class="tl-action">PM_CHECKLIST_COMPLETED</div><div class="tl-detail">Rate cap · Bill rate · GP% · Contract type · JRS · Band · Location · Skills · Business justification captured</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:22:10</div><div class="tl-action">ATTESTATION_COMPLETED</div><div class="tl-detail">All 3 · ATTEST-v2.1 · Hash: b7c2...1a44</div></div></li>
-        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">09:23:40</div><div class="tl-action">JRS_VALIDATION_RUN</div><div class="tl-detail">Outcome: ${c.scenario==='jrs_active'?'ACTIVE':'ONE_REPLACEMENT'} · TAX-2025-Q2</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:24:00</div><div class="tl-action">JRS accepted</div><div class="tl-detail">Final JR/S: "${renewalData.finalJRS||c.jrsTram}"</div></div></li>
-        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">09:25:30</div><div class="tl-action">TRAM_MISMATCH_DETECTED</div><div class="tl-detail">work_location_city: Dallas vs Austin</div></div></li>
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">09:26:55</div><div class="tl-action">TRAM_CORRECTION_APPROVED</div><div class="tl-detail">Austin → Dallas · Reason: Updated per project move</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:28:11</div><div class="tl-action">TRAM_SUBMISSION_COMPLETED</div><div class="tl-detail">TRAM-R-88821 · assisted_manual</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:30:44</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">SHA-256: a3f1...9d02</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">09:31:02</div><div class="tl-action">EMAIL_SENT</div><div class="tl-detail">Msg: SYN-MSG-9942</div></div></li>
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">RENEWAL_STARTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">PM_CHECKLIST_COMPLETED</div><div class="tl-detail">Rate cap · Bill rate · GP% · Contract type · JRS · Band · Location · Skills · Business justification captured</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">ATTESTATION_COMPLETED</div><div class="tl-detail">All 3 attestations confirmed</div></div></li>
+        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATION_RUN</div><div class="tl-detail">Outcome: ${c.scenario==='jrs_active'?'ACTIVE':'ONE_REPLACEMENT'} · Final JR/S: "${renewalData.finalJRS||c.jrsTram}"</div></div></li>
+        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">TRAM_RECONCILIATION_COMPLETED</div><div class="tl-detail">TRAM ID: ${newTramId} · Method: assisted_manual</div></div></li>
+        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">${xlsxName} · Downloaded to PM machine</div></div></li>
+        <li><div class="tl-dot"></div><div class="tl-content"><div class="tl-time">Pending</div><div class="tl-action">EMAIL_SENT</div><div class="tl-detail">To: ${sectorEmail} · Awaiting PM send confirmation</div></div></li>
       </ul>`;
-    footer=`<button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
+    footer=`
+      <a class="btn btn-primary" href="${mailtoLink}" target="_blank" onclick="postAudit('EMAIL_OPENED_OUTLOOK','${c.serial}','To: ${sectorEmail}','pending')">📧 Open in Outlook</a>
+      <button class="btn btn-green" onclick="confirmEmailSent('${c.serial}','${sectorEmail}','${xlsxName}')">✓ I Sent the Email</button>
+      <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
   }
   document.getElementById('renewalModalBody').innerHTML=body;
   document.getElementById('renewalModalFooter').innerHTML=footer;
@@ -1196,6 +1213,16 @@ Attachment: ${xlsxName}</div>`;
 function renewalNext(){renewalStep++;renderRenewalStep();}
 function renewalBack(){renewalStep--;renderRenewalStep();}
 function renewalSubmit(){renewalStep=7;renderRenewalStep();}
+
+function confirmEmailSent(contractorId, toEmail, filename){
+  postAudit('EMAIL_SENT', contractorId, `To: ${toEmail} · File: ${filename}`, 'success');
+  // Replace footer with final confirmation
+  document.getElementById('renewalModalFooter').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;width:100%">
+      <span style="color:#16a34a;font-weight:700;font-size:14px">✅ Renewal complete — email confirmed sent.</span>
+      <button class="btn btn-secondary" style="margin-left:auto" onclick="closeRenewalModal()">Close</button>
+    </div>`;
+}
 
 async function downloadExcel(contractorId){
   const statusEl = document.getElementById('excelStatus');
