@@ -960,7 +960,7 @@ function openRenewalModal(id){
     alert('⚠ Missing TRAM Request ID\n\nThis contractor has no TRAM Request ID. The renewal workflow cannot proceed. This data-quality issue is flagged in the DQ panel.');
     return;
   }
-  renewalData={c,step:1,attest:[false,false,false],jrsAccepted:false,tramResolved:false};
+  renewalData={c, contractor:c, step:1,attest:[false,false,false],jrsAccepted:false,tramResolved:false};
   renewalStep=1;
   document.getElementById('renewalModal').classList.add('open');
   renderRenewalStep();
