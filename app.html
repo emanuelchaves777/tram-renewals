@@ -947,490 +947,292 @@ function openDetail(serial){
 function closeDetail(e){if(e.target===document.getElementById('detailOverlay')) closeDetailPanel();}
 function closeDetailPanel(){document.getElementById('detailOverlay').classList.remove('open');}
 
-// ── RENEWAL MODAL ─────────────────────────────
-let renewalStep=0;
+// ── RENEWAL MODAL — single-screen review + one-click submit ───────────────────
 let renewalData={};
 function openRenewalModal(id){
   const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
   if(c.renewal==='In Progress'){
-    alert('⚠ DUPLICATE DETECTED\n\nAn active renewal request already exists for this contractor. A new request cannot be submitted.\n\nThis event has been recorded in the audit log.');
+    alert('⚠ DUPLICATE DETECTED\n\nAn active renewal request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
   if(!c.tramId){
-    alert('⚠ Missing TRAM Request ID\n\nThis contractor has no TRAM Request ID. The renewal workflow cannot proceed. This data-quality issue is flagged in the DQ panel.');
+    alert('⚠ Missing TRAM Request ID\n\nThis contractor has no TRAM Request ID on record.\nPlease update the source report before proceeding.');
     return;
   }
-  renewalData={c, contractor:c, step:1,attest:[false,false,false],jrsAccepted:false,tramResolved:false};
-  renewalStep=1;
+  renewalData={c};
   document.getElementById('renewalModal').classList.add('open');
-  renderRenewalStep();
+  renderRenewalForm();
 }
 function closeRenewalModal(){document.getElementById('renewalModal').classList.remove('open');}
 
-function renderRenewalStep(){
-  const {c}=renewalData;
-  document.getElementById('renewalModalTitle').textContent=`Renewal — ${c.name} (${c.id})`;
-  // Steps: 1=Review, 2=PM Checklist, 3=Attest, 4=JRS Validate, 5=TRAM Recon, 6=Excel & Email, 7=Complete
-  const steps=['Review','PM Checklist','Attest','JRS Validate','TRAM Recon','Excel & Email','Complete'];
-  const stepsHtml=`<div class="steps">${steps.map((s,i)=>{let cls='';if(i+1<renewalStep) cls='done';else if(i+1===renewalStep) cls='active';return `<div class="step ${cls}">${i+1<renewalStep?'✓ ':''}${s}</div>`;}).join('')}</div>`;
-  let body='',footer='';
+function renderRenewalForm(){
+  const c=renewalData.c;
+  document.getElementById('renewalModalTitle').textContent=`Renewal — ${c.name} (${c.serial})`;
 
-  // ── STEP 1: TRAM / SYSTEM DATA REVIEW ──────────────────────────────────
-  if(renewalStep===1){
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:16px">Review prepopulated fields from the source report. Propose changes where authorized. All changes are auditable.</p>
+  // JRS status pill
+  const jrsPill=c.jrsStatus==='active'
+    ? `<span class="badge badge-green" style="font-size:12px">✓ JRS Active — will be validated automatically on submit</span>`
+    : c.jrsStatus==='warn'
+      ? `<span class="badge badge-yellow" style="font-size:12px">⚠ JRS has a replacement — will be auto-resolved on submit</span>`
+      : `<span class="badge badge-red" style="font-size:12px">✗ JRS unresolvable — correct before submitting</span>`;
+
+  // Default new end date: current end + 3 months
+  const defaultEnd=(()=>{try{const d=new Date(c.endDate);d.setMonth(d.getMonth()+3);return d.toISOString().slice(0,10);}catch{return '';}})();
+  const defaultStart=c.endDate||'';
+
+  document.getElementById('renewalModalBody').innerHTML=`
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#1e40af">
+      <b>${c.name}</b> &nbsp;·&nbsp; ${c.client} &nbsp;·&nbsp; ${c.project} &nbsp;·&nbsp; Serial: <code>${c.serial}</code>
+      &nbsp;·&nbsp; Prior TRAM ID: <code>${c.tramId}</code>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803d">
+      <b>What happens when you click Submit:</b> The application will automatically
+      validate JRS · populate the Excel template · send the renewal email to ${getSectorEmailLabel(c.sector)} · record the audit trail.
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Contractor Full Name</label>
+        <input value="${c.name}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>TalentID / Serial</label>
+        <input value="${c.serial}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>Client</label>
+        <input value="${c.client}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>Vendor</label>
+        <input value="${c.vendor}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>Current End Date</label>
+        <input value="${c.endDate||'–'}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>New End Date <span style="color:#dc2626">*</span></label>
+        <input id="r_newEnd" type="date" value="${defaultEnd}">
+      </div>
+      <div class="form-group">
+        <label>New Start Date <span style="color:#dc2626">*</span></label>
+        <input id="r_newStart" type="date" value="${defaultStart}">
+      </div>
+      <div class="form-group">
+        <label>Work Location <span style="color:#dc2626">*</span></label>
+        <input id="r_location" value="${c.workLocation||''}">
+      </div>
+    </div>
+
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">JR/S &amp; Role</div>
       <div class="form-grid">
-        <div class="form-group"><label>Contractor Full Name</label><input value="${c.name}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>TalentID / Serial</label><input value="${c.serial}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Client Name (PO)</label><input value="${c.client}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Project Name (PO)</label><input value="${c.project}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>JR/S (TRAM)</label><input value="${c.jrsTram}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Actual Band</label><input value="${c.band}"></div>
-        <div class="form-group"><label>Current End Date</label><input value="${c.endDate}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Proposed New End Date <span style="color:#dc2626">*</span></label><input id="newEndDate" type="date" value="2025-10-14"></div>
-        <div class="form-group"><label>Work Location</label><input id="workCity" value="${c.workLocation}"></div>
-        <div class="form-group"><label>Country</label><input value="${c.country}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Prior TRAM Request ID</label><input value="${c.tramId}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Project Contact (TRAM)</label><input value="${c.contact}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Vendor</label><input value="${c.vendor}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Contractor Assignee</label><input value="${c.contractorAssignee}" readonly style="background:#f9fafb"></div>
-      </div>`;
-    footer=`<button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="renewalNext()">Next: PM Checklist →</button>`;
-
-  // ── STEP 2: PM CHECKLIST ────────────────────────────────────────────────
-  } else if(renewalStep===2){
-    body=stepsHtml+`
-      <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Complete the PM review checklist. All fields are reviewed with the PM before submitting. Required fields are marked <span style="color:#dc2626">*</span>.</p>
-
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#1e40af">
-        <b>Subcontractor:</b> ${c.name} &nbsp;|&nbsp; <b>Serial:</b> ${c.serial} &nbsp;|&nbsp; <b>Client:</b> ${c.client} &nbsp;|&nbsp; <b>Project:</b> ${c.project}
+        <div class="form-group" style="grid-column:span 2">
+          <label>JR/S (Job Role &amp; Specialty) <span style="color:#dc2626">*</span></label>
+          <input id="r_jrs" value="${c.jrsTram||''}">
+          <div style="margin-top:6px">${jrsPill}</div>
+        </div>
+        <div class="form-group">
+          <label>Band <span style="color:#dc2626">*</span></label>
+          <input id="r_band" value="${c.band||''}">
+        </div>
+        <div class="form-group">
+          <label>Niche Skills (3–5 keywords) <span style="color:#dc2626">*</span></label>
+          <input id="r_skills" value="${(c.skillDescription||'').slice(0,120)}" placeholder="e.g. SAP HANA EWM, OT/IT convergence">
+        </div>
       </div>
+    </div>
 
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Financials</div>
       <div class="form-grid">
-        <div class="form-group"><label>Rate Cap ($/hr) <span style="color:#dc2626">*</span></label><input id="pmRateCap" type="number" min="0" step="0.01" placeholder="e.g. 125.00"></div>
-        <div class="form-group"><label>Bill Rate to Client ($/hr) <span style="color:#dc2626">*</span></label><input id="pmBillRate" type="number" min="0" step="0.01" placeholder="e.g. 150.00"></div>
-        <div class="form-group"><label>Project GP% <span style="color:#dc2626">*</span></label><input id="pmGP" type="number" min="0" max="100" step="0.1" placeholder="e.g. 28.5"></div>
-        <div class="form-group"><label>Contract Type (IBM ↔ Vendor) <span style="color:#dc2626">*</span></label>
-          <select id="pmContractType"><option value="">— Select —</option><option>T&amp;M (Time &amp; Materials)</option><option>FP (Fixed Price)</option><option>Rate Card</option><option>Max Price</option></select></div>
-        <div class="form-group"><label>Confirmed Start Date <span style="color:#dc2626">*</span></label><input id="pmStartDate" type="date" value="${c.endDate}"></div>
-        <div class="form-group"><label>Confirmed End Date <span style="color:#dc2626">*</span></label><input id="pmEndDate" type="date"></div>
-        <div class="form-group" style="grid-column:span 2"><label>Confirmed JR/S (Job Role &amp; Specialty) <span style="color:#dc2626">*</span></label><input id="pmJRS" value="${c.jrsTram}" placeholder="Confirm or correct JR/S"></div>
-        <div class="form-group"><label>Confirmed Band <span style="color:#dc2626">*</span></label><input id="pmBand" value="${c.band}" placeholder="Confirm or correct band"></div>
-        <div class="form-group"><label>Confirmed Home &amp; Work Location <span style="color:#dc2626">*</span></label><input id="pmLocation" value="${c.workLocation}" placeholder="Home city / Work city"></div>
-      </div>
-
-      <div class="form-group" style="margin-top:4px">
-        <label>Niche Skills (3–5 key skills) <span style="color:#dc2626">*</span></label>
-        <textarea id="pmSkills" rows="2" placeholder="List 3–5 niche skills that justify this subcontractor (e.g. SAP HANA EWM, OT/IT convergence, SCADA integration)">${c.skillDescription}</textarea>
-      </div>
-
-      <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-top:4px">
-        <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Business Justification <span style="color:#dc2626">*</span> — Include all four points below to avoid approval delays</p>
-
         <div class="form-group">
-          <label style="display:flex;gap:6px;align-items:baseline">
-            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">1</span>
-            Confirmation that no Domestic or GD resources are available with the required skills <span style="color:#dc2626">*</span>
-          </label>
-          <textarea id="bj1" rows="2" placeholder="e.g. Internal bench review completed on [date]. No available IBMers identified with SAP HANA EWM expertise at Band 8 in the Ottawa market."></textarea>
+          <label>Rate Cap ($/hr) <span style="color:#dc2626">*</span></label>
+          <input id="r_rateCap" type="number" min="0" step="0.01" placeholder="e.g. 125.00">
         </div>
-
         <div class="form-group">
-          <label style="display:flex;gap:6px;align-items:baseline">
-            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">2</span>
-            Explanation of GP% if below 25% — include contract type, pricing structure, or other constraint <span style="color:#6b7280;font-size:11px">(required if GP &lt; 25%)</span>
-          </label>
-          <textarea id="bj2" rows="2" placeholder="e.g. GP is 18% due to fixed-price contract with client rate card. Margin is capped by MSA terms signed in 2022. No ability to renegotiate mid-engagement."></textarea>
+          <label>Bill Rate to Client ($/hr) <span style="color:#dc2626">*</span></label>
+          <input id="r_billRate" type="number" min="0" step="0.01" placeholder="e.g. 150.00">
         </div>
-
         <div class="form-group">
-          <label style="display:flex;gap:6px;align-items:baseline">
-            <span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">3</span>
-            Justification for continuing a 12-month contract rather than converting to regular employee <span style="color:#6b7280;font-size:11px">(required for multi-year contractors)</span>
-          </label>
-          <textarea id="bj3" rows="2" placeholder="e.g. This is a niche SAP HANA EWM specialist required only for the duration of the ERP implementation. Project ends Q4 2025. IBM headcount plan does not include a permanent role."></textarea>
+          <label>Project GP% <span style="color:#dc2626">*</span></label>
+          <input id="r_gp" type="number" min="0" max="100" step="0.1" placeholder="e.g. 28.5">
         </div>
-
-        <div class="form-group" style="margin-bottom:0">
-          <label style="display:flex;gap:6px;align-items:baseline">
-            <span style="background:#f3f4f6;color:#6b7280;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">4</span>
-            Any other insight from a contract perspective <span style="color:#6b7280;font-size:11px">(optional)</span>
-          </label>
-          <textarea id="bj4" rows="2" placeholder="e.g. Client has specifically requested this contractor by name in the SOW. Replacement would require a 3-month ramp-up and is not feasible mid-delivery."></textarea>
+        <div class="form-group">
+          <label>Contract Type <span style="color:#dc2626">*</span></label>
+          <select id="r_contractType">
+            <option value="">— Select —</option>
+            <option>T&amp;M (Time &amp; Materials)</option>
+            <option>FP (Fixed Price)</option>
+            <option>Rate Card</option>
+            <option>Max Price</option>
+          </select>
         </div>
-      </div>`;
-    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-primary" onclick="pmChecklistNext()">Next: Attestations →</button>`;
-
-  // ── STEP 3: ATTESTATIONS ────────────────────────────────────────────────
-  } else if(renewalStep===3){
-    const attTexts=[
-      'I confirm that I completed the required internal talent and bench review using the approved process and did not identify an available internal resource who meets the documented requirements for this assignment.',
-      'I confirm that I reviewed the information in this renewal request and that it is complete and accurate to the best of my knowledge. Any required corrections have been entered in the appropriate fields.',
-      'I confirm that I am authorized to initiate this renewal request for the selected assignment.'
-    ];
-    const attLabels=['Attestation 1: Internal Talent Review','Attestation 2: Information Accuracy','Attestation 3: Authorization'];
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All three attestations are mandatory. They are not pre-selected. They are versioned and audited. <b>Version: ATTEST-v2.1</b></p>
-      ${attTexts.map((t,i)=>`<div class="attest-box" id="attBox${i}"><label><input type="checkbox" id="att${i}" onchange="toggleAtt(${i})"> <span><b>${attLabels[i]}</b><br>${t}</span></label></div>`).join('')}`;
-    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-primary" id="attNextBtn" onclick="renewalNext()" disabled>Next: JRS Validation →</button>`;
-
-  // ── STEP 4 (was 3): JRS VALIDATION ─────────────────────────────────────
-  } else if(renewalStep===4){
-    const sc=c.scenario;
-    let jrsHtml='';
-    if(sc==='jrs_active'){
-      jrsHtml=`<div class="jrs-result jrs-active">✅ <b>JRS is ACTIVE</b><br>"${c.jrsTram}" found in "Consulting Short List" tab, Column A of IBM Consulting Taxonomy Shortlist M389.<br><span style="font-size:11px">Rule: active_match · Tab: Consulting Short List · Column A (JR/S) · Publication: M389 September</span></div>`;
-      if(!renewalData.jrsAccepted){renewalData.jrsAccepted=true;renewalData.finalJRS=c.jrsTram;setTimeout(renderRenewalStep,60);}
-    } else if(sc==='jrs_one_replace'){
-      jrsHtml=`<div class="jrs-result jrs-warn">⚠ <b>JRS not in active list — replacement found in Change Log</b><br>
-        Searched "Consulting Short List" Column A (JR/S): <b>not found</b>.<br>
-        Searched "Change Log" Column A (Previous Value): <b>found</b>.<br>
-        Column B (Current Value / Action: Rename) → Replacement: <b>"Data Analytics Consultant"</b><br>
-        <span style="font-size:11px">Rule: ONE_REPLACEMENT · Tab: Change Log · Col A → Col B · Publication: M389 September · NOT auto-applied.</span>
-        <div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-green btn-sm" onclick="acceptJRS('Data Analytics Consultant')">Accept Replacement</button><button class="btn btn-secondary btn-sm" onclick="rejectJRS()">Review Manually</button></div>
-      </div>`;
-    } else if(sc==='jrs_multi_replace'){
-      jrsHtml=`<div class="jrs-result jrs-blocked">🛑 <b>Multiple replacements found in Change Log — human selection required</b><br>
-        "Consulting Short List" Column A: <b>not found</b>.<br>
-        "Change Log" Column A found — Column B shows multiple possible replacements:<br>
-        1. "Enterprise Architecture Specialist"&nbsp;&nbsp;2. "Solution Architecture Lead"<br>
-        Automated selection is not permitted. Escalate to CSP team for sector: <b>${c.sector}</b>.<br>
-        <span style="font-size:11px">Rule: MULTI_REPLACEMENT · Tab: Change Log · Publication: M389 September</span>
-        <div style="margin-top:10px"><button class="btn btn-warn btn-sm" onclick="escalateJRS()">Escalate to CSP Team (${c.sector})</button></div>
-      </div>`;
-    } else if(sc==='jrs_not_found'){
-      jrsHtml=`<div class="jrs-result jrs-error">🛑 <b>JRS not found in active list or Change Log</b><br>
-        "Consulting Short List" Column A (JR/S): <b>not found</b>.<br>
-        "Change Log" Column A (Previous Value): <b>not found</b>.<br>
-        This JRS does not exist in IBM Consulting Taxonomy M389. Escalate to CSP team for sector: <b>${c.sector}</b>.<br>
-        <span style="font-size:11px">Rule: NOT_FOUND · Both tabs searched · Publication: M389 September · Audit record written.</span>
-        <div style="margin-top:10px"><button class="btn btn-danger btn-sm" onclick="escalateJRS()">Escalate to CSP Team (${c.sector})</button></div>
-      </div>`;
-    }
-    const canContinue=renewalData.jrsAccepted&&(sc==='jrs_active'||sc==='jrs_one_replace');
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">JRS validated against IBM Consulting Taxonomy Shortlist M389 September. Lookup: "Consulting Short List" Column A first; if not found, "Change Log" Column A → Column B.</p>
-      <div class="info-grid" style="margin-bottom:14px">
-        <div class="info-item"><label>JR/S (TRAM) from Report</label><span>${c.jrsTram}</span></div>
-        <div class="info-item"><label>Taxonomy File</label><span>M389 September · Consulting Short List / Change Log</span></div>
-      </div>${jrsHtml}
-      ${renewalData.jrsAccepted?`<div class="confirm-row">✅ <b>JRS validated.</b> Final JRS: "${renewalData.finalJRS}"</div>`:''}`;
-    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-primary" onclick="renewalNext()" ${canContinue?'':'disabled'}>Next: TRAM Reconciliation →</button>`;
-
-  // ── STEP 5 (was 4): TRAM RECONCILIATION ────────────────────────────────
-  } else if(renewalStep===5){
-    const pm = renewalData.pmChecklist||{};
-    const finalJRS   = renewalData.finalJRS || pm.jrs || c.jrsTram;
-    const newEnd     = pm.endDate     || c.endDate    || '–';
-    const newStart   = pm.startDate   || '–';
-    const band       = pm.band        || c.band       || '–';
-    const workLoc    = pm.location    || c.workLocation || '–';
-    const rateCap    = pm.rateCap     || '–';
-    const billRate   = pm.billRate    || '–';
-    const gp         = pm.gp         || '–';
-    const ctType     = pm.contractType|| '–';
-    const bj         = [pm.bj1,pm.bj2,pm.bj3,pm.bj4].filter(Boolean).join('\n');
-
-    // Helper — renders one row: label | value + copy button | tag
-    function tramRow(label, value, tag='', tagColor='#6b7280'){
-      const safe = (value||'–').toString().replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      const tagHtml = tag ? `<span style="font-size:11px;color:${tagColor};margin-left:6px">${tag}</span>` : '';
-      return `<tr>
-        <td style="font-weight:600;color:#374151;white-space:nowrap">${label}</td>
-        <td>
-          <span style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:4px;font-size:12px;user-select:all">${value||'–'}</span>
-          <button class="btn btn-secondary btn-sm" style="margin-left:6px;padding:2px 8px;font-size:11px"
-            onclick="navigator.clipboard.writeText('${safe}').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)}).catch(()=>{})">Copy</button>
-          ${tagHtml}
-        </td>
-      </tr>`;
-    }
-    function tramSection(title){ return `<tr><td colspan="2" style="background:#f9fafb;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;padding:8px 10px;border-top:2px solid #e5e7eb">${title}</td></tr>`; }
-    function tramReadOnly(label, value){
-      return `<tr>
-        <td style="color:#9ca3af;white-space:nowrap">${label}</td>
-        <td><span style="font-family:monospace;background:#f9fafb;padding:2px 8px;border-radius:4px;font-size:12px;color:#9ca3af">${value||'–'}</span> <span style="font-size:11px;color:#9ca3af">Auto-populated — confirm only</span></td>
-      </tr>`;
-    }
-
-    body=stepsHtml+`
-      <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:14px">
-        <b>TRAM v9.6 — Step by step:</b><br>
-        <code style="font-size:12px;line-height:2">My Requests → Create New Request → Spend</code><br>
-        When asked <b>"Import from Existing TRAM request or Prom Seat ID?"</b> → select <b>Yes</b> → paste the Prior TRAM Request ID below.<br>
-        <span style="color:#6b7280;font-size:12px">TRAM will pre-fill most fields. Only update the highlighted fields. Read-only fields are shown for confirmation only.</span>
       </div>
+    </div>
 
-      <table class="recon-table" style="margin-bottom:0">
-        <thead><tr><th>TRAM Field</th><th>Value — click Copy to paste into TRAM</th></tr></thead>
-        <tbody>
-          ${tramSection('IMPORT')}
-          ${tramRow('Import from Existing TRAM Request ID', c.tramId, '← paste this when TRAM asks', '#1d4ed8')}
-
-          ${tramSection('OVERVIEW')}
-          ${tramReadOnly('Bulk Hire', 'No')}
-          ${tramReadOnly('Spend Type', 'Contingent')}
-          ${tramRow('Location of the Role to be performed', workLoc)}
-          ${tramReadOnly('Sourcing Solution', 'Staff Augmentation')}
-          ${tramRow('Open Seat ID', c.tramId)}
-          ${tramReadOnly('Labor Group', 'Consulting')}
-          ${tramRow('Position Title', finalJRS)}
-
-          ${tramSection('DEMAND INFORMATION — auto-populated, confirm only')}
-          ${tramReadOnly('Geography', c.geography||'–')}
-          ${tramReadOnly('Market', c.market||'–')}
-          ${tramReadOnly('Country', c.country||'–')}
-          ${tramReadOnly('Sector', c.sector||'–')}
-          ${tramRow('JR/S', finalJRS, finalJRS!==c.jrsTram?'⚠ Changed from original':'', finalJRS!==c.jrsTram?'#d97706':'')}
-          ${tramRow('Expected Start Date', newStart)}
-          ${tramRow('Planned End Date', newEnd)}
-          ${tramRow('Band Equivalent', band)}
-
-          ${tramSection('CLIENT / PROJECT — auto-populated, confirm only')}
-          ${tramReadOnly('Client / Project', c.client+' — '+c.project)}
-          ${tramReadOnly('Vendor Name', c.vendor||'–')}
-          ${tramReadOnly('Supplier Contract Type', 'Staff Augmentation')}
-
-          ${tramSection('FINANCIAL — update these values')}
-          ${tramRow('Cost Rate ($/hr)', rateCap, 'Rate Cap from PM checklist')}
-          ${tramRow('Bill Rate ($/hr)', billRate, 'Bill Rate from PM checklist')}
-          ${tramRow('Contractor Cost Rate ($/hr)', rateCap)}
-          ${tramRow('Contractor Bill Rate ($/hr)', billRate)}
-          ${tramRow('Resource GP%', gp, 'From PM checklist')}
-          ${tramRow('Project GP%', gp, 'From PM checklist')}
-
-          ${tramSection('BUSINESS JUSTIFICATION — paste into TRAM field')}
-          ${tramRow('Internal Search Performed', 'Yes')}
-          ${tramRow('Are there resources available?', 'No')}
-          ${tramRow('Business Justification', bj||'(complete PM checklist first)')}
-        </tbody>
-      </table>
-
-      <div class="section-title" style="margin-top:16px">After submitting in TRAM — record the new TRAM Request ID here</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <input id="newTramIdInput" type="text" style="border:1px solid #d1d5db;border-radius:6px;padding:8px 12px;font-size:14px;font-family:monospace;width:280px;outline:none"
-          placeholder="e.g. NA202510048216S"
-          value="${renewalData.newTramId||''}"
-          oninput="renewalData.newTramId=this.value.trim();document.getElementById('btnTramNext').disabled=!this.value.trim()">
-        <span style="font-size:13px;color:#6b7280">← Enter the new TRAM ID after submission</span>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Business Justification</div>
+      <div class="form-group">
+        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">1</span>
+          No Domestic/GD resources available <span style="color:#dc2626">*</span></label>
+        <textarea id="r_bj1" rows="2" placeholder="Internal bench review completed on [date]. No IBMers available with the required skills."></textarea>
       </div>
-      ${renewalData.newTramId
-        ? `<div class="confirm-row">✅ New TRAM ID recorded: <b>${renewalData.newTramId}</b> — this will be included in the Excel file.</div>`
-        : `<div class="dq-warn">⚠ Submit in TRAM first, then enter the new TRAM Request ID above. The Next button unlocks after you enter it.</div>`}`;
-
-    footer=`
-      <button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <a href="https://tram.ibm.com" target="_blank" class="btn btn-warn" style="text-decoration:none">🔗 Open TRAM v9.6</a>
-      <button class="btn btn-primary" id="btnTramNext" onclick="renewalNext()" ${renewalData.newTramId?'':'disabled'}>Next: Excel &amp; Email →</button>`;
-
-  // ── STEP 6 (was 5): EXCEL & EMAIL ──────────────────────────────────────
-  } else if(renewalStep===6){
-    const safeName=c.name.replace('. ','_');
-    const newTramId=renewalData.newTramId||'NA202510048216S';
-    const pmData=renewalData.pmChecklist||{};
-    const newEndDate=pmData.endDate||'2025-10-14';
-    const xlsxName=`${safeName}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
-    const sectorEmail=getSectorEmail(c.sector);
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">All validations passed. Generate the Excel file and send the renewal email to Contractor Support.</p>
-      <div class="section-title">Excel File — <code>Request Form Template_Contractor Team.xlsm</code></div>
-      <div class="confirm-row">
-        📄 <b>Onboardings tab will be populated — row 2</b><br>
-        Filename: <b>${xlsxName}</b><br>
-        Saved to: PM's local machine (browser download)<br>
-        Source: Box folder <code>308916282342</code> (Request Form Template_Contractor Team.xlsm)
+      <div class="form-group">
+        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">2</span>
+          GP% explanation if below 25% <span style="color:#6b7280;font-size:11px">(required if GP &lt; 25%)</span></label>
+        <textarea id="r_bj2" rows="2" placeholder="e.g. Fixed-price contract. Client rate card limits margin."></textarea>
       </div>
-      <div id="excelStatus" style="margin-bottom:12px"></div>
-      <div class="section-title">Email Preview — Recipient determined by Sector: <b>${c.sector}</b></div>
-      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table.</div>`:''}
-      <div class="email-preview">To: ${sectorEmail}
-Subject: ${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL
-
-Can you please help with this renewal?
-
-Attachment: ${xlsxName}</div>`;
-    footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-primary" id="btnDownloadExcel" onclick="downloadExcel('${c.serial}')">⬇ Download Excel File</button>
-      <button class="btn btn-green" id="btnConfirmSend" onclick="renewalSubmit()" style="display:none">✓ Excel Downloaded — Confirm &amp; Send</button>`;
-
-  // ── STEP 7: COMPLETE + OPEN IN OUTLOOK ──────────────────────────────────
-  } else if(renewalStep===7){
-    const newTramId  = renewalData.newTramId || c.tramId || '–';
-    const sectorEmail= getSectorEmail(c.sector);
-    const xlsxName   = renewalData.excelFilename || `${c.name.replace('. ','_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
-    const subject    = encodeURIComponent(`${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL`);
-    const emailBody  = encodeURIComponent(`Can you please help with this renewal?\n\nAttachment: ${xlsxName}`);
-    const mailtoLink = `mailto:${sectorEmail}?subject=${subject}&body=${emailBody}`;
-    const now        = new Date().toLocaleTimeString('en-US',{hour12:false});
-
-    body=stepsHtml+`
-      <div class="confirm-row" style="margin-bottom:16px">
-        ✅ <b>Excel file downloaded.</b> Attach it manually to the email below.<br>
-        File: <b>${xlsxName}</b>
+      <div class="form-group">
+        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">3</span>
+          Justification for 12-month continuation <span style="color:#6b7280;font-size:11px">(if multi-year)</span></label>
+        <textarea id="r_bj3" rows="2" placeholder="e.g. Niche specialist needed only for project duration. No permanent role planned."></textarea>
       </div>
-      <div class="section-title">📧 Send Email to Contractor Support</div>
-      <div class="email-preview" style="margin-bottom:12px">To: ${sectorEmail}
-Subject: ${newTramId} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL
-
-Can you please help with this renewal?
-
-Attachment: ${xlsxName}</div>
-      <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:16px">
-        💡 <b>Click "Open in Outlook" below.</b> Outlook opens with the email pre-filled.<br>
-        Attach <b>${xlsxName}</b> from your Downloads folder, then click Send.
+      <div class="form-group" style="margin-bottom:0">
+        <label><span style="background:#f3f4f6;color:#6b7280;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">4</span>
+          Any other contract insight <span style="color:#6b7280;font-size:11px">(optional)</span></label>
+        <textarea id="r_bj4" rows="2" placeholder="e.g. Client requested contractor by name."></textarea>
       </div>
-      <div class="section-title">Audit Timeline</div>
-      <ul class="timeline">
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">RENEWAL_STARTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">PM_CHECKLIST_COMPLETED</div><div class="tl-detail">Rate cap · Bill rate · GP% · Contract type · JRS · Band · Location · Skills · Business justification captured</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">ATTESTATION_COMPLETED</div><div class="tl-detail">All 3 attestations confirmed</div></div></li>
-        <li><div class="tl-dot orange"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATION_RUN</div><div class="tl-detail">Outcome: ${c.scenario==='jrs_active'?'ACTIVE':'ONE_REPLACEMENT'} · Final JR/S: "${renewalData.finalJRS||c.jrsTram}"</div></div></li>
-        <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">TRAM_RECONCILIATION_COMPLETED</div><div class="tl-detail">TRAM ID: ${newTramId} · Method: assisted_manual</div></div></li>
-        <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">${xlsxName} · Downloaded to PM machine</div></div></li>
-        <li><div class="tl-dot"></div><div class="tl-content"><div class="tl-time">Pending</div><div class="tl-action">EMAIL_SENT</div><div class="tl-detail">To: ${sectorEmail} · Awaiting PM send confirmation</div></div></li>
-      </ul>`;
-    footer=`
-      <a class="btn btn-primary" href="${mailtoLink}" target="_blank" onclick="postAudit('EMAIL_OPENED_OUTLOOK','${c.serial}','To: ${sectorEmail}','pending')">📧 Open in Outlook</a>
-      <button class="btn btn-green" onclick="confirmEmailSent('${c.serial}','${sectorEmail}','${xlsxName}')">✓ I Sent the Email</button>
-      <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
-  }
-  document.getElementById('renewalModalBody').innerHTML=body;
-  document.getElementById('renewalModalFooter').innerHTML=footer;
-}
-function renewalNext(){renewalStep++;renderRenewalStep();}
-function renewalBack(){renewalStep--;renderRenewalStep();}
-function renewalSubmit(){renewalStep=7;renderRenewalStep();}
+    </div>
 
-function confirmEmailSent(contractorId, toEmail, filename){
-  postAudit('EMAIL_SENT', contractorId, `To: ${toEmail} · File: ${filename}`, 'success');
-  // Replace footer with final confirmation
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:6px;background:#fafafa">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">TRAM — Update &amp; Capture New ID</div>
+      <div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:10px">
+        <b>Required:</b> Open TRAM, import from <code>${c.tramId}</code>, update the dates and financial fields, submit.
+        Then paste the new TRAM Request ID below. The application will include it in the Excel and email automatically.
+        <br><a href="https://tram.ibm.com" target="_blank" class="btn btn-warn btn-sm" style="text-decoration:none;margin-top:8px;display:inline-flex">🔗 Open TRAM</a>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>New TRAM Request ID <span style="color:#dc2626">*</span></label>
+        <input id="r_tramId" placeholder="e.g. NA202510048216S" style="font-family:monospace;font-size:14px"
+          oninput="document.getElementById('btnSubmitRenewal').disabled=!this.value.trim()">
+      </div>
+    </div>
+
+    <div id="renewalSubmitStatus" style="margin-top:12px"></div>`;
+
   document.getElementById('renewalModalFooter').innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;width:100%">
-      <span style="color:#16a34a;font-weight:700;font-size:14px">✅ Renewal complete — email confirmed sent.</span>
-      <button class="btn btn-secondary" style="margin-left:auto" onclick="closeRenewalModal()">Close</button>
-    </div>`;
+    <button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
+    <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()" disabled>
+      Submit Renewal — Excel + Email sent automatically
+    </button>`;
 }
 
-async function downloadExcel(contractorId){
-  const statusEl = document.getElementById('excelStatus');
-  const btnDown  = document.getElementById('btnDownloadExcel');
-  const btnSend  = document.getElementById('btnConfirmSend');
+async function submitRenewal(){
+  const c=renewalData.c;
+  const get=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
 
-  if(!API_BASE){
-    // Prototype mode — simulate download
-    if(statusEl) statusEl.innerHTML=`<div class="confirm-row">⚠ <b>Prototype mode</b> — no backend connected. In production this downloads the real populated .xlsm file.</div>`;
-    if(btnDown)  btnDown.style.display='none';
-    if(btnSend)  btnSend.style.display='inline-flex';
+  // ── Validate required fields ──────────────────────────────────────────────
+  const required=[
+    ['r_newEnd','New End Date'],['r_newStart','New Start Date'],['r_location','Work Location'],
+    ['r_jrs','JR/S'],['r_band','Band'],['r_skills','Niche Skills'],
+    ['r_rateCap','Rate Cap'],['r_billRate','Bill Rate'],['r_gp','GP%'],
+    ['r_contractType','Contract Type'],['r_bj1','Business Justification #1'],
+    ['r_tramId','New TRAM Request ID'],
+  ];
+  const missing=required.filter(([id])=>!get(id));
+  if(missing.length){
+    alert('Please complete the following fields before submitting:\n\n• '+missing.map(([,l])=>l).join('\n• '));
     return;
   }
 
-  if(btnDown) btnDown.disabled=true;
-  if(statusEl) statusEl.innerHTML=`<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">⏳ Generating Excel file from template…</div>`;
+  // ── Disable button + show spinner ─────────────────────────────────────────
+  const btn=document.getElementById('btnSubmitRenewal');
+  const statusEl=document.getElementById('renewalSubmitStatus');
+  btn.disabled=true;
+  btn.textContent='⏳ Submitting…';
+  statusEl.innerHTML=`<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">
+    ⏳ <b>Processing…</b> Validating JRS · Generating Excel · Sending email…</div>`;
 
+  // ── Prototype mode ────────────────────────────────────────────────────────
+  if(!API_BASE){
+    await new Promise(r=>setTimeout(r,1400)); // simulate latency
+    const xlsxName=`${c.name.replace('. ','_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
+    const sectorEmail=getSectorEmail(c.sector);
+    showRenewalSuccess({
+      excel_filename: xlsxName,
+      final_jrs: get('r_jrs'),
+      tram_id_used: get('r_tramId'),
+      email: {to: sectorEmail, subject:`${get('r_tramId')} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL`},
+      email_error: null,
+      submitted_at: new Date().toISOString(),
+      mailto_fallback: null,
+      _prototype: true,
+    });
+    return;
+  }
+
+  // ── Live submit ───────────────────────────────────────────────────────────
   try {
-    const c = renewalData.contractor;
-    const pm = renewalData.pmChecklist || {};
-
-    const resp = await fetch(API_BASE + '/api/generate-excel', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contractor_id: contractorId,
-        pm_checklist: {
-          ...pm,
-          contractor_name: c.name,
-          client:          c.client,
-          vendor:          c.vendor,
-          scope_of_work:   c.skillDescription,
-          manager_email:   c.pmIntranetId || pm.managerEmail || '',
-          tram_id_new:     renewalData.newTramId || c.tramId || '',
-          end_date:        pm.endDate || c.endDate || '',
-          comments:        [pm.bizJust1||'',pm.bizJust2||'',pm.bizJust3||'',pm.bizJust4||''].filter(Boolean).join('\n'),
-          user:            'current_user',
-        }
+    const resp=await apiFetch('/api/submit-renewal',{
+      method:'POST',
+      body:JSON.stringify({
+        contractor_id:    c.serial,
+        new_end_date:     get('r_newEnd'),
+        new_start_date:   get('r_newStart'),
+        confirmed_jrs:    get('r_jrs'),
+        confirmed_band:   get('r_band'),
+        work_location:    get('r_location'),
+        rate_cap:         get('r_rateCap'),
+        bill_rate:        get('r_billRate'),
+        gp_pct:           get('r_gp'),
+        contract_type:    get('r_contractType'),
+        niche_skills:     get('r_skills'),
+        biz_just_1:       get('r_bj1'),
+        biz_just_2:       get('r_bj2'),
+        biz_just_3:       get('r_bj3'),
+        biz_just_4:       get('r_bj4'),
+        tram_id_new:      get('r_tramId'),
       })
     });
-
-    if(!resp.ok){
-      const err = await resp.json().catch(()=>({detail:resp.statusText}));
-      throw new Error(err.detail || resp.statusText);
-    }
-
-    // Trigger browser download
-    const blob     = await resp.blob();
-    const filename = resp.headers.get('X-Filename') || 'renewal.xlsm';
-    const sha256   = resp.headers.get('X-SHA256')   || '';
-    const missing  = resp.headers.get('X-Missing-Fields') || '';
-    const url      = URL.createObjectURL(blob);
-    const a        = document.createElement('a');
-    a.href         = url;
-    a.download     = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    let warn = missing ? `<br>⚠ Missing fields: <b>${missing}</b>` : '';
-    if(statusEl) statusEl.innerHTML=`<div class="confirm-row">✅ <b>${filename}</b> downloaded to your machine.<br>SHA-256: <code>${sha256.slice(0,8)}…${sha256.slice(-4)}</code>${warn}</div>`;
-    if(btnDown)  btnDown.style.display='none';
-    if(btnSend)  btnSend.style.display='inline-flex';
-
-    await postAudit('EXCEL_GENERATED', contractorId, `File: ${filename} · SHA-256: ${sha256.slice(0,8)}`, 'success');
-
-  } catch(e) {
-    if(statusEl) statusEl.innerHTML=`<div class="dq-warn">❌ Excel generation failed: ${e.message}</div>`;
-    if(btnDown)  btnDown.disabled=false;
+    showRenewalSuccess(resp);
+  } catch(e){
+    btn.disabled=false;
+    btn.textContent='Submit Renewal — Excel + Email sent automatically';
+    statusEl.innerHTML=`<div class="dq-warn">❌ Submission failed: ${e.message}</div>`;
   }
 }
 
-// PM Checklist validation — required fields before advancing to attestations
-function pmChecklistNext(){
-  const required=[
-    {id:'pmRateCap',   label:'Rate Cap'},
-    {id:'pmBillRate',  label:'Bill Rate to Client'},
-    {id:'pmGP',        label:'Project GP%'},
-    {id:'pmContractType', label:'Contract Type'},
-    {id:'pmStartDate', label:'Start Date'},
-    {id:'pmEndDate',   label:'End Date'},
-    {id:'pmJRS',       label:'Confirmed JR/S'},
-    {id:'pmBand',      label:'Confirmed Band'},
-    {id:'pmLocation',  label:'Work Location'},
-    {id:'pmSkills',    label:'Niche Skills'},
-    {id:'bj1',         label:'Business Justification 1 (Domestic/GD resource review)'},
-  ];
-  const missing=required.filter(f=>{const el=document.getElementById(f.id);return !el||!el.value.trim();});
-  if(missing.length){
-    alert('Please complete the following required fields before proceeding:\n\n• '+missing.map(f=>f.label).join('\n• '));
-    return;
-  }
-  // Capture PM checklist values into renewalData for use in later steps
-  renewalData.pmChecklist={
-    rateCap:    document.getElementById('pmRateCap').value,
-    billRate:   document.getElementById('pmBillRate').value,
-    gp:         document.getElementById('pmGP').value,
-    contractType: document.getElementById('pmContractType').value,
-    startDate:  document.getElementById('pmStartDate').value,
-    endDate:    document.getElementById('pmEndDate').value,
-    jrs:        document.getElementById('pmJRS').value,
-    band:       document.getElementById('pmBand').value,
-    location:   document.getElementById('pmLocation').value,
-    skills:     document.getElementById('pmSkills').value,
-    bj1:        document.getElementById('bj1').value,
-    bj2:        document.getElementById('bj2').value,
-    bj3:        document.getElementById('bj3').value,
-    bj4:        document.getElementById('bj4').value,
-  };
-  renewalStep++;
-  renderRenewalStep();
+function showRenewalSuccess(resp){
+  const c=renewalData.c;
+  c.renewal='In Progress'; // update local state
+  const now=new Date(resp.submitted_at||Date.now()).toLocaleString();
+  const emailOk=!!resp.email;
+  const emailLine=emailOk
+    ? `<div class="confirm-row">✅ <b>Email sent</b> to ${resp.email.to}</div>`
+    : `<div class="dq-warn">⚠ <b>Email not sent automatically</b> — ${resp.email_error||'credentials not configured'}.
+        ${resp.mailto_fallback?`<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-warn btn-sm" style="margin-top:8px;display:inline-flex;text-decoration:none">📧 Open in Outlook as fallback</a>`:''}
+      </div>`;
+
+  document.getElementById('renewalModalBody').innerHTML=`
+    <div style="text-align:center;padding:24px 0 12px">
+      <div style="font-size:48px;margin-bottom:8px">${emailOk?'✅':'⚠'}</div>
+      <div style="font-size:20px;font-weight:700;color:${emailOk?'#15803d':'#92400e'};margin-bottom:4px">
+        ${emailOk?'Renewal Successfully Submitted':'Renewal Submitted — Action Required'}
+      </div>
+      <div style="font-size:13px;color:#6b7280">${now}</div>
+    </div>
+    <div class="confirm-row" style="margin-bottom:10px">
+      📋 <b>New TRAM Request ID:</b> <code style="font-size:15px;font-family:monospace">${resp.tram_id_used||'–'}</code>
+    </div>
+    <div class="confirm-row" style="margin-bottom:10px">
+      📄 <b>Excel file generated:</b> ${resp.excel_filename||'–'}
+      ${resp.excel_sha256?`<br><span style="font-size:11px;color:#6b7280">SHA-256: ${resp.excel_sha256.slice(0,8)}…${resp.excel_sha256.slice(-4)}</span>`:''}
+    </div>
+    ${emailLine}
+    ${resp._prototype?`<div class="dq-warn" style="margin-top:8px">⚠ <b>Prototype mode</b> — no backend connected. In production the Excel is generated and the email is sent automatically.</div>`:''}
+    <div class="section-title" style="margin-top:16px">Audit Summary</div>
+    <ul class="timeline">
+      <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATED</div><div class="tl-detail">Final JR/S: "${resp.final_jrs||'–'}"</div></div></li>
+      <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">${resp.excel_filename||'–'} · ${resp.fields_written||'?'} fields written</div></div></li>
+      <li><div class="tl-dot ${emailOk?'green':'red'}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${emailOk?'SENT':'FAILED'}</div><div class="tl-detail">${emailOk?'To: '+resp.email.to:resp.email_error||'—'}</div></div></li>
+      <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">RENEWAL_SUBMITTED</div><div class="tl-detail">TRAM ID: ${resp.tram_id_used||'–'}</div></div></li>
+    </ul>`;
+  document.getElementById('renewalModalFooter').innerHTML=`
+    <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
+  postAudit('RENEWAL_SUBMITTED',c.serial,`TRAM: ${resp.tram_id_used||'–'} · Excel: ${resp.excel_filename||'–'}`,emailOk?'success':'warning');
 }
-function toggleAtt(i){
-  renewalData.attest[i]=document.getElementById('att'+i).checked;
-  document.getElementById('attBox'+i).classList.toggle('checked',renewalData.attest[i]);
-  const btn=document.getElementById('attNextBtn');
-  if(btn) btn.disabled=!renewalData.attest.every(Boolean);
-}
-function acceptJRS(name){renewalData.jrsAccepted=true;renewalData.finalJRS=name;renderRenewalStep();}
-function rejectJRS(){alert('Enter the correct JRS in the field above and contact the process owner for guidance.');}
 // ── SECTOR → CSP EMAIL ROUTING ─────────────────────────────────────────
 // Confirmed routing rules:
 //   indcontr@cr.ibm.com   → Industrial sectors
@@ -1484,97 +1286,183 @@ function getSectorEmailLabel(sector){
   return labels[email]||email;
 }
 
-function escalateJRS(){
-  alert('JRS case escalated to CSP team for this sector (OQ-30 resolved: routing by sector).\nRenewal blocked until the CSP team provides a confirmed JRS value.\nAudit record written.\n\n[PROTOTYPE — no real escalation sent]');
-  closeRenewalModal();
-}
-function resolveCity(){
-  const reason=prompt('Approve Work Location City correction\n\nSource: Dallas  →  TRAM: Austin\n\nEnter reason for accepting "Dallas":','Updated per project move — confirmed');
-  if(reason){renewalData.tramResolved=true;renderRenewalStep();}
-}
-
-// ── OFFBOARDING MODAL ─────────────────────────
-let offboardStep=0;
+// ── OFFBOARDING MODAL — single-screen review + one-click submit ───────────────
 let offboardData={};
 function openOffboardModal(id){
   const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
   if(c.offboard==='In Progress'){
-    alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor. A new request cannot be submitted.\n\nThis event has been recorded in the audit log.');
+    alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
-  offboardData={c,step:1};
+  offboardData={c};
   document.getElementById('offboardModal').classList.add('open');
-  renderOffboardStep();
+  renderOffboardForm();
 }
 function closeOffboardModal(){document.getElementById('offboardModal').classList.remove('open');}
 
-function renderOffboardStep(){
-  const {c}=offboardData;
-  document.getElementById('offboardModalTitle').textContent=`Offboarding — ${c.name} (${c.id})`;
-  const steps=['Review','Confirm','Submitted'];
-  const stepsHtml=`<div class="steps">${steps.map((s,i)=>{let cls='';if(i+1<offboardData.step) cls='done';else if(i+1===offboardData.step) cls='active';return `<div class="step ${cls}">${i+1<offboardData.step?'✓ ':''}${s}</div>`;}).join('')}</div>`;
-  let body='',footer='';
-  if(offboardData.step===1){
-    // Confirmed offboarding fields (OQ-06): Sector, Manager Email (PM), Contractor Name,
-    // PO Number, Serial Number, Last day (mm/dd/yyyy), Reason For Termination,
-    // Laptop (yes/no), Laptop returned (yes/no), Comments
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Prepopulated from source report. All fields marked * are required.</p>
-      <div class="form-grid">
-        <div class="form-group"><label>Contractor Name *</label><input value="${c.name}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Serial Number *</label><input value="${c.serial}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Sector *</label><input value="${c.sector}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>Manager Email (PM) *</label><input value="${c.pmIntranetId}" placeholder="PM email"></div>
-        <div class="form-group"><label>PO Number *</label><input value="${c.poNumber}" readonly style="background:#f9fafb"></div>
-        <div class="form-group"><label>TRAM Request ID *</label><input value="${c.tramId||''}" ${!c.tramId?'placeholder="MISSING — required" style="border-color:#dc2626"':'readonly style="background:#f9fafb"'}></div>
-        <div class="form-group"><label>Last Day (mm/dd/yyyy) *</label><input id="offTermDate" type="date"></div>
-        <div class="form-group"><label>Reason For Termination *</label>
-          <select id="offReason"><option value="">— Select —</option><option>Assignment Completed</option><option>Mutual Agreement</option><option>Performance</option><option>Budget Reduction</option><option>Other</option></select></div>
-        <div class="form-group"><label>Laptop (yes/no) *</label>
-          <select id="offLaptop"><option value="">— Select —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
-        <div class="form-group"><label>Laptop Returned (yes/no)</label>
-          <select id="offLaptopRet"><option value="">— Select —</option><option value="Yes">Yes</option><option value="No">No</option><option value="N/A">N/A</option></select></div>
+function renderOffboardForm(){
+  const c=offboardData.c;
+  document.getElementById('offboardModalTitle').textContent=`Offboarding — ${c.name} (${c.serial})`;
+  const sectorEmail=getSectorEmail(c.sector);
+
+  document.getElementById('offboardModalBody').innerHTML=`
+    <div style="background:#fff1f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#b91c1c">
+      <b>${c.name}</b> &nbsp;·&nbsp; ${c.client} &nbsp;·&nbsp; ${c.project}
+      &nbsp;·&nbsp; Serial: <code>${c.serial}</code> &nbsp;·&nbsp; TRAM: <code>${c.tramId||'Missing'}</code>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803d">
+      <b>What happens when you click Submit:</b> The application will automatically
+      send the offboarding email to ${getSectorEmailLabel(c.sector)} · record the audit trail.
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Contractor Name</label>
+        <input value="${c.name}" readonly style="background:#f9fafb">
       </div>
-      <div class="form-group"><label>Comments</label><textarea id="offComments" rows="2" placeholder="Optional additional information"></textarea></div>`;
-    footer=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="offboardNext()">Next: Review &amp; Email Preview →</button>`;
-  } else if(offboardData.step===2){
-    const sectorEmail=getSectorEmail(c.sector);
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Review the summary and email preview before submitting. This action cannot be undone.</p>
-      <div class="confirm-row"><b>Contractor:</b> ${c.name} · <b>Serial:</b> ${c.serial}<br><b>Sector:</b> ${c.sector} · <b>PO:</b> ${c.poNumber}<br><b>TRAM:</b> ${c.tramId||'[MISSING]'}<br><b>Requested by:</b> A. Martinez | 2025-07-14</div>
-      ${sectorEmail==='⏳ Pending OQ-21a'?`<div class="dq-warn" style="margin-top:10px">⚠ CSP email for sector "<b>${c.sector}</b>" not yet in routing table (OQ-21a pending).</div>`:''}
-      <div class="section-title" style="margin-top:12px">Email Preview — Recipient: <b>${c.sector}</b> CSP Team</div>
-      <div class="email-preview">To: ${sectorEmail}
-Subject: ${c.tramId} ${c.serial} ${c.poNumber} ${c.name} ${c.client} OFFBOARDING
+      <div class="form-group">
+        <label>Serial Number</label>
+        <input value="${c.serial}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>Sector</label>
+        <input value="${c.sector}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>Manager Email (PM) <span style="color:#dc2626">*</span></label>
+        <input id="ob_mgr" value="${c.pmIntranetId||''}" placeholder="PM email">
+      </div>
+      <div class="form-group">
+        <label>PO Number</label>
+        <input value="${c.poNumber||'–'}" readonly style="background:#f9fafb">
+      </div>
+      <div class="form-group">
+        <label>TRAM Request ID</label>
+        <input value="${c.tramId||''}" readonly style="background:#f9fafb" ${!c.tramId?'style="border-color:#dc2626"':''}>
+      </div>
+      <div class="form-group">
+        <label>Last Day <span style="color:#dc2626">*</span></label>
+        <input id="ob_lastDay" type="date">
+      </div>
+      <div class="form-group">
+        <label>Reason For Termination <span style="color:#dc2626">*</span></label>
+        <select id="ob_reason">
+          <option value="">— Select —</option>
+          <option>Assignment Completed</option>
+          <option>Mutual Agreement</option>
+          <option>Performance</option>
+          <option>Budget Reduction</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Laptop <span style="color:#dc2626">*</span></label>
+        <select id="ob_laptop">
+          <option value="">— Select —</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Laptop Returned</label>
+        <select id="ob_laptopRet">
+          <option value="">— Select —</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+          <option value="N/A">N/A</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Comments</label>
+      <textarea id="ob_comments" rows="2" placeholder="Optional"></textarea>
+    </div>
 
-Can you please help with this offboarding?
+    <div class="section-title" style="margin-top:4px">Email Preview</div>
+    <div class="email-preview" style="margin-bottom:4px">To: ${sectorEmail}
+Subject: ${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING
 
-[PROTOTYPE — no real email sent]</div>`;
-    footer=`<button class="btn btn-secondary" onclick="offboardBack()">← Back</button>
-      <button class="btn btn-danger" onclick="offboardSubmit()">✓ Confirm &amp; Submit Offboarding</button>`;
-  } else if(offboardData.step===3){
+Please process the following offboarding request.
+[Fields will be included automatically in the sent email]</div>
+
+    <div id="offboardSubmitStatus" style="margin-top:12px"></div>`;
+
+  document.getElementById('offboardModalFooter').innerHTML=`
+    <button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
+    <button class="btn btn-danger" id="btnSubmitOffboard" onclick="submitOffboarding()">
+      Submit Offboarding — Email sent automatically
+    </button>`;
+}
+
+async function submitOffboarding(){
+  const c=offboardData.c;
+  const get=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  const required=[['ob_lastDay','Last Day'],['ob_reason','Reason For Termination'],['ob_laptop','Laptop']];
+  const missing=required.filter(([id])=>!get(id));
+  if(missing.length){alert('Please complete:\n\n• '+missing.map(([,l])=>l).join('\n• '));return;}
+
+  const btn=document.getElementById('btnSubmitOffboard');
+  const statusEl=document.getElementById('offboardSubmitStatus');
+  btn.disabled=true; btn.textContent='⏳ Submitting…';
+  statusEl.innerHTML=`<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">⏳ <b>Processing…</b> Sending offboarding email…</div>`;
+
+  if(!API_BASE){
+    await new Promise(r=>setTimeout(r,900));
     const sectorEmail=getSectorEmail(c.sector);
-    body=stepsHtml+`<div class="confirm-row" style="margin-bottom:16px">
-      ✅ <b>Offboarding submitted.</b><br>
-      Sent to: ${sectorEmail} (${c.sector} CSP team)<br>
-      Message ID: SYN-MSG-9943 · 2025-07-14 09:45 UTC<br>
-      Audit: OFFBOARDING_SUBMITTED</div>
-      <p style="font-size:13px;color:#6b7280">Status will update to "Offboarding In Progress" in the dashboard on the next source refresh.</p>`;
-    footer=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Close</button>`;
+    showOffboardSuccess({
+      email:{to:sectorEmail},email_error:null,
+      submitted_at:new Date().toISOString(),mailto_fallback:null,_prototype:true
+    });
+    return;
   }
-  document.getElementById('offboardModalBody').innerHTML=body;
-  document.getElementById('offboardModalFooter').innerHTML=footer;
+
+  try{
+    const resp=await apiFetch('/api/submit-offboarding',{
+      method:'POST',
+      body:JSON.stringify({
+        contractor_id: c.serial,
+        last_day:      get('ob_lastDay'),
+        reason:        get('ob_reason'),
+        laptop:        get('ob_laptop'),
+        laptop_returned: get('ob_laptopRet'),
+        comments:      get('ob_comments'),
+        manager_email: get('ob_mgr'),
+      })
+    });
+    showOffboardSuccess(resp);
+  }catch(e){
+    btn.disabled=false; btn.textContent='Submit Offboarding — Email sent automatically';
+    statusEl.innerHTML=`<div class="dq-warn">❌ Submission failed: ${e.message}</div>`;
+  }
 }
-function offboardNext(){
-  const r=document.getElementById('offReason');
-  const t=document.getElementById('offTermDate');
-  const l=document.getElementById('offLaptop');
-  if(t&&!t.value){alert('Please enter the contractor\'s last day.');return;}
-  if(r&&!r.value){alert('Please select a reason for termination.');return;}
-  if(l&&!l.value){alert('Please indicate whether the contractor has a laptop (yes/no).');return;}
-  offboardData.step++;renderOffboardStep();
+
+function showOffboardSuccess(resp){
+  const c=offboardData.c;
+  c.offboard='In Progress';
+  const now=new Date(resp.submitted_at||Date.now()).toLocaleString();
+  const emailOk=!!resp.email;
+  const emailLine=emailOk
+    ? `<div class="confirm-row">✅ <b>Email sent</b> to ${resp.email.to}</div>`
+    : `<div class="dq-warn">⚠ <b>Email not sent automatically</b> — ${resp.email_error||'credentials not configured'}.
+        ${resp.mailto_fallback?`<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-warn btn-sm" style="margin-top:8px;display:inline-flex;text-decoration:none">📧 Open in Outlook as fallback</a>`:''}
+      </div>`;
+  document.getElementById('offboardModalBody').innerHTML=`
+    <div style="text-align:center;padding:24px 0 12px">
+      <div style="font-size:48px;margin-bottom:8px">${emailOk?'✅':'⚠'}</div>
+      <div style="font-size:20px;font-weight:700;color:${emailOk?'#15803d':'#92400e'};margin-bottom:4px">
+        ${emailOk?'Offboarding Successfully Submitted':'Offboarding Submitted — Action Required'}
+      </div>
+      <div style="font-size:13px;color:#6b7280">${now}</div>
+    </div>
+    ${emailLine}
+    ${resp._prototype?`<div class="dq-warn" style="margin-top:8px">⚠ <b>Prototype mode</b> — In production the offboarding email is sent automatically.</div>`:''}
+    <ul class="timeline" style="margin-top:16px">
+      <li><div class="tl-dot ${emailOk?'green':'red'}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${emailOk?'SENT':'FAILED'}</div><div class="tl-detail">${emailOk?'To: '+resp.email.to:resp.email_error||'—'}</div></div></li>
+      <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">OFFBOARDING_SUBMITTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
+    </ul>`;
+  document.getElementById('offboardModalFooter').innerHTML=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Close</button>`;
+  postAudit('OFFBOARDING_SUBMITTED',c.serial,`Email: ${emailOk?'sent':'failed'}`,emailOk?'success':'warning');
 }
-function offboardBack(){offboardData.step--;renderOffboardStep();}
-function offboardSubmit(){offboardData.step=3;renderOffboardStep();}
 
 // ── TAB CONTENT ───────────────────────────────
 function renderRenewalTab(){

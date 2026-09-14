@@ -7,7 +7,8 @@ Endpoints:
   POST /api/refresh             — re-ingest from Box
   POST /api/refresh-taxonomy    — reload taxonomy from Box
   GET  /api/jrs/{jrs_value}     — validate a single JRS string
-  POST /api/generate-excel      — generate populated renewal .xlsm
+  POST /api/submit-renewal      — ONE-SHOT: validate JRS + generate Excel + send email
+  POST /api/submit-offboarding  — ONE-SHOT: generate offboarding email
   POST /api/audit               — append an audit record
   GET  /api/audit               — retrieve audit log
 
@@ -64,6 +65,53 @@ class AuditRecord(BaseModel):
 class ExcelRequest(BaseModel):
     contractor_id: str          # serial / TalentID to look up in ingestion cache
     pm_checklist:  dict         # all PM checklist fields from Step 2 of renewal workflow
+
+
+class SubmitRenewalRequest(BaseModel):
+    """
+    Single-shot renewal submission.
+    The PM fills in the review form; the backend does everything else automatically:
+      1. JRS validation
+      2. Excel generation (downloads template from Box, populates all fields)
+      3. Email send via Microsoft Graph
+      4. Audit write
+    """
+    contractor_id:   str
+    # Fields the PM reviewed / corrected in the UI
+    new_end_date:    str
+    new_start_date:  str
+    confirmed_jrs:   str
+    confirmed_band:  str
+    work_location:   str
+    rate_cap:        str
+    bill_rate:       str
+    gp_pct:          str
+    contract_type:   str
+    niche_skills:    str
+    biz_just_1:      str
+    biz_just_2:      str = ""
+    biz_just_3:      str = ""
+    biz_just_4:      str = ""
+    us_citizenship:  str = ""
+    security_access: str = ""
+    pen_testing:     str = ""
+    requires_laptop: str = "No"
+    laptop_os:       str = ""
+    laptop_address:  str = ""
+    contractor_phone:str = ""
+    # TRAM ID the PM enters after submitting in TRAM (may be empty on first pass)
+    tram_id_new:     str = ""
+
+
+class SubmitOffboardingRequest(BaseModel):
+    """Single-shot offboarding — generates and sends the email automatically."""
+    contractor_id:    str
+    last_day:         str
+    reason:           str
+    laptop:           str
+    laptop_returned:  str = ""
+    comments:         str = ""
+    manager_email:    str = ""
 
 
 class SendEmailRequest(BaseModel):
@@ -198,83 +246,229 @@ def get_sector_email(sector: str):
     return {"sector": sector, "email": email}
 
 
-# ── Excel Generation ─────────────────────────────────────────────────────────
+# ── ONE-SHOT Renewal Submission ───────────────────────────────────────────────
+
+@app.post("/api/submit-renewal")
+def submit_renewal(req: SubmitRenewalRequest):
+    """
+    Fully automated renewal pipeline triggered by a single PM click.
+
+    Steps executed automatically:
+      1. Resolve contractor record from cache
+      2. Validate JRS against M389 taxonomy
+      3. Download Excel template from Box
+      4. Populate the Excel with all PM-reviewed fields
+      5. Send the renewal email via Microsoft Graph (Excel attached)
+      6. Write audit record
+
+    Returns a single JSON response with all results so the frontend
+    can display the confirmation screen in one shot.
+    """
+    # ── 1. Resolve contractor ─────────────────────────────────────────────────
+    contractor = _resolve_contractor(req.contractor_id)
+
+    # ── 2. JRS validation ─────────────────────────────────────────────────────
+    jrs_to_use = req.confirmed_jrs or contractor.get("jrsTram", "")
+    jrs_result = jrs_validation.validate_jrs(jrs_to_use)
+    if jrs_result["outcome"] in ("multi_replacement", "not_found"):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"JRS '{jrs_to_use}' cannot be auto-resolved: {jrs_result['outcome']}. "
+                "Please correct the JRS field before submitting."
+            ),
+        )
+    # If there is exactly one replacement, apply it automatically
+    final_jrs = jrs_to_use
+    if jrs_result["outcome"] == "one_replacement" and jrs_result.get("replacements"):
+        final_jrs = jrs_result["replacements"][0]
+
+    # ── 3. Build PM checklist dict for Excel generation ───────────────────────
+    biz_just_parts = [p for p in [
+        req.biz_just_1, req.biz_just_2, req.biz_just_3, req.biz_just_4
+    ] if p.strip()]
+    biz_just = "\n".join(f"{i+1}. {p}" for i, p in enumerate(biz_just_parts))
+
+    pm_checklist = {
+        "manager_email":    contractor.get("pmIntranetId", ""),
+        "start_date":       req.new_start_date,
+        "end_date":         req.new_end_date,
+        "tram_id_new":      req.tram_id_new or contractor.get("tramId", ""),
+        "niche_skills":     req.niche_skills,
+        "biz_just_1":       req.biz_just_1,
+        "biz_just_2":       req.biz_just_2,
+        "biz_just_3":       req.biz_just_3,
+        "biz_just_4":       req.biz_just_4,
+        "us_citizenship":   req.us_citizenship,
+        "security_access":  req.security_access,
+        "pen_testing":      req.pen_testing,
+        "requires_laptop":  req.requires_laptop,
+        "laptop_os":        req.laptop_os,
+        "laptop_address":   req.laptop_address,
+        "contractor_phone": req.contractor_phone,
+        "comments":         biz_just,
+        "jrs":              final_jrs,
+        "band":             req.confirmed_band,
+        "location":         req.work_location,
+        "rateCap":          req.rate_cap,
+        "billRate":         req.bill_rate,
+        "gp":               req.gp_pct,
+        "contractType":     req.contract_type,
+    }
+
+    # Patch contractor with PM-confirmed values for Excel
+    contractor_for_excel = {
+        **contractor,
+        "jrsTram": final_jrs,
+        "band":    req.confirmed_band,
+        "workLocation": req.work_location,
+        "endDate": req.new_end_date,
+    }
+
+    # ── 4. Download template + generate Excel ─────────────────────────────────
+    try:
+        box_client = get_client()
+        template_bytes = excel_generation.download_template(box_client, BOX_FOLDER_ID)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not download Excel template from Box: {e}",
+        )
+
+    excel_result = excel_generation.generate_renewal_excel(
+        contractor=contractor_for_excel,
+        pm_checklist=pm_checklist,
+        template_bytes=template_bytes,
+    )
+
+    # ── 5. Send email ─────────────────────────────────────────────────────────
+    email_result = None
+    email_error  = None
+    tram_id_for_subject = req.tram_id_new or contractor.get("tramId", "–")
+
+    if email_sender.is_configured():
+        try:
+            email_result = email_sender.send_renewal_email(
+                contractor=contractor,
+                tram_id_new=tram_id_for_subject,
+                excel_filename=excel_result["filename"],
+                excel_bytes=excel_result["file_bytes"],
+            )
+        except Exception as e:
+            email_error = str(e)
+    else:
+        email_error = (
+            "Microsoft Graph credentials not configured. "
+            "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL "
+            "in Railway environment variables."
+        )
+
+    # ── 6. Audit ──────────────────────────────────────────────────────────────
+    _append_audit(
+        user="current_user",
+        action="RENEWAL_SUBMITTED",
+        contractor=req.contractor_id,
+        detail=(
+            f"JRS: {final_jrs} · "
+            f"End: {req.new_end_date} · "
+            f"Excel: {excel_result['filename']} · "
+            f"Email: {'sent' if email_result else 'FAILED — ' + (email_error or '')}"
+        ),
+        outcome="success" if email_result else "warning",
+    )
+
+    return {
+        "status":           "ok" if email_result else "partial",
+        "jrs_result":       jrs_result,
+        "final_jrs":        final_jrs,
+        "excel_filename":   excel_result["filename"],
+        "excel_sha256":     excel_result["sha256"],
+        "fields_written":   excel_result["fields_written"],
+        "missing_fields":   excel_result["missing_mandatory"],
+        "email":            email_result,
+        "email_error":      email_error,
+        "submitted_at":     datetime.utcnow().isoformat() + "Z",
+        "tram_id_used":     tram_id_for_subject,
+        # Convenience: mailto fallback if Graph not configured
+        "mailto_fallback":  _build_mailto(contractor, tram_id_for_subject, excel_result["filename"]),
+    }
+
+
+# ── ONE-SHOT Offboarding Submission ───────────────────────────────────────────
+
+@app.post("/api/submit-offboarding")
+def submit_offboarding(req: SubmitOffboardingRequest):
+    """
+    Fully automated offboarding pipeline triggered by a single PM click.
+    Sends the offboarding email to the correct CSP team automatically.
+    """
+    contractor = _resolve_contractor(req.contractor_id)
+
+    offboard_data = {
+        "manager_email":    req.manager_email or contractor.get("pmIntranetId", ""),
+        "last_day":         req.last_day,
+        "reason":           req.reason,
+        "laptop":           req.laptop,
+        "laptop_returned":  req.laptop_returned,
+        "comments":         req.comments,
+    }
+
+    email_result = None
+    email_error  = None
+
+    if email_sender.is_configured():
+        try:
+            email_result = email_sender.send_offboarding_email(
+                contractor=contractor,
+                offboard_data=offboard_data,
+            )
+        except Exception as e:
+            email_error = str(e)
+    else:
+        email_error = (
+            "Microsoft Graph credentials not configured. "
+            "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL "
+            "in Railway environment variables."
+        )
+
+    _append_audit(
+        user="current_user",
+        action="OFFBOARDING_SUBMITTED",
+        contractor=req.contractor_id,
+        detail=(
+            f"Last day: {req.last_day} · "
+            f"Reason: {req.reason} · "
+            f"Email: {'sent' if email_result else 'FAILED — ' + (email_error or '')}"
+        ),
+        outcome="success" if email_result else "warning",
+    )
+
+    return {
+        "status":       "ok" if email_result else "partial",
+        "email":        email_result,
+        "email_error":  email_error,
+        "submitted_at": datetime.utcnow().isoformat() + "Z",
+        "mailto_fallback": _build_offboard_mailto(contractor, offboard_data),
+    }
+
+
+# ── Legacy: kept for backward compatibility ───────────────────────────────────
 
 @app.post("/api/generate-excel")
 def generate_excel(req: ExcelRequest):
-    """
-    Generate the populated renewal .xlsm file.
-    Returns the file as a downloadable attachment.
-
-    The frontend triggers a browser download — the file lands on the PM's machine.
-    """
-    # Find contractor in cache
-    contractor = None
-    if _ingestion_result:
-        all_records = (
-            _ingestion_result.get("contractors", []) +
-            _ingestion_result.get("dq_exceptions", [])
-        )
-        contractor = next(
-            (c for c in all_records if c.get("serial") == req.contractor_id),
-            None
-        )
-
-    # Fall back to minimal record built from pm_checklist if not in cache
-    if not contractor:
-        contractor = {
-            "serial":           req.contractor_id,
-            "name":             req.pm_checklist.get("contractor_name", req.contractor_id),
-            "client":           req.pm_checklist.get("client", ""),
-            "vendor":           req.pm_checklist.get("vendor", ""),
-            "tramId":           req.pm_checklist.get("tram_id_new", ""),
-            "skillDescription": req.pm_checklist.get("scope_of_work", ""),
-            "pmIntranetId":     req.pm_checklist.get("manager_email", ""),
-            "endDate":          req.pm_checklist.get("end_date", ""),
-        }
-
-    # Download template from Box
+    """Legacy endpoint — prefer /api/submit-renewal for new code."""
+    contractor = _resolve_contractor(req.contractor_id)
     try:
         client = get_client()
         template_bytes = excel_generation.download_template(client, BOX_FOLDER_ID)
     except Exception as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Could not download template from Box: {str(e)}. "
-                   "Ensure the template file is uploaded to the Consulting NA Box folder."
-        )
+        raise HTTPException(status_code=503, detail=f"Could not download template from Box: {e}")
 
-    # Generate the populated file
     result = excel_generation.generate_renewal_excel(
         contractor=contractor,
         pm_checklist=req.pm_checklist,
         template_bytes=template_bytes,
     )
-
-    # Warn if mandatory fields are missing but do not block — let user decide
-    if result["missing_mandatory"]:
-        _append_audit(
-            user=req.pm_checklist.get("user", "unknown"),
-            action="EXCEL_MANDATORY_FIELDS_MISSING",
-            contractor=req.contractor_id,
-            detail=f"Missing fields: {', '.join(result['missing_mandatory'])}",
-            outcome="warning",
-        )
-
-    # Record successful generation
-    _append_audit(
-        user=req.pm_checklist.get("user", "unknown"),
-        action="EXCEL_GENERATED",
-        contractor=req.contractor_id,
-        detail=(
-            f"File: {result['filename']} · "
-            f"{result['fields_written']} fields written · "
-            f"SHA-256: {result['sha256'][:8]}...{result['sha256'][-4:]}"
-        ),
-        outcome="success",
-    )
-
-    # Return file as download
     return Response(
         content=result["file_bytes"],
         media_type="application/vnd.ms-excel.sheet.macroEnabled.12",
@@ -287,83 +481,27 @@ def generate_excel(req: ExcelRequest):
     )
 
 
-# ── Email Send ───────────────────────────────────────────────────────────────
-
 @app.post("/api/send-email")
 def send_email(req: SendEmailRequest):
-    """
-    Send the renewal or offboarding email via Microsoft Graph.
-
-    The frontend passes the already-generated excel file as base64.
-    This keeps the flow stateless — no server-side file storage needed.
-    """
+    """Legacy endpoint — prefer /api/submit-renewal for new code."""
     import base64
-
-    # Resolve contractor record
-    contractor = None
-    if _ingestion_result:
-        all_records = (
-            _ingestion_result.get("contractors", []) +
-            _ingestion_result.get("dq_exceptions", [])
-        )
-        contractor = next(
-            (c for c in all_records if c.get("serial") == req.contractor_id),
-            None
-        )
-    if not contractor:
-        contractor = {"serial": req.contractor_id, "name": req.contractor_id}
-
-    # Check Graph credentials configured
+    contractor = _resolve_contractor(req.contractor_id)
     if not email_sender.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Microsoft Graph email credentials not configured. "
-                "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL "
-                "in Railway environment variables. "
-                "See backend/DEPLOYMENT.md Step 5 for setup instructions."
-            ),
-        )
-
+        raise HTTPException(status_code=503, detail="Microsoft Graph credentials not configured.")
     try:
         excel_bytes = base64.b64decode(req.excel_bytes_base64)
-
         if req.email_type == "offboarding":
-            result = email_sender.send_offboarding_email(
-                contractor=contractor,
-                offboard_data=req.offboard_data,
-            )
+            result = email_sender.send_offboarding_email(contractor=contractor, offboard_data=req.offboard_data)
         else:
             result = email_sender.send_renewal_email(
-                contractor=contractor,
-                tram_id_new=req.tram_id_new,
-                excel_filename=req.excel_filename,
-                excel_bytes=excel_bytes,
+                contractor=contractor, tram_id_new=req.tram_id_new,
+                excel_filename=req.excel_filename, excel_bytes=excel_bytes,
             )
-
-        _append_audit(
-            user="current_user",
-            action="EMAIL_SENT",
-            contractor=req.contractor_id,
-            detail=(
-                f"To: {result['to']} · "
-                f"Subject: {result['subject']} · "
-                f"MsgID: {result['message_id']}"
-            ),
-            outcome="success",
-        )
-
+        _append_audit(user="current_user", action="EMAIL_SENT", contractor=req.contractor_id,
+                      detail=f"To: {result['to']} · Subject: {result['subject']}", outcome="success")
         return result
-
     except Exception as e:
-        _append_audit(
-            user="current_user",
-            action="EMAIL_FAILED",
-            contractor=req.contractor_id,
-            detail=str(e),
-            outcome="error",
-        )
-        raise HTTPException(status_code=500, detail=f"Email send failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Email send failed: {e}")
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
@@ -431,3 +569,61 @@ def _run_jrs_batch():
                 "replacements": [],
                 "message": "No JRS value in source record.",
             }
+
+
+def _resolve_contractor(contractor_id: str) -> dict:
+    """
+    Look up a contractor by serial/TalentID in the in-memory cache.
+    Falls back to a minimal stub so the pipeline never hard-blocks on a cache miss.
+    """
+    if _ingestion_result:
+        all_records = (
+            _ingestion_result.get("contractors", []) +
+            _ingestion_result.get("dq_exceptions", [])
+        )
+        match = next((c for c in all_records if c.get("serial") == contractor_id), None)
+        if match:
+            return match
+    # Stub — lets the pipeline continue; Excel/email will have partial data
+    return {"serial": contractor_id, "name": contractor_id}
+
+
+def _build_mailto(contractor: dict, tram_id: str, excel_filename: str) -> str:
+    """Build a mailto: fallback link for when Graph email is not configured."""
+    from urllib.parse import quote
+    sector = contractor.get("sector", "")
+    from config import SECTOR_EMAIL_MAP, SECTOR_EMAIL_DEFAULT
+    to = SECTOR_EMAIL_MAP.get(sector.strip().lower(), SECTOR_EMAIL_DEFAULT)
+    subject = quote(
+        f"{tram_id} {contractor.get('serial','–')} {contractor.get('poNumber','–')} "
+        f"{contractor.get('name','–')} {contractor.get('client','–')} RENEWAL"
+    )
+    body = quote(f"Can you please help with this renewal?\n\nAttachment: {excel_filename}")
+    return f"mailto:{to}?subject={subject}&body={body}"
+
+
+def _build_offboard_mailto(contractor: dict, offboard_data: dict) -> str:
+    """Build a mailto: fallback link for offboarding when Graph is not configured."""
+    from urllib.parse import quote
+    sector = contractor.get("sector", "")
+    from config import SECTOR_EMAIL_MAP, SECTOR_EMAIL_DEFAULT
+    to = SECTOR_EMAIL_MAP.get(sector.strip().lower(), SECTOR_EMAIL_DEFAULT)
+    subject = quote(
+        f"{contractor.get('tramId','–')} {contractor.get('serial','–')} "
+        f"{contractor.get('poNumber','–')} {contractor.get('name','–')} "
+        f"{contractor.get('client','–')} OFFBOARDING"
+    )
+    lines = [
+        "Please process the following offboarding request:",
+        "",
+        f"Contractor Name: {contractor.get('name','–')}",
+        f"Serial Number: {contractor.get('serial','–')}",
+        f"PO Number: {contractor.get('poNumber','–')}",
+        f"Last Day: {offboard_data.get('last_day','–')}",
+        f"Reason: {offboard_data.get('reason','–')}",
+        f"Laptop: {offboard_data.get('laptop','–')}",
+        f"Laptop Returned: {offboard_data.get('laptop_returned','–')}",
+        f"Comments: {offboard_data.get('comments','–')}",
+    ]
+    body = quote("\n".join(lines))
+    return f"mailto:{to}?subject={subject}&body={body}"
