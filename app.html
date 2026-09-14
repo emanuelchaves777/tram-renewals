@@ -1120,22 +1120,77 @@ function renderRenewalStep(){
 
   // ── STEP 5 (was 4): TRAM RECONCILIATION ────────────────────────────────
   } else if(renewalStep===5){
-    const cm=!renewalData.tramResolved;
-    body=stepsHtml+`<p style="font-size:13px;color:#6b7280;margin-bottom:14px">Comparing reviewed values against TRAM record (${c.tramId}). Mismatches must be resolved. Silent overwrite is not permitted.</p>
-      <table class="recon-table"><thead><tr><th>Field</th><th>Source Report</th><th>TRAM Current</th><th>Status</th><th>Action</th></tr></thead><tbody>
-        <tr><td>Contractor Name</td><td>${c.name}</td><td>${c.name}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
-        <tr><td>Client</td><td>${c.client}</td><td>${c.client}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
-        <tr><td>JR/S (TRAM)</td><td>${renewalData.finalJRS||c.jrsTram}</td><td>${c.jrsTram}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
-        <tr><td>Band</td><td>${c.band}</td><td>${c.band}</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
-        <tr class="${cm?'field-changed':''}"><td>Work Location City</td><td>Dallas</td><td>Austin</td>
-          <td><span class="${cm?'recon-mismatch':'recon-match'}">${cm?'✗ Mismatch':'✓ Resolved'}</span></td>
-          <td>${cm?`<button class="btn btn-warn btn-sm" onclick="resolveCity()">Review &amp; Accept</button>`:'<span style="color:#16a34a;font-size:12px">Approved</span>'}</td></tr>
-        <tr><td>Spend Type</td><td>Contingent</td><td>Contingent</td><td><span class="recon-match">✓ Match</span></td><td>–</td></tr>
-      </tbody></table>
-      ${cm?`<div class="dq-warn">⚠ Unresolved mismatch: <b>Work Location City</b>. Submission blocked until resolved.</div>`:''}
-      ${renewalData.tramResolved?`<div class="confirm-row">✅ All fields reconciled. TRAM ready for submission.</div>`:''}`;
+    const pm = renewalData.pmChecklist||{};
+    const finalJRS = renewalData.finalJRS || c.jrsTram;
+    const newEndDate = pm.endDate || c.endDate || '–';
+    const newStartDate = pm.startDate || '–';
+    const rateCap = pm.rateCap || '–';
+    const billRate = pm.billRate || '–';
+    const projectGP = pm.projectGP || '–';
+    const contractType = pm.contractType || '–';
+    const band = pm.band || c.band || '–';
+    const workLoc = pm.workLocation || c.workLocation || '–';
+
+    // Fields the user must enter into TRAM — pre-filled from report + PM checklist
+    const tramFields = [
+      {label:'Prior TRAM Request ID (Import from)',  value:c.tramId,       note:'Use this to import the existing request'},
+      {label:'Contractor Full Name',                  value:c.name,         note:''},
+      {label:'Serial / TalentID',                     value:c.serial,       note:''},
+      {label:'Client Name',                           value:c.client,       note:''},
+      {label:'Project Name',                          value:c.project,      note:''},
+      {label:'Vendor',                                value:c.vendor,       note:''},
+      {label:'PO Number',                             value:c.poNumber,     note:''},
+      {label:'JR/S',                                  value:finalJRS,       note: finalJRS!==c.jrsTram ? '⚠ Updated from original — confirm with CSP' : ''},
+      {label:'Actual Band',                           value:band,           note:''},
+      {label:'Work Location',                         value:workLoc,        note:''},
+      {label:'Start Date',                            value:newStartDate,   note:''},
+      {label:'End Date (New)',                        value:newEndDate,     note:''},
+      {label:'Rate Cap ($/hr)',                       value:rateCap,        note:'From PM checklist'},
+      {label:'Bill Rate to Client ($/hr)',            value:billRate,       note:'From PM checklist'},
+      {label:'Project GP%',                           value:projectGP,      note:'From PM checklist'},
+      {label:'Contract Type',                         value:contractType,   note:'From PM checklist'},
+      {label:'Sector',                                value:c.sector,       note:'Read-only in TRAM — confirm only'},
+      {label:'Geography',                             value:c.geography,    note:'Read-only in TRAM — confirm only'},
+      {label:'Spend Type',                            value:'Contingent',   note:'Read-only in TRAM — confirm only'},
+    ];
+
+    const fieldRows = tramFields.map(f=>`
+      <tr>
+        <td style="font-weight:600;color:#374151">${f.label}</td>
+        <td>
+          <span style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px">${f.value||'–'}</span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:6px;padding:2px 8px;font-size:11px" onclick="navigator.clipboard.writeText('${(f.value||'').replace(/'/g,"\\'")}').then(()=>this.textContent='✓ Copied').catch(()=>{})">Copy</button>
+        </td>
+        <td style="font-size:12px;color:${f.note.startsWith('⚠')?'#d97706':'#6b7280'}">${f.note}</td>
+      </tr>`).join('');
+
+    body=stepsHtml+`
+      <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:14px">
+        <b>TRAM v9.6 — Navigation path:</b><br>
+        <code style="font-size:12px">My Requests → Create New Request → Spend → Import from existing TRAM request</code><br>
+        <span style="color:#6b7280;font-size:12px">When prompted, enter the <b>Prior TRAM Request ID</b> below to pre-fill the existing values. Then update only the fields that have changed.</span>
+      </div>
+
+      <div class="section-title">Fields to enter in TRAM — click Copy next to each value</div>
+      <table class="recon-table">
+        <thead><tr><th>TRAM Field</th><th>Value to Enter</th><th>Notes</th></tr></thead>
+        <tbody>${fieldRows}</tbody>
+      </table>
+
+      <div class="section-title">After submitting in TRAM — enter the new TRAM Request ID</div>
+      <div class="form-group" style="max-width:360px">
+        <label>New TRAM Request ID <span style="color:#dc2626">*</span></label>
+        <input id="newTramIdInput" type="text" placeholder="e.g. NA202510048216S"
+          value="${renewalData.newTramId||''}"
+          oninput="renewalData.newTramId=this.value;document.getElementById('btnTramNext').disabled=!this.value.trim()">
+      </div>
+
+      ${renewalData.newTramId?`<div class="confirm-row">✅ TRAM ID recorded: <b>${renewalData.newTramId}</b>. Ready to proceed.</div>`:''}
+      <div class="dq-warn" style="${renewalData.newTramId?'display:none':''}">⚠ Enter the new TRAM Request ID above after completing submission in TRAM. This field is required before proceeding.</div>`;
+
     footer=`<button class="btn btn-secondary" onclick="renewalBack()">← Back</button>
-      <button class="btn btn-primary" onclick="renewalNext()" ${renewalData.tramResolved?'':'disabled'}>Next: Excel &amp; Email →</button>`;
+      <a href="https://tram.ibm.com" target="_blank" class="btn btn-warn">🔗 Open TRAM v9.6</a>
+      <button class="btn btn-primary" id="btnTramNext" onclick="renewalNext()" ${renewalData.newTramId?'':'disabled'}>Next: Excel &amp; Email →</button>`;
 
   // ── STEP 6 (was 5): EXCEL & EMAIL ──────────────────────────────────────
   } else if(renewalStep===6){
