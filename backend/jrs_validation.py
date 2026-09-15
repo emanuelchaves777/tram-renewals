@@ -225,25 +225,31 @@ def _parse_changelog_sheet(wb: openpyxl.Workbook) -> list:
     ws = wb[TAXONOMY_CHANGELOG_TAB]
     changelog = []
 
-    prev_idx = new_idx = action_idx = None
+    # Default to positional columns A=0, B=1, C=2 — the Change Log structure
+    # is always Previous Value | Current Value | Action regardless of header text.
+    prev_idx = 0
+    new_idx  = 1
+    action_idx = 2
 
     for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
         if row_idx == 0:
+            # Try to find columns by header text; fall back to positional if not found
+            found_prev = found_new = found_action = None
             for col_idx, cell in enumerate(row):
                 if not cell:
                     continue
                 label = str(cell).strip().lower()
                 if TAXONOMY_PREV_COL.lower() in label:
-                    prev_idx = col_idx
+                    found_prev = col_idx
                 elif TAXONOMY_NEW_COL.lower() in label:
-                    new_idx = col_idx
+                    found_new = col_idx
                 elif TAXONOMY_ACTION_COL.lower() in label:
-                    action_idx = col_idx
-            if None in (prev_idx, new_idx, action_idx):
-                raise ValueError(
-                    "Could not resolve all required columns in Change Log tab. "
-                    f"Found: prev={prev_idx}, new={new_idx}, action={action_idx}"
-                )
+                    found_action = col_idx
+            # Only override positional defaults if all three were found by name
+            if None not in (found_prev, found_new, found_action):
+                prev_idx   = found_prev
+                new_idx    = found_new
+                action_idx = found_action
             continue
 
         def _get(idx):
