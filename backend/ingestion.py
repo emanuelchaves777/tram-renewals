@@ -1,7 +1,9 @@
 """
-ingestion.py — Reads the contractor management .xlsb report from Box.
+ingestion.py — Parses the contractor management report from uploaded bytes.
 
-Key design rules (from confirmed architecture decisions):
+No Box dependency. Files are uploaded directly via the /api/upload/report endpoint.
+
+Key design rules:
   - Always resolve columns by HEADER NAME, never by position.
   - Use the earlier of OOBT PO Expected End Date and TRAM Request ID End Date.
   - Quarantine rows with missing mandatory fields into a DQ list.
@@ -14,11 +16,9 @@ from datetime import date, datetime
 from typing import Any
 
 import pyxlsb
-from boxsdk import Client
+import openpyxl
 
 from config import (
-    BOX_FOLDER_ID,
-    REPORT_FILE_PREFIX,
     REPORT_TAB_NAME,
     MANDATORY_HEADERS,
     HEADER_ALIASES,
@@ -28,81 +28,43 @@ from config import (
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def ingest_from_box(client: Client) -> dict:
+def ingest_from_bytes(file_bytes: bytes, filename: str, ext: str) -> dict:
     """
-    Find the latest report in Box, download it, parse the Compiled tab,
-    and return a structured result dict.
+    Parse a contractor report from raw bytes.
+    Accepts .xlsb (binary Excel) or .xlsx (standard Excel).
 
     Returns:
         {
-          "filename":      str,
-          "report_date":   str  (DD.MM from filename),
-          "ingested_at":   str  (ISO UTC),
+          "filename":       str,
+          "report_date":    str,
+          "ingested_at":    str  (ISO UTC),
           "staleness_days": int,
-          "is_stale":      bool,
+          "is_stale":       bool,
           "missing_headers": [str],
-          "contractors":   [dict],   # accepted rows
-          "dq_exceptions": [dict],   # quarantined rows
+          "contractors":    [dict],
+          "dq_exceptions":  [dict],
         }
     """
-    filename, file_bytes = _download_latest_report(client)
-    report_date = _extract_date_from_filename(filename)
-    rows, missing_headers = _parse_xlsb(file_bytes, REPORT_TAB_NAME)
-    contractors, dq_exceptions = _build_contractor_records(rows, filename)
+    if ext == "xlsb":
+        rows, missing_headers = _parse_xlsb(file_bytes, REPORT_TAB_NAME)
+    else:
+        rows, missing_headers = _parse_xlsx(file_bytes, REPORT_TAB_NAME)
 
-    ingested_at = datetime.utcnow().isoformat() + "Z"
+    contractors, dq_exceptions = _build_contractor_records(rows, filename)
+    report_date    = _extract_date_from_filename(filename)
+    ingested_at    = datetime.utcnow().isoformat() + "Z"
     staleness_days = _compute_staleness(report_date)
 
     return {
-        "filename":       filename,
-        "report_date":    report_date,
-        "ingested_at":    ingested_at,
-        "staleness_days": staleness_days,
-        "is_stale":       staleness_days > STALENESS_WARNING_DAYS,
+        "filename":        filename,
+        "report_date":     report_date,
+        "ingested_at":     ingested_at,
+        "staleness_days":  staleness_days,
+        "is_stale":        staleness_days > STALENESS_WARNING_DAYS,
         "missing_headers": missing_headers,
-        "contractors":    contractors,
-        "dq_exceptions":  dq_exceptions,
+        "contractors":     contractors,
+        "dq_exceptions":   dq_exceptions,
     }
-
-
-# ── Box file discovery ────────────────────────────────────────────────────────
-
-def _download_latest_report(client: Client) -> tuple[str, bytes]:
-    """
-    List the Box folder, find all files matching the report prefix,
-    pick the one with the latest modification date, and return its bytes.
-    """
-    folder = client.folder(BOX_FOLDER_ID)
-    items = list(folder.get_items(limit=200))
-
-    candidates = [
-        item for item in items
-        if item.type == "file"
-        and item.name.startswith(REPORT_FILE_PREFIX)
-        and item.name.endswith(".xlsb")
-    ]
-
-    if not candidates:
-        raise FileNotFoundError(
-            f"No .xlsb file starting with '{REPORT_FILE_PREFIX}' found in Box folder {BOX_FOLDER_ID}."
-        )
-
-    # Pick the most recently modified file
-    latest = max(candidates, key=lambda f: f.modified_at)
-
-    # Download to a temp file (pyxlsb needs a file path, not a stream)
-    with tempfile.NamedTemporaryFile(suffix=".xlsb", delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        with open(tmp_path, "wb") as f:
-            client.file(latest.id).download_to(f)
-        with open(tmp_path, "rb") as f:
-            file_bytes = f.read()
-    finally:
-        os.unlink(tmp_path)
-
-    return latest.name, file_bytes
 
 
 # ── .xlsb parsing ─────────────────────────────────────────────────────────────
@@ -157,6 +119,59 @@ def _parse_xlsb(file_bytes: bytes, tab_name: str) -> tuple[list[dict], list[str]
         os.unlink(tmp_path)
 
     return rows, missing_headers
+
+
+def _parse_xlsx(file_bytes: bytes, tab_name: str) -> tuple[list[dict], list[str]]:
+    """
+    Parse a standard .xlsx workbook (openpyxl).
+    Returns (rows, missing_mandatory_headers).
+    Falls back to first sheet if tab_name not found.
+    """
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+
+    # Find the right sheet — exact match first, then case-insensitive, then first sheet
+    ws = None
+    if tab_name in wb.sheetnames:
+        ws = wb[tab_name]
+    else:
+        ci = next((s for s in wb.sheetnames if s.lower() == tab_name.lower()), None)
+        ws = wb[ci] if ci else wb[wb.sheetnames[0]]
+
+    rows        = []
+    headers     = []
+    missing_headers = []
+
+    for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+        values = list(row)
+        if row_idx == 0:
+            headers = _resolve_headers(values)
+            resolved_set = {h for h in headers if h}
+            missing_headers = [m for m in MANDATORY_HEADERS if m not in resolved_set]
+            continue
+        if not any(v for v in values if v is not None):
+            continue
+        record = {}
+        for col_idx, canonical in enumerate(headers):
+            if canonical and col_idx < len(values):
+                record[canonical] = _clean_xlsx_value(values[col_idx])
+        rows.append(record)
+
+    wb.close()
+    return rows, missing_headers
+
+
+def _clean_xlsx_value(v: Any) -> Any:
+    """Normalise a cell value from openpyxl — handles dates natively."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        stripped = v.strip()
+        return stripped if stripped else None
+    if isinstance(v, (date, datetime)):
+        if isinstance(v, datetime):
+            return v.date().isoformat()
+        return v.isoformat()
+    return v
 
 
 def _resolve_headers(raw_values: list) -> list[str]:

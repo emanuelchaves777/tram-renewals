@@ -24,15 +24,11 @@ Outcomes:
   "not_found"        — not in taxonomy at all; escalate
 """
 import io
-import tempfile
-import os
 from typing import Any
 
 import openpyxl
-from boxsdk import Client
 
 from config import (
-    BOX_TAXONOMY_FILE_ID,
     TAXONOMY_ACTIVE_TAB,
     TAXONOMY_ACTIVE_COL,
     TAXONOMY_CHANGELOG_TAB,
@@ -43,29 +39,24 @@ from config import (
 
 
 # ── In-memory taxonomy cache ──────────────────────────────────────────────────
-# Loaded once per process start (or on manual refresh).
 _taxonomy_cache: dict | None = None
 _taxonomy_publication: str = "not loaded"
 
 
-def load_taxonomy(client: Client) -> dict:
+def load_taxonomy_from_bytes(file_bytes: bytes) -> dict:
     """
-    Download the taxonomy .xlsx from Box and build lookup structures.
-    Stores result in module-level cache. Returns the cache dict.
+    Parse a taxonomy .xlsx from raw bytes and cache it.
+    Replaces the previous Box-based load_taxonomy(client).
     """
     global _taxonomy_cache, _taxonomy_publication
 
-    file_bytes = _download_taxonomy(client)
     active_set, changelog = _parse_taxonomy(file_bytes)
 
     _taxonomy_cache = {
-        "active":    active_set,    # set of lowercase JRS strings that are active
-        "changelog": changelog,     # list of {prev, new, action} dicts
+        "active":    active_set,   # set of lowercase JRS strings
+        "changelog": changelog,    # list of {prev, new, action} dicts
     }
-
-    # Try to infer publication name from file metadata (not always available)
     _taxonomy_publication = "loaded"
-
     return _taxonomy_cache
 
 
@@ -165,20 +156,6 @@ def validate_jrs(jrs_value: str) -> dict:
         ),
         "publication":  _taxonomy_publication,
     }
-
-
-# ── Box download ──────────────────────────────────────────────────────────────
-
-def _download_taxonomy(client: Client) -> bytes:
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
-        with open(tmp_path, "wb") as f:
-            client.file(BOX_TAXONOMY_FILE_ID).download_to(f)
-        with open(tmp_path, "rb") as f:
-            return f.read()
-    finally:
-        os.unlink(tmp_path)
 
 
 # ── .xlsx parsing ─────────────────────────────────────────────────────────────

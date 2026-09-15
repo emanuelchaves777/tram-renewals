@@ -1,29 +1,22 @@
 """
 excel_generation.py — Generates the populated renewal .xlsm file.
 
-Confirmed spec (docs/excel-template-mapping.md):
-  Template file : Request Form Template_Contractor Team.xlsm
+Template is uploaded by the PM via the Setup panel (no Box required).
+
+Spec:
   Tab to populate: Onboardings
   Data row       : Row 2 (headers in row 1)
   Output naming  : {Subcontractor Name}_Renewal_{YYYYMMDD}_{TalentID}.xlsm
-  Save location  : Returned as bytes — frontend triggers browser download to PM's machine
-
-All 20 column headers are mapped below in COLUMN_MAP.
-Fields marked ⏳ Pending CSP are written as empty strings — no invented values.
+  Returns        : bytes — sent directly in the API response
 """
 
 import hashlib
 import io
-import os
 import re
-import tempfile
 from datetime import date, datetime
 from typing import Any
 
 import openpyxl
-from boxsdk import Client
-
-from config import BOX_TAXONOMY_FILE_ID   # reusing Box client; template fetched via Box
 
 # ── Template identity ─────────────────────────────────────────────────────────
 TEMPLATE_FILENAME = "Request Form Template_Contractor Team.xlsm"
@@ -106,35 +99,6 @@ def generate_renewal_excel(
         "missing_mandatory": missing,
     }
 
-
-def download_template(client: Client, folder_id: str) -> bytes:
-    """
-    Find and download the template .xlsm from the given Box folder.
-    Raises FileNotFoundError if the template is not found.
-    """
-    folder = client.folder(folder_id)
-    items  = list(folder.get_items(limit=200))
-
-    match = next(
-        (i for i in items
-         if i.type == "file" and i.name == TEMPLATE_FILENAME),
-        None
-    )
-    if not match:
-        raise FileNotFoundError(
-            f"Template '{TEMPLATE_FILENAME}' not found in Box folder {folder_id}. "
-            "Please upload it to the same folder as the contractor report."
-        )
-
-    with tempfile.NamedTemporaryFile(suffix=".xlsm", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
-        with open(tmp_path, "wb") as f:
-            client.file(match.id).download_to(f)
-        with open(tmp_path, "rb") as f:
-            return f.read()
-    finally:
-        os.unlink(tmp_path)
 
 
 # ── Data assembly ─────────────────────────────────────────────────────────────

@@ -180,16 +180,15 @@
 ═══════════════════════════════════════════ -->
 <div id="tab-dashboard">
 
-  <div class="freshness-bar">
-    <div class="dot dot-warn"></div>
-    <div>
-      <b>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</b>
-      <span style="margin-left:12px">Tab: Compiled</span>
-      <span style="margin-left:12px">Report date: 09 Jul 2025</span>
-      <span style="margin-left:12px">Ingested: 14 Jul 2025 08:42 UTC</span>
-      <span style="margin-left:12px;color:#d97706;font-weight:600">⚠ Dataset is 5 days old — review before submitting</span>
+  <div class="freshness-bar" id="freshnessBar">
+    <div class="dot dot-warn" id="freshnessDot"></div>
+    <div id="freshnessText">
+      <b id="freshnessFile">No report loaded</b>
+      <span id="freshnessDate" style="margin-left:12px"></span>
+      <span id="freshnessIngested" style="margin-left:12px"></span>
+      <span id="freshnessStale" style="margin-left:12px;color:#d97706;font-weight:600"></span>
     </div>
-    <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="refreshFromBox()">↻ Refresh from Box</button>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="openSetupPanel()">⚙ Setup / Upload Files</button>
   </div>
 
   <div class="cards" id="bucketCards">
@@ -379,6 +378,69 @@
 </div><!-- /main -->
 
 <!-- ═══════════════════════════════════════════
+     SETUP PANEL (slide-in from right)
+═══════════════════════════════════════════ -->
+<div class="overlay" id="setupOverlay" onclick="closeSetupPanel(event)">
+  <div class="panel" id="setupPanel">
+    <div class="panel-header">
+      <h2>⚙ Setup — Upload Files</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeSetupPanel()">✕ Close</button>
+    </div>
+    <div class="panel-body">
+
+      <p style="font-size:13px;color:#6b7280;margin-bottom:20px">
+        Upload your three files once. They are held in memory on the server for the current session.
+        No Box connection required.
+      </p>
+
+      <!-- Report -->
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+        <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#dc2626">*</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+          The <code>.xlsb</code> or <code>.xlsx</code> contractor management report from Box.<br>
+          Filename example: <code>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</code>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="file" id="fileReport" accept=".xlsb,.xlsx" style="font-size:13px">
+          <button class="btn btn-primary btn-sm" onclick="uploadFile('report')">Upload</button>
+        </div>
+        <div id="statusReport" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <!-- Taxonomy -->
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+        <div style="font-weight:700;margin-bottom:4px">2. JRS Taxonomy <span style="color:#dc2626">*</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+          The M389 taxonomy <code>.xlsx</code> file (IBM Consulting Taxonomy Shortlist).<br>
+          Contains "Consulting Short List" and "Change Log" tabs.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="file" id="fileTaxonomy" accept=".xlsx" style="font-size:13px">
+          <button class="btn btn-primary btn-sm" onclick="uploadFile('taxonomy')">Upload</button>
+        </div>
+        <div id="statusTaxonomy" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <!-- Template -->
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+        <div style="font-weight:700;margin-bottom:4px">3. Excel Renewal Template <span style="color:#dc2626">*</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+          The <code>Request Form Template_Contractor Team.xlsm</code> file.<br>
+          Must contain an "Onboardings" tab with headers in row 1.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="file" id="fileTemplate" accept=".xlsm,.xlsx" style="font-size:13px">
+          <button class="btn btn-primary btn-sm" onclick="uploadFile('template')">Upload</button>
+        </div>
+        <div id="statusTemplate" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <div id="setupSummary" style="margin-top:4px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
      DETAIL PANEL (slide-in)
 ═══════════════════════════════════════════ -->
 <div class="overlay" id="detailOverlay" onclick="closeDetail(event)">
@@ -442,56 +504,89 @@ async function apiFetch(path, options={}) {
   return res.json();
 }
 
-// Called on page load — tries to load real data; falls back to synthetic
-async function loadData() {
-  if (!API_BASE) {
-    // No backend configured — use synthetic data
-    renderTable(CONTRACTORS);
-    updateBucketCounts(CONTRACTORS);
+// ── Setup panel ───────────────────────────────
+function openSetupPanel(){document.getElementById('setupOverlay').classList.add('open');}
+function closeSetupPanel(e){
+  if(!e||e.target===document.getElementById('setupOverlay'))
+    document.getElementById('setupOverlay').classList.remove('open');
+}
+
+async function uploadFile(type) {
+  const fileInput = document.getElementById('file' + type.charAt(0).toUpperCase() + type.slice(1));
+  const statusEl  = document.getElementById('status' + type.charAt(0).toUpperCase() + type.slice(1));
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    statusEl.innerHTML = `<span style="color:#dc2626">Please select a file first.</span>`;
     return;
   }
+  const file = fileInput.files[0];
+  statusEl.innerHTML = `<span style="color:#6b7280">⏳ Uploading ${file.name}…</span>`;
+
+  if (!API_BASE) {
+    // Prototype mode — simulate upload
+    await new Promise(r=>setTimeout(r,800));
+    statusEl.innerHTML = `<span style="color:#16a34a">✅ ${file.name} — loaded (prototype mode)</span>`;
+    checkSetupComplete();
+    return;
+  }
+
   try {
-    showLoadingBanner('Loading contractor data from Box…');
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(API_BASE + '/api/upload/' + type, {method:'POST', body: form});
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail: res.statusText}));
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    if (type === 'report') {
+      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ exceptions</span>`;
+      await loadContractors();
+    } else if (type === 'taxonomy') {
+      statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — template ready (${(data.size/1024).toFixed(0)} KB)</span>`;
+    }
+    checkSetupComplete();
+  } catch(e) {
+    statusEl.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+  }
+}
+
+function checkSetupComplete() {
+  const allDone = ['statusReport','statusTaxonomy','statusTemplate']
+    .every(id => document.getElementById(id).innerHTML.includes('✅'));
+  const summaryEl = document.getElementById('setupSummary');
+  if (allDone) {
+    summaryEl.innerHTML = `<div class="confirm-row">✅ <b>All files loaded.</b> You can close this panel and start processing renewals.</div>`;
+  }
+}
+
+// ── Load contractors from backend ──────────────
+async function loadContractors() {
+  try {
     const data = await apiFetch('/api/contractors');
-    const all = [...data.contractors, ...data.dq_exceptions];
+    const all  = [...data.contractors, ...data.dq_exceptions];
+    updateFreshnessBar(data.meta);
+    renderTable(all);
+    updateBucketCounts(all);
+  } catch(_) {}
+}
+
+// Called on page load — show synthetic data, check if backend already has data
+async function loadData() {
+  renderTable(CONTRACTORS);
+  updateBucketCounts(CONTRACTORS);
+  if (!API_BASE) return;
+  try {
+    const data = await apiFetch('/api/contractors');
+    const all  = [...data.contractors, ...data.dq_exceptions];
     updateFreshnessBar(data.meta);
     renderTable(all);
     updateBucketCounts(all);
     hideBanner();
-  } catch(e) {
-    showErrorBanner('Could not load live data: ' + e.message + ' — showing prototype data.');
-    renderTable(CONTRACTORS);
-    updateBucketCounts(CONTRACTORS);
-  }
-}
-
-async function refreshFromBox() {
-  if (!API_BASE) {
-    alert('[PROTOTYPE] No backend connected.\nSet API_BASE in app.html after deploying the backend.\n\nSee backend/DEPLOYMENT.md for instructions.');
-    return;
-  }
-  try {
-    showLoadingBanner('Refreshing from Box…');
-    await apiFetch('/api/refresh', {method:'POST'});
-    await loadData();
-  } catch(e) {
-    showErrorBanner('Refresh failed: ' + e.message);
-  }
-}
-
-async function refreshTaxonomy() {
-  if (!API_BASE) {
-    alert('[PROTOTYPE] No backend connected. Taxonomy refresh requires the live backend.');
-    return;
-  }
-  try {
-    showLoadingBanner('Reloading JRS taxonomy from Box…');
-    await apiFetch('/api/refresh-taxonomy', {method:'POST'});
-    showLoadingBanner('Taxonomy loaded. Re-ingesting contractors…');
-    await apiFetch('/api/refresh', {method:'POST'});
-    await loadData();
-  } catch(e) {
-    showErrorBanner('Taxonomy refresh failed: ' + e.message);
+  } catch(_) {
+    // No data loaded yet — show setup prompt
+    showLoadingBanner('No data loaded — click ⚙ Setup / Upload Files to get started.');
   }
 }
 
