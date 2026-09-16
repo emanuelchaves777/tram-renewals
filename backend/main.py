@@ -468,7 +468,22 @@ def _resolve_contractor(contractor_id: str) -> dict:
         match = next((c for c in all_records if c.get("serial") == contractor_id), None)
         if match:
             return match
-    return {"serial": contractor_id, "name": contractor_id}
+        # Report is loaded but this serial wasn't found in it
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Contractor '{contractor_id}' not found in the loaded report. "
+                "The report may have been re-uploaded without this record."
+            ),
+        )
+    # No report loaded at all (server restarted / cold start)
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "No contractor report is loaded. The server may have restarted and lost its "
+            "in-memory state. Please re-upload the report via the Setup panel and try again."
+        ),
+    )
 
 
 def _append_audit(user, action, contractor=None, detail=None, outcome="success"):
