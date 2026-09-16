@@ -84,7 +84,7 @@ def send_offboarding_email(
 ) -> dict:
     """
     Send the offboarding notification email to the correct CSP team.
-    Body is a JSON payload so the receiving team or their automation can parse it directly.
+    Body is an HTML table with one data row and the 10 confirmed columns.
     """
     to_email = _get_sector_email(contractor.get("sector", ""))
     subject  = _build_offboarding_subject(contractor)
@@ -94,7 +94,7 @@ def send_offboarding_email(
         to_email=to_email,
         subject=subject,
         body=body,
-        body_type="Text",
+        body_type="HTML",
         attachment_filename=None,
         attachment_bytes=None,
     )
@@ -244,52 +244,65 @@ def _build_offboarding_subject(contractor: dict) -> str:
 
 def _build_offboarding_body(contractor: dict, offboard_data: dict) -> str:
     """
-    Build the offboarding email body as a JSON payload.
-    The receiving CSP team or their automation can parse it directly.
+    Build the offboarding email body as a single-row HTML table.
 
-    Schema mirrors the confirmed offboarding fields:
-      requestType, sector, projectManagerEmail, contractor.name,
-      purchaseOrder, asset.serialNumber / hasLaptop / laptopReturned,
-      termination.lastDay / reason, comments
+    Columns (confirmed order):
+      Sector | Manager Email (PM) | Contractor Name | PO Number |
+      Serial Number | Last day (mm/dd/yyyy) | Reason For Termination |
+      Laptop (yes/no) | Laptop returned (yes/no) | Comments
+
+    Rules:
+      - null / empty values  → "–"
+      - Boolean (yes/no str) → "Yes" / "No"
+      - Last day date        → MM/DD/YYYY
     """
-    def _nullable(val) -> str | None:
-        v = str(val).strip() if val is not None else ""
-        return v if v else None
+    def _v(val) -> str:
+        return str(val).strip() if val and str(val).strip() else "–"
 
-    def _bool_field(val) -> bool:
-        """Convert yes/no/true/false string to bool; default False."""
-        if val is None:
-            return False
-        return str(val).strip().lower() in ("yes", "true", "1")
+    def _bool_display(val) -> str:
+        if not val:
+            return "–"
+        return "Yes" if str(val).strip().lower() in ("yes", "true", "1") else "No"
 
-    laptop_raw    = offboard_data.get("laptop")
-    ret_raw       = offboard_data.get("laptop_returned")
+    def _format_date(val) -> str:
+        """Convert YYYY-MM-DD (or any common format) to MM/DD/YYYY."""
+        raw = str(val).strip() if val else ""
+        if not raw:
+            return "–"
+        # Try ISO format first
+        try:
+            from datetime import datetime as _dt
+            return _dt.strptime(raw, "%Y-%m-%d").strftime("%m/%d/%Y")
+        except ValueError:
+            pass
+        # Already in MM/DD/YYYY or unrecognised — return as-is
+        return raw
 
-    payload = [
-        {
-            "requestType": "contractor_termination",
-            "record": {
-                "sector":              _nullable(contractor.get("sector")),
-                "projectManagerEmail": _nullable(offboard_data.get("manager_email")),
-                "contractor": {
-                    "name": _nullable(contractor.get("name")),
-                },
-                "purchaseOrder": _nullable(contractor.get("poNumber")),
-                "asset": {
-                    "serialNumber":  _nullable(contractor.get("serial")),
-                    "hasLaptop":     _bool_field(laptop_raw),
-                    "laptopReturned": _bool_field(ret_raw),
-                },
-                "termination": {
-                    "lastDay": _nullable(offboard_data.get("last_day")),
-                    "reason":  _nullable(offboard_data.get("reason")),
-                },
-                "comments": _nullable(offboard_data.get("comments")),
-            },
-        }
+    CELL  = 'style="border:1px solid #000;padding:8px"'
+    HCELL = 'style="border:1px solid #000;padding:8px"'
+
+    columns = [
+        ("Sector",                    _v(contractor.get("sector"))),
+        ("Manager Email (PM)",        _v(offboard_data.get("manager_email"))),
+        ("Contractor Name",           _v(contractor.get("name"))),
+        ("PO Number",                 _v(contractor.get("poNumber"))),
+        ("Serial Number",             _v(contractor.get("serial"))),
+        ("Last day (mm/dd/yyyy)",     _format_date(offboard_data.get("last_day"))),
+        ("Reason For Termination",    _v(offboard_data.get("reason"))),
+        ("Laptop (yes/no)",           _bool_display(offboard_data.get("laptop"))),
+        ("Laptop returned (yes/no)",  _bool_display(offboard_data.get("laptop_returned"))),
+        ("Comments",                  _v(offboard_data.get("comments"))),
     ]
 
-    return json.dumps(payload, indent=2, ensure_ascii=False)
+    headers = "".join(f"<th {HCELL}>{h}</th>" for h, _ in columns)
+    cells   = "".join(f"<td {CELL}>{v}</td>"   for _, v in columns)
+
+    return (
+        f'<table style="border-collapse:collapse;width:100%">'
+        f"<thead><tr>{headers}</tr></thead>"
+        f"<tbody><tr>{cells}</tr></tbody>"
+        f"</table>"
+    )
 
 
 def _get_sector_email(sector: str) -> str:

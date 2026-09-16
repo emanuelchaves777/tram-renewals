@@ -1484,27 +1484,39 @@ function renderOffboardForm(){
     </div>
 
     <div class="section-title" style="margin-top:4px">Email Preview</div>
-    <div class="email-preview" style="margin-bottom:4px;white-space:pre;font-size:12px">To: ${sectorEmail}
-Subject: ${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING
-
-[
-  {
-    "requestType": "contractor_termination",
-    "record": {
-      "sector": ${c.sector?JSON.stringify(c.sector):'null'},
-      "projectManagerEmail": ${c.pmIntranetId?JSON.stringify(c.pmIntranetId):'null'},
-      "contractor": { "name": ${c.name?JSON.stringify(c.name):'null'} },
-      "purchaseOrder": ${c.poNumber?JSON.stringify(c.poNumber):'null'},
-      "asset": {
-        "serialNumber": ${c.serial?JSON.stringify(c.serial):'null'},
-        "hasLaptop": false,
-        "laptopReturned": false
-      },
-      "termination": { "lastDay": null, "reason": null },
-      "comments": null
-    }
-  }
-]</div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:6px">To: <b>${sectorEmail}</b> &nbsp;·&nbsp; Subject: <b>${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING</b></div>
+    <div style="overflow-x:auto;margin-bottom:4px">
+      <table style="border-collapse:collapse;width:100%;font-size:12px">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000;padding:8px">Sector</th>
+            <th style="border:1px solid #000;padding:8px">Manager Email (PM)</th>
+            <th style="border:1px solid #000;padding:8px">Contractor Name</th>
+            <th style="border:1px solid #000;padding:8px">PO Number</th>
+            <th style="border:1px solid #000;padding:8px">Serial Number</th>
+            <th style="border:1px solid #000;padding:8px">Last day (mm/dd/yyyy)</th>
+            <th style="border:1px solid #000;padding:8px">Reason For Termination</th>
+            <th style="border:1px solid #000;padding:8px">Laptop (yes/no)</th>
+            <th style="border:1px solid #000;padding:8px">Laptop returned (yes/no)</th>
+            <th style="border:1px solid #000;padding:8px">Comments</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #000;padding:8px">${c.sector||'–'}</td>
+            <td style="border:1px solid #000;padding:8px">${c.pmIntranetId||'–'}</td>
+            <td style="border:1px solid #000;padding:8px">${c.name||'–'}</td>
+            <td style="border:1px solid #000;padding:8px">${c.poNumber||'–'}</td>
+            <td style="border:1px solid #000;padding:8px">${c.serial||'–'}</td>
+            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px">–</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div id="offboardSubmitStatus" style="margin-top:12px"></div>`;
 

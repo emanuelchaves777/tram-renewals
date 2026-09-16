@@ -517,51 +517,45 @@ def _build_mailto(contractor, tram_id, excel_filename):
 
 
 def _build_offboard_mailto(contractor, offboard_data):
-    import json as _json
     from urllib.parse import quote
+    from datetime import datetime as _dt
 
-    def _nullable(val):
-        v = str(val).strip() if val is not None else ""
-        return v if v else None
+    def _v(val):
+        return str(val).strip() if val and str(val).strip() else "–"
 
-    def _bool_field(val):
-        if val is None:
-            return False
-        return str(val).strip().lower() in ("yes", "true", "1")
+    def _bool_display(val):
+        if not val:
+            return "–"
+        return "Yes" if str(val).strip().lower() in ("yes", "true", "1") else "No"
+
+    def _format_date(val):
+        raw = str(val).strip() if val else ""
+        if not raw:
+            return "–"
+        try:
+            return _dt.strptime(raw, "%Y-%m-%d").strftime("%m/%d/%Y")
+        except ValueError:
+            return raw
 
     sector = contractor.get("sector", "")
     to = SECTOR_EMAIL_MAP.get(sector.strip().lower(), SECTOR_EMAIL_DEFAULT)
-
-    tram   = contractor.get("tramId") or "–"
-    serial = contractor.get("serial") or "–"
-    po     = contractor.get("poNumber") or "–"
-    name   = contractor.get("name") or "–"
-    client = contractor.get("client") or "–"
-    subject = quote(f"{tram} {serial} {po} {name} {client} OFFBOARDING")
-
-    payload = [
-        {
-            "requestType": "contractor_termination",
-            "record": {
-                "sector":              _nullable(contractor.get("sector")),
-                "projectManagerEmail": _nullable(offboard_data.get("manager_email")),
-                "contractor": {
-                    "name": _nullable(contractor.get("name")),
-                },
-                "purchaseOrder": _nullable(contractor.get("poNumber")),
-                "asset": {
-                    "serialNumber":   _nullable(contractor.get("serial")),
-                    "hasLaptop":      _bool_field(offboard_data.get("laptop")),
-                    "laptopReturned": _bool_field(offboard_data.get("laptop_returned")),
-                },
-                "termination": {
-                    "lastDay": _nullable(offboard_data.get("last_day")),
-                    "reason":  _nullable(offboard_data.get("reason")),
-                },
-                "comments": _nullable(offboard_data.get("comments")),
-            },
-        }
+    subject = quote(
+        f"{_v(contractor.get('tramId'))} {_v(contractor.get('serial'))} "
+        f"{_v(contractor.get('poNumber'))} {_v(contractor.get('name'))} "
+        f"{_v(contractor.get('client'))} OFFBOARDING"
+    )
+    # mailto bodies are plain text — mirror the HTML table columns as labelled lines
+    lines = [
+        f"Sector:                   {_v(contractor.get('sector'))}",
+        f"Manager Email (PM):       {_v(offboard_data.get('manager_email'))}",
+        f"Contractor Name:          {_v(contractor.get('name'))}",
+        f"PO Number:                {_v(contractor.get('poNumber'))}",
+        f"Serial Number:            {_v(contractor.get('serial'))}",
+        f"Last day (mm/dd/yyyy):    {_format_date(offboard_data.get('last_day'))}",
+        f"Reason For Termination:   {_v(offboard_data.get('reason'))}",
+        f"Laptop (yes/no):          {_bool_display(offboard_data.get('laptop'))}",
+        f"Laptop returned (yes/no): {_bool_display(offboard_data.get('laptop_returned'))}",
+        f"Comments:                 {_v(offboard_data.get('comments'))}",
     ]
-
-    body = quote(_json.dumps(payload, indent=2, ensure_ascii=False))
+    body = quote("\n".join(lines))
     return f"mailto:{to}?subject={subject}&body={body}"
