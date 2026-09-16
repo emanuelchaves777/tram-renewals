@@ -248,17 +248,21 @@ def _build_offboarding_body(contractor: dict, offboard_data: dict) -> str:
     field order: Sector | Manager Email (PM) | Contractor Name | PO Number |
     Serial Number | Last day | Reason For Termination | Laptop | Laptop returned | Comments
     """
+    def _v(val):
+        """Return val if non-empty, else –"""
+        return str(val).strip() if val and str(val).strip() else "–"
+
     fields = [
-        ("Sector",                   contractor.get("sector", "–")),
-        ("Manager Email (PM)",       offboard_data.get("manager_email", "–")),
-        ("Contractor Name",          contractor.get("name", "–")),
-        ("PO Number",                contractor.get("poNumber", "–")),
-        ("Serial Number",            contractor.get("serial", "–")),
-        ("Last day (mm/dd/yyyy)",    offboard_data.get("last_day", "–")),
-        ("Reason For Termination",   offboard_data.get("reason", "–")),
-        ("Laptop (yes/no)",          offboard_data.get("laptop", "–")),
-        ("Laptop returned (yes/no)", offboard_data.get("laptop_returned", "–")),
-        ("Comments",                 offboard_data.get("comments", "–")),
+        ("Sector",                   _v(contractor.get("sector"))),
+        ("Manager Email (PM)",       _v(offboard_data.get("manager_email"))),
+        ("Contractor Name",          _v(contractor.get("name"))),
+        ("PO Number",                _v(contractor.get("poNumber"))),
+        ("Serial Number",            _v(contractor.get("serial"))),
+        ("Last day (mm/dd/yyyy)",    _v(offboard_data.get("last_day"))),
+        ("Reason For Termination",   _v(offboard_data.get("reason"))),
+        ("Laptop (yes/no)",          _v(offboard_data.get("laptop"))),
+        ("Laptop returned (yes/no)", _v(offboard_data.get("laptop_returned"))),
+        ("Comments",                 _v(offboard_data.get("comments"))),
     ]
 
     # ── HTML version (renders as a table in Outlook) ──────────────────────────
