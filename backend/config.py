@@ -76,20 +76,27 @@ MANDATORY_HEADERS = [
 # Header aliases — maps alternate column names in the report to canonical names.
 # Add new aliases here when the report format changes; never change the canonical names.
 HEADER_ALIASES = {
-    "serial":                         "Serial Number",
+    # Serial / TalentID — real report uses spaces around "/"
+    "serial":                          "Serial Number",
     "talent id":                       "Serial Number",
     "talentid":                        "Serial Number",
     "talentid/serial":                 "Serial Number",
+    "talentid / serial number":        "Serial Number",
     "serial number":                   "Serial Number",
+    # Name
     "contractor full name":            "Contractor Full Name",
     "contractor name":                 "Contractor Full Name",
     "full name":                       "Contractor Full Name",
+    # Client / Project — real report uses " - " (space-dash-space)
     "client name-po":                  "Client Name-PO",
+    "client name - po":                "Client Name-PO",
     "client name":                     "Client Name-PO",
     "client":                          "Client Name-PO",
     "project name-po":                 "Project Name-PO",
+    "project name - po":               "Project Name-PO",
     "project name":                    "Project Name-PO",
     "project":                         "Project Name-PO",
+    # Dates
     "oobt po expected end date":       "OOBT PO Expected End Date",
     "po expected end date":            "OOBT PO Expected End Date",
     "expected end date":               "OOBT PO Expected End Date",
@@ -97,9 +104,12 @@ HEADER_ALIASES = {
     "tram end date":                   "TRAM Request ID End Date",
     "tram request id":                 "TRAM Request ID",
     "tram id":                         "TRAM Request ID",
+    # JRS
     "jr/s (tram)":                     "JR/S (TRAM)",
+    "jr/s (oobt)":                     "JR/S (OOBT)",
     "jr/s":                            "JR/S (TRAM)",
     "jrs":                             "JR/S (TRAM)",
+    # Role / assignment
     "actual band":                     "Actual Band",
     "band":                            "Actual Band",
     "work location":                   "Work Location",
@@ -113,15 +123,21 @@ HEADER_ALIASES = {
     "market":                          "Market/GMT",
     "country":                         "Country",
     "hr lob":                          "HR LOB",
+    # TRAM / people
     "tram requester":                  "TRAM Requester",
     "tram requester (submitter)":      "TRAM Requester",
     "contractor assignee":             "Contractor Assignee",
     "pm notes id":                     "PM Notes ID",
     "pm intranet id":                  "PM Intranet ID",
+    # Workflow status columns
+    "renewal in progress":             "Renewal In Progress",
+    "offboard in progress":            "Offboard In Progress",
+    # Other
     "skill description":               "Skill Description",
     "contractor notes id":             "Contractor Notes ID",
     "contractor intranet address":     "Contractor Intranet Address",
     "csa id":                          "CSA ID",
     "talentid/cnum":                   "TalentID/CNUM",
+    "talentid / cnum":                 "TalentID/CNUM",
     "cnum":                            "TalentID/CNUM",
 }

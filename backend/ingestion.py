@@ -281,9 +281,9 @@ def _build_contractor_records(
                                           row.get("TRAM Request ID End Date"),
                                       )
                                   ),
-            # Workflow state (app-managed, not from report)
-            "renewal":    "–",
-            "offboard":   "–",
+            # Workflow state — read from report columns if present, else default
+            "renewal":    row.get("Renewal In Progress") or "–",
+            "offboard":   row.get("Offboard In Progress") or "–",
             # Data quality
             "dq":         len(issues) > 0,
             "dqIssues":   issues,
