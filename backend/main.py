@@ -525,16 +525,23 @@ def _build_offboard_mailto(contractor, offboard_data):
         f"{contractor.get('poNumber','–')} {contractor.get('name','–')} "
         f"{contractor.get('client','–')} OFFBOARDING"
     )
+    # Plain-text table body for mailto (Outlook will render tab-separated values)
+    headers = "Sector\tManager Email (PM)\tContractor Name\tPO Number\tSerial Number\tLast day (mm/dd/yyyy)\tReason For Termination\tLaptop (yes/no)\tLaptop returned (yes/no)\tComments"
+    values  = "\t".join([
+        contractor.get("sector", "–"),
+        offboard_data.get("manager_email", "–"),
+        contractor.get("name", "–"),
+        contractor.get("poNumber", "–"),
+        contractor.get("serial", "–"),
+        offboard_data.get("last_day", "–"),
+        offboard_data.get("reason", "–"),
+        offboard_data.get("laptop", "–"),
+        offboard_data.get("laptop_returned", "–"),
+        offboard_data.get("comments", "–"),
+    ])
     lines = [
-        "Please process the following offboarding request:", "",
-        f"Contractor Name: {contractor.get('name','–')}",
-        f"Serial Number: {contractor.get('serial','–')}",
-        f"PO Number: {contractor.get('poNumber','–')}",
-        f"Last Day: {offboard_data.get('last_day','–')}",
-        f"Reason: {offboard_data.get('reason','–')}",
-        f"Laptop: {offboard_data.get('laptop','–')}",
-        f"Laptop Returned: {offboard_data.get('laptop_returned','–')}",
-        f"Comments: {offboard_data.get('comments','–')}",
+        "Can you please help with this offboarding?", "",
+        headers, values,
     ]
     body = quote("\n".join(lines))
     return f"mailto:{to}?subject={subject}&body={body}"

@@ -84,9 +84,7 @@ def send_offboarding_email(
 ) -> dict:
     """
     Send the offboarding notification email to the correct CSP team.
-
-    Subject format (same routing, OFFBOARDING suffix):
-      [TRAM ID] [TalentID/Serial] [PO Number] [Contractor Name] [Client Name] OFFBOARDING
+    Body is an HTML table with all confirmed offboarding fields.
     """
     to_email = _get_sector_email(contractor.get("sector", ""))
     subject  = _build_offboarding_subject(contractor)
@@ -96,6 +94,7 @@ def send_offboarding_email(
         to_email=to_email,
         subject=subject,
         body=body,
+        body_type="HTML",
         attachment_filename=None,
         attachment_bytes=None,
     )
@@ -114,6 +113,7 @@ def _send(
     body: str,
     attachment_filename: str | None,
     attachment_bytes: bytes | None,
+    body_type: str = "Text",
 ) -> dict:
     """Build and send the email via Microsoft Graph."""
 
@@ -125,7 +125,7 @@ def _send(
         )
 
     token    = _get_access_token()
-    payload  = _build_payload(to_email, subject, body, attachment_filename, attachment_bytes)
+    payload  = _build_payload(to_email, subject, body, attachment_filename, attachment_bytes, body_type)
     send_url = GRAPH_SEND_URL.format(sender=MS_SENDER_EMAIL)
 
     resp = httpx.post(
@@ -181,13 +181,14 @@ def _build_payload(
     body: str,
     attachment_filename: str | None,
     attachment_bytes: bytes | None,
+    body_type: str = "Text",
 ) -> dict:
     """Build the Microsoft Graph sendMail request payload."""
     payload = {
         "message": {
             "subject": subject,
             "body": {
-                "contentType": "Text",
+                "contentType": body_type,
                 "content": body,
             },
             "toRecipients": [
@@ -242,22 +243,47 @@ def _build_offboarding_subject(contractor: dict) -> str:
 
 
 def _build_offboarding_body(contractor: dict, offboard_data: dict) -> str:
-    """Build the offboarding email body with confirmed OQ-06 fields."""
-    lines = [
-        "Please process the following offboarding request:",
-        "",
-        f"Sector:                  {contractor.get('sector', '–')}",
-        f"Manager Email (PM):      {offboard_data.get('manager_email', '–')}",
-        f"Contractor Name:         {contractor.get('name', '–')}",
-        f"PO Number:               {contractor.get('poNumber', '–')}",
-        f"Serial Number:           {contractor.get('serial', '–')}",
-        f"Last Day:                {offboard_data.get('last_day', '–')}",
-        f"Reason for Termination:  {offboard_data.get('reason', '–')}",
-        f"Laptop:                  {offboard_data.get('laptop', '–')}",
-        f"Laptop Returned:         {offboard_data.get('laptop_returned', '–')}",
-        f"Comments:                {offboard_data.get('comments', '–')}",
+    """
+    Build the offboarding email body as an HTML table matching the confirmed
+    field order: Sector | Manager Email (PM) | Contractor Name | PO Number |
+    Serial Number | Last day | Reason For Termination | Laptop | Laptop returned | Comments
+    """
+    fields = [
+        ("Sector",                   contractor.get("sector", "–")),
+        ("Manager Email (PM)",       offboard_data.get("manager_email", "–")),
+        ("Contractor Name",          contractor.get("name", "–")),
+        ("PO Number",                contractor.get("poNumber", "–")),
+        ("Serial Number",            contractor.get("serial", "–")),
+        ("Last day (mm/dd/yyyy)",    offboard_data.get("last_day", "–")),
+        ("Reason For Termination",   offboard_data.get("reason", "–")),
+        ("Laptop (yes/no)",          offboard_data.get("laptop", "–")),
+        ("Laptop returned (yes/no)", offboard_data.get("laptop_returned", "–")),
+        ("Comments",                 offboard_data.get("comments", "–")),
     ]
-    return "\n".join(lines)
+
+    # ── HTML version (renders as a table in Outlook) ──────────────────────────
+    header_cells = "".join(
+        f'<th style="background:#1d4ed8;color:#fff;padding:8px 12px;'
+        f'text-align:left;white-space:nowrap;font-size:13px">{h}</th>'
+        for h, _ in fields
+    )
+    value_cells = "".join(
+        f'<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;'
+        f'font-size:13px;white-space:nowrap">{v or "–"}</td>'
+        for _, v in fields
+    )
+
+    html = f"""
+<p style="font-family:Segoe UI,Arial,sans-serif;font-size:14px">
+  Can you please help with this offboarding?
+</p>
+<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;
+              margin-top:12px;border:1px solid #e5e7eb">
+  <thead><tr>{header_cells}</tr></thead>
+  <tbody><tr>{value_cells}</tr></tbody>
+</table>
+"""
+    return html
 
 
 def _get_sector_email(sector: str) -> str:
