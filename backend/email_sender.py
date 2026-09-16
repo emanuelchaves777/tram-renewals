@@ -84,7 +84,7 @@ def send_offboarding_email(
 ) -> dict:
     """
     Send the offboarding notification email to the correct CSP team.
-    Body is an HTML table with all confirmed offboarding fields.
+    Body is a JSON payload so the receiving team or their automation can parse it directly.
     """
     to_email = _get_sector_email(contractor.get("sector", ""))
     subject  = _build_offboarding_subject(contractor)
@@ -94,7 +94,7 @@ def send_offboarding_email(
         to_email=to_email,
         subject=subject,
         body=body,
-        body_type="HTML",
+        body_type="Text",
         attachment_filename=None,
         attachment_bytes=None,
     )
@@ -244,50 +244,52 @@ def _build_offboarding_subject(contractor: dict) -> str:
 
 def _build_offboarding_body(contractor: dict, offboard_data: dict) -> str:
     """
-    Build the offboarding email body as an HTML table matching the confirmed
-    field order: Sector | Manager Email (PM) | Contractor Name | PO Number |
-    Serial Number | Last day | Reason For Termination | Laptop | Laptop returned | Comments
-    """
-    def _v(val):
-        """Return val if non-empty, else –"""
-        return str(val).strip() if val and str(val).strip() else "–"
+    Build the offboarding email body as a JSON payload.
+    The receiving CSP team or their automation can parse it directly.
 
-    fields = [
-        ("Sector",                   _v(contractor.get("sector"))),
-        ("Manager Email (PM)",       _v(offboard_data.get("manager_email"))),
-        ("Contractor Name",          _v(contractor.get("name"))),
-        ("PO Number",                _v(contractor.get("poNumber"))),
-        ("Serial Number",            _v(contractor.get("serial"))),
-        ("Last day (mm/dd/yyyy)",    _v(offboard_data.get("last_day"))),
-        ("Reason For Termination",   _v(offboard_data.get("reason"))),
-        ("Laptop (yes/no)",          _v(offboard_data.get("laptop"))),
-        ("Laptop returned (yes/no)", _v(offboard_data.get("laptop_returned"))),
-        ("Comments",                 _v(offboard_data.get("comments"))),
+    Schema mirrors the confirmed offboarding fields:
+      requestType, sector, projectManagerEmail, contractor.name,
+      purchaseOrder, asset.serialNumber / hasLaptop / laptopReturned,
+      termination.lastDay / reason, comments
+    """
+    def _nullable(val) -> str | None:
+        v = str(val).strip() if val is not None else ""
+        return v if v else None
+
+    def _bool_field(val) -> bool:
+        """Convert yes/no/true/false string to bool; default False."""
+        if val is None:
+            return False
+        return str(val).strip().lower() in ("yes", "true", "1")
+
+    laptop_raw    = offboard_data.get("laptop")
+    ret_raw       = offboard_data.get("laptop_returned")
+
+    payload = [
+        {
+            "requestType": "contractor_termination",
+            "record": {
+                "sector":              _nullable(contractor.get("sector")),
+                "projectManagerEmail": _nullable(offboard_data.get("manager_email")),
+                "contractor": {
+                    "name": _nullable(contractor.get("name")),
+                },
+                "purchaseOrder": _nullable(contractor.get("poNumber")),
+                "asset": {
+                    "serialNumber":  _nullable(contractor.get("serial")),
+                    "hasLaptop":     _bool_field(laptop_raw),
+                    "laptopReturned": _bool_field(ret_raw),
+                },
+                "termination": {
+                    "lastDay": _nullable(offboard_data.get("last_day")),
+                    "reason":  _nullable(offboard_data.get("reason")),
+                },
+                "comments": _nullable(offboard_data.get("comments")),
+            },
+        }
     ]
 
-    # ── HTML version (renders as a table in Outlook) ──────────────────────────
-    header_cells = "".join(
-        f'<th style="background:#1d4ed8;color:#fff;padding:8px 12px;'
-        f'text-align:left;white-space:nowrap;font-size:13px">{h}</th>'
-        for h, _ in fields
-    )
-    value_cells = "".join(
-        f'<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;'
-        f'font-size:13px;white-space:nowrap">{v or "–"}</td>'
-        for _, v in fields
-    )
-
-    html = f"""
-<p style="font-family:Segoe UI,Arial,sans-serif;font-size:14px">
-  Can you please help with this offboarding?
-</p>
-<table style="border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;
-              margin-top:12px;border:1px solid #e5e7eb">
-  <thead><tr>{header_cells}</tr></thead>
-  <tbody><tr>{value_cells}</tr></tbody>
-</table>
-"""
-    return html
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 def _get_sector_email(sector: str) -> str:

@@ -1484,18 +1484,34 @@ function renderOffboardForm(){
     </div>
 
     <div class="section-title" style="margin-top:4px">Email Preview</div>
-    <div class="email-preview" style="margin-bottom:4px">To: ${sectorEmail}
+    <div class="email-preview" style="margin-bottom:4px;white-space:pre;font-size:12px">To: ${sectorEmail}
 Subject: ${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING
 
-Please process the following offboarding request.
-[Fields will be included automatically in the sent email]</div>
+[
+  {
+    "requestType": "contractor_termination",
+    "record": {
+      "sector": ${c.sector?JSON.stringify(c.sector):'null'},
+      "projectManagerEmail": ${c.pmIntranetId?JSON.stringify(c.pmIntranetId):'null'},
+      "contractor": { "name": ${c.name?JSON.stringify(c.name):'null'} },
+      "purchaseOrder": ${c.poNumber?JSON.stringify(c.poNumber):'null'},
+      "asset": {
+        "serialNumber": ${c.serial?JSON.stringify(c.serial):'null'},
+        "hasLaptop": false,
+        "laptopReturned": false
+      },
+      "termination": { "lastDay": null, "reason": null },
+      "comments": null
+    }
+  }
+]</div>
 
     <div id="offboardSubmitStatus" style="margin-top:12px"></div>`;
 
   document.getElementById('offboardModalFooter').innerHTML=`
     <button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
     <button class="btn btn-danger" id="btnSubmitOffboard" onclick="submitOffboarding()">
-      Submit Offboarding — Email sent automatically
+      Submit &amp; Send Offboarding Email
     </button>`;
 }
 
@@ -1543,45 +1559,67 @@ async function submitOffboarding(){
 
 function showOffboardSuccess(resp){
   const c=offboardData.c;
-  c.offboard='In Progress';
   const now=new Date(resp.submitted_at||Date.now()).toLocaleString();
-
-  // Three states:
-  // 1. Email sent via Graph   → green confirmation
-  // 2. Graph not configured   → blue Outlook button (expected, not an error)
-  // 3. Graph configured but failed → red error
   const graphNotConfigured = resp.email_error && resp.email_error.includes('not configured');
   const emailOk  = !!resp.email;
   const realFail = !emailOk && !graphNotConfigured;
 
-  const emailLine = emailOk
-    ? `<div class="confirm-row">✅ <b>Email sent automatically</b> to ${resp.email.to}</div>`
-    : graphNotConfigured
-      ? `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
-           📧 <b>Open in Outlook to send the offboarding email.</b><br>
-           The email is pre-filled with all fields — just click Send.
-           ${resp.mailto_fallback?`<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:10px;display:inline-flex">📧 Open in Outlook</a>`:''}
-         </div>`
-      : `<div class="dq-warn">❌ <b>Email failed:</b> ${resp.email_error}</div>`;
+  if(emailOk){
+    // Graph sent it — show final confirmation immediately
+    _offboardFinalScreen(c, resp, now, true);
+    return;
+  }
+  if(realFail){
+    _offboardFinalScreen(c, resp, now, false);
+    return;
+  }
+  // Graph not configured — show Outlook step first, then let PM confirm they sent it
+  document.getElementById('offboardModalBody').innerHTML=`
+    <div style="text-align:center;padding:16px 0 8px">
+      <div style="font-size:40px;margin-bottom:8px">📧</div>
+      <div style="font-size:18px;font-weight:700;color:#1e40af;margin-bottom:4px">Send the Offboarding Email</div>
+      <div style="font-size:13px;color:#6b7280">Offboarding details are ready. Open Outlook, verify, and click Send.</div>
+    </div>
+    <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:14px;font-size:13px;color:#1e40af;margin:14px 0">
+      The email is pre-filled with all required fields (recipient, subject, and all 10 offboarding fields).<br>
+      <a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary" style="text-decoration:none;margin-top:12px;display:inline-flex">
+        📧 Open in Outlook
+      </a>
+    </div>`;
+  document.getElementById('offboardModalFooter').innerHTML=`
+    <button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
+    <button class="btn btn-green" onclick="_offboardConfirmSent(${JSON.stringify(resp).replace(/"/g,'&quot;')})">✓ I Sent the Email</button>`;
+}
 
-  const timelineDot  = emailOk ? 'green' : realFail ? 'red' : 'blue';
-  const timelineText = emailOk ? `Sent to ${resp.email.to}` : graphNotConfigured ? 'Outlook mailto opened' : resp.email_error;
+function _offboardConfirmSent(resp){
+  const c=offboardData.c;
+  const now=new Date().toLocaleString();
+  _offboardFinalScreen(c, resp, now, false, true);
+}
 
+function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
+  c.offboard='In Progress';
+  const icon  = autoSent ? '✅' : manualSent ? '✅' : '❌';
+  const color = (autoSent||manualSent) ? '#15803d' : '#b91c1c';
+  const title = autoSent ? 'Offboarding Successfully Submitted'
+              : manualSent ? 'Offboarding Successfully Submitted'
+              : 'Submission Error';
+  const emailDetail = autoSent ? `Sent automatically to ${resp.email?.to}`
+                    : manualSent ? 'Sent via Outlook'
+                    : resp.email_error;
   document.getElementById('offboardModalBody').innerHTML=`
     <div style="text-align:center;padding:20px 0 10px">
-      <div style="font-size:44px;margin-bottom:8px">${emailOk?'✅':realFail?'❌':'📧'}</div>
-      <div style="font-size:20px;font-weight:700;color:${emailOk?'#15803d':realFail?'#b91c1c':'#1e40af'};margin-bottom:4px">
-        ${emailOk?'Offboarding Successfully Submitted':realFail?'Submission Error':'Offboarding Submitted'}
-      </div>
+      <div style="font-size:44px;margin-bottom:8px">${icon}</div>
+      <div style="font-size:20px;font-weight:700;color:${color};margin-bottom:4px">${title}</div>
       <div style="font-size:13px;color:#6b7280">${now}</div>
     </div>
-    ${emailLine}
+    ${autoSent?`<div class="confirm-row">✅ <b>Email sent automatically</b> to ${resp.email?.to}</div>`:''}
     <ul class="timeline" style="margin-top:16px">
       <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">OFFBOARDING_SUBMITTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
-      <li><div class="tl-dot ${timelineDot}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${emailOk?'SENT':realFail?'FAILED':'OUTLOOK'}</div><div class="tl-detail">${timelineText}</div></div></li>
+      <li><div class="tl-dot ${autoSent||manualSent?'green':'red'}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${autoSent?'SENT':manualSent?'SENT_OUTLOOK':'FAILED'}</div><div class="tl-detail">${emailDetail}</div></div></li>
     </ul>`;
   document.getElementById('offboardModalFooter').innerHTML=`<button class="btn btn-secondary" onclick="closeOffboardModal()">Close</button>`;
-  postAudit('OFFBOARDING_SUBMITTED',c.serial,`Email: ${emailOk?'sent':graphNotConfigured?'outlook':('failed: '+resp.email_error)}`,emailOk?'success':'warning');
+  postAudit('OFFBOARDING_SUBMITTED',c.serial,`Email: ${autoSent?'auto-sent':manualSent?'outlook':'failed'}`,autoSent||manualSent?'success':'error');
 }
 
 // ── TAB CONTENT ───────────────────────────────
