@@ -38,6 +38,7 @@ import ingestion
 import jrs_validation
 import excel_generation
 import email_sender
+import ledger as ledger_module
 
 # ── Persistent storage directory ──────────────────────────────────────────────
 # Railway provides a writable filesystem; we store the three uploaded files here
@@ -48,6 +49,16 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 _REPORT_PATH   = DATA_DIR / "report.bin"      # raw bytes + ext meta
 _TAXONOMY_PATH = DATA_DIR / "taxonomy.xlsx"
 _TEMPLATE_PATH = DATA_DIR / "template.bin"    # raw bytes + ext meta
+
+# ── Upload PIN ────────────────────────────────────────────────────────────────
+# Set UPLOAD_PIN env var on Railway. If unset, uploads are open (dev mode).
+UPLOAD_PIN = os.getenv("UPLOAD_PIN", "")
+
+
+def _verify_pin(pin: str) -> None:
+    """Raise 403 if PIN is configured and provided value doesn't match."""
+    if UPLOAD_PIN and pin != UPLOAD_PIN:
+        raise HTTPException(status_code=403, detail="Invalid upload PIN.")
 
 # ── App setup ──────────────────────────────────────────────────────────────────
 
@@ -96,6 +107,10 @@ def _boot_load() -> None:
     import json
     global _ingestion_result, _template_bytes
 
+    # Always initialise ledger first so it's ready before report applies it
+    ledger_module.init(DATA_DIR)
+    print(f"[boot] Ledger loaded: {len(ledger_module.get_all())} entries")
+
     # Report
     meta_path = _REPORT_PATH.parent / "report_meta.json"
     if _REPORT_PATH.exists() and meta_path.exists():
@@ -103,6 +118,8 @@ def _boot_load() -> None:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             file_bytes = _REPORT_PATH.read_bytes()
             result = ingestion.ingest_from_bytes(file_bytes, meta["filename"], meta["ext"])
+            # Apply ledger overrides before caching
+            result["contractors"] = ledger_module.apply_to_contractors(result["contractors"])
             _ingestion_result = result
             print(f"[boot] Loaded report from disk: {meta['filename']} — {len(result['contractors'])} contractors")
         except Exception as exc:
@@ -245,12 +262,13 @@ def get_status():
 # ── File Upload endpoints ──────────────────────────────────────────────────────
 
 @app.post("/api/upload/report")
-async def upload_report(file: UploadFile = File(...)):
+async def upload_report(file: UploadFile = File(...), pin: str = ""):
     """
     Upload the contractor management .xlsb report.
-    Replaces the previous Box-based ingestion.
     Accepts: .xlsb or .xlsx
+    PIN-protected: set UPLOAD_PIN env var on Railway.
     """
+    _verify_pin(pin)
     global _ingestion_result
 
     if not file.filename:
@@ -267,21 +285,26 @@ async def upload_report(file: UploadFile = File(...)):
 
     try:
         result = ingestion.ingest_from_bytes(file_bytes, file.filename, ext)
+
+        # Apply ledger overrides so app-processed statuses survive the new upload
+        result["contractors"] = ledger_module.apply_to_contractors(result["contractors"])
         _ingestion_result = result
 
-        # Persist to disk so it survives restarts
+        # Persist raw bytes to disk so the file survives restarts
         _persist_report(file_bytes, file.filename, ext)
 
         # Run JRS validation batch
         _run_jrs_batch()
 
+        ledger_count = len(ledger_module.get_all())
         _append_audit(
             user="current_user",
             action="REPORT_UPLOADED",
             detail=(
                 f"File: {file.filename} · "
                 f"{len(result['contractors'])} rows accepted · "
-                f"{len(result['dq_exceptions'])} rejected"
+                f"{len(result['dq_exceptions'])} rejected · "
+                f"{ledger_count} ledger overrides applied"
             ),
             outcome="success",
         )
@@ -292,6 +315,7 @@ async def upload_report(file: UploadFile = File(...)):
             "accepted": len(result["contractors"]),
             "dq":       len(result["dq_exceptions"]),
             "missing_headers": result["missing_headers"],
+            "ledger_applied": ledger_count,
         }
 
     except Exception as e:
@@ -299,11 +323,12 @@ async def upload_report(file: UploadFile = File(...)):
 
 
 @app.post("/api/upload/taxonomy")
-async def upload_taxonomy(file: UploadFile = File(...)):
+async def upload_taxonomy(file: UploadFile = File(...), pin: str = ""):
     """
     Upload the JRS taxonomy .xlsx file.
-    Replaces the previous Box-based taxonomy load.
+    PIN-protected: set UPLOAD_PIN env var on Railway.
     """
+    _verify_pin(pin)
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Expected a .xlsx taxonomy file.")
 
@@ -333,12 +358,14 @@ async def upload_taxonomy(file: UploadFile = File(...)):
 
 
 @app.post("/api/upload/template")
-async def upload_template(file: UploadFile = File(...)):
+async def upload_template(file: UploadFile = File(...), pin: str = ""):
     """
     Upload the Excel renewal template (.xlsm or .xlsx).
     Stored in memory for use by the Excel generation step.
     Persisted to disk so it survives restarts.
+    PIN-protected: set UPLOAD_PIN env var on Railway.
     """
+    _verify_pin(pin)
     global _template_bytes
 
     if not file.filename:
@@ -507,6 +534,17 @@ def submit_renewal(req: SubmitRenewalRequest):
     else:
         email_error = "Microsoft Graph credentials not configured — use Outlook fallback link."
 
+    # Persist to ledger — survives next CMO upload
+    ledger_module.record_renewal(
+        serial=req.contractor_id,
+        renewal_data={
+            "tram_id_new":   tram_id_for_subject,
+            "new_end_date":  req.new_end_date,
+            "confirmed_jrs": final_jrs,
+            "excel":         excel_result["filename"],
+        },
+    )
+
     _append_audit(
         user="current_user",
         action="RENEWAL_SUBMITTED",
@@ -564,6 +602,15 @@ def submit_offboarding(req: SubmitOffboardingRequest):
     else:
         email_error = "Microsoft Graph credentials not configured — use Outlook fallback link."
 
+    # Persist to ledger — survives next CMO upload
+    ledger_module.record_offboarding(
+        serial=req.contractor_id,
+        offboard_data={
+            **offboard_data,
+            "contractor_name": contractor.get("name", req.contractor_id),
+        },
+    )
+
     _append_audit(
         user="current_user",
         action="OFFBOARDING_SUBMITTED",
@@ -582,6 +629,14 @@ def submit_offboarding(req: SubmitOffboardingRequest):
         "submitted_at":    datetime.utcnow().isoformat() + "Z",
         "mailto_fallback": _build_offboard_mailto(contractor, offboard_data),
     }
+
+
+# ── Ledger inspection ─────────────────────────────────────────────────────────
+
+@app.get("/api/ledger")
+def get_ledger():
+    """Return the full state ledger. Useful for admin inspection."""
+    return {"entries": ledger_module.get_all(), "count": len(ledger_module.get_all())}
 
 
 # ── Audit log ──────────────────────────────────────────────────────────────────

@@ -407,6 +407,13 @@
         No Box connection required.
       </p>
 
+      <!-- Upload PIN -->
+      <div style="border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;background:#fefce8">
+        <div style="font-weight:700;margin-bottom:6px;font-size:13px">🔒 Upload PIN <span style="color:#dc2626">*</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Required to upload or replace files. Set on Railway as <code>UPLOAD_PIN</code>. Leave blank if no PIN is configured.</div>
+        <input type="password" id="uploadPin" placeholder="Enter upload PIN" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:220px">
+      </div>
+
       <!-- Report -->
       <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
         <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#dc2626">*</span></div>
@@ -559,6 +566,7 @@ async function uploadFile(type) {
     return;
   }
   const file = fileInput.files[0];
+  const pin  = (document.getElementById('uploadPin') || {}).value || '';
   statusEl.innerHTML = `<span style="color:#6b7280">⏳ Uploading ${file.name}…</span>`;
 
   if (!API_BASE) {
@@ -572,14 +580,17 @@ async function uploadFile(type) {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(API_BASE + '/api/upload/' + type, {method:'POST', body: form});
+    // PIN sent as query param (not in FormData body, easier to pass through FastAPI)
+    const url = `${API_BASE}/api/upload/${type}?pin=${encodeURIComponent(pin)}`;
+    const res = await fetch(url, {method:'POST', body: form});
     if (!res.ok) {
       const err = await res.json().catch(()=>({detail: res.statusText}));
       throw new Error(err.detail || res.statusText);
     }
     const data = await res.json();
     if (type === 'report') {
-      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ exceptions</span>`;
+      const ledgerNote = data.ledger_applied ? ` · 📋 ${data.ledger_applied} ledger overrides applied` : '';
+      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ exceptions${ledgerNote}</span>`;
       await loadContractors();
     } else if (type === 'taxonomy') {
       statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
@@ -969,14 +980,17 @@ function renderTable(data){
           ? `<b style="color:#dc2626">${c.endDate}</b>`
           : `<b>${c.endDate}</b>`)
       : '<span style="color:#9ca3af">–</span>';
-    return `<tr style="cursor:pointer" onclick="openDetail('${c.serial}')">
+    // Ghost rows — contractor no longer in CMO but preserved from ledger
+    const ghostStyle = c._ghost ? ' style="opacity:0.65;background:#fafafa"' : '';
+    const ghostBadge = c._ghost ? '<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO — kept from history">📋 ledger</span>' : '';
+    return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
       <td class="col-action" onclick="event.stopPropagation()">
-        <button class="btn btn-primary btn-sm" onclick="openRenewalModal('${c.serial}')" ${c.renewal==='In Progress'?'disabled title="Renewal already in progress"':''}>Renewal</button>
-        <button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="openOffboardModal('${c.serial}')" ${c.offboard==='In Progress'?'disabled title="Offboarding already in progress"':''}>Offboard</button>
+        <button class="btn btn-primary btn-sm" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Renewal already in progress')+'"':''}>Renewal</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Offboarding already in progress')+'"':''}>Offboard</button>
       </td>
       <td>${expDate}</td>
       <td>${daysCell}</td>
-      <td><b>${c.name}</b></td>
+      <td><b>${c.name}</b>${ghostBadge}</td>
       <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
       <td>${c.client}</td>
       <td>${c.project}</td>
