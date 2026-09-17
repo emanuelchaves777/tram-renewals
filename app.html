@@ -1098,12 +1098,54 @@ function renderRenewalForm(){
   const c=renewalData.c;
   document.getElementById('renewalModalTitle').textContent=`Renewal — ${c.name} (${c.serial})`;
 
-  // JRS status pill
-  const jrsPill=c.jrsStatus==='active'
-    ? `<span class="badge badge-green" style="font-size:12px">✓ JRS Active — will be validated automatically on submit</span>`
-    : c.jrsStatus==='warn'
-      ? `<span class="badge badge-yellow" style="font-size:12px">⚠ JRS has a replacement — will be auto-resolved on submit</span>`
-      : `<span class="badge badge-red" style="font-size:12px">✗ JRS unresolvable — correct before submitting</span>`;
+  // ── JRS section: content depends on validation outcome ─────────────────────
+  const jrsResult = c.jrsResult || {};
+  const jrsOutcome = jrsResult.outcome || (c.jrsStatus==='active'?'active':c.jrsStatus==='warn'?'one_replacement':'not_found');
+  const originalJrs = c.jrsTram || '';
+
+  let jrsBlock = '';
+  let jrsSubmitBlocked = false;
+
+  if (jrsOutcome === 'active') {
+    jrsBlock = `
+      <input id="r_jrs" value="${originalJrs}" readonly style="background:#f9fafb">
+      <div style="margin-top:6px"><span class="badge badge-green" style="font-size:12px">✓ JRS Active — no changes needed</span></div>`;
+  } else if (jrsOutcome === 'one_replacement') {
+    const proposed = (jrsResult.replacements||[])[0] || '';
+    jrsBlock = `
+      <input id="r_jrs" value="${proposed}" style="border-color:#f59e0b">
+      <div style="margin-top:8px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e">
+        <b>⚠ JRS Replacement Proposed</b><br>
+        Original: <code>${originalJrs}</code> → Proposed: <code>${proposed}</code><br>
+        <span style="color:#78350f">Review the proposed value above. You may edit it. Click Submit to confirm.</span>
+      </div>`;
+  } else if (jrsOutcome === 'multi_replacement') {
+    const opts = (jrsResult.replacements||[]).map(r=>`<option value="${r}">${r}</option>`).join('');
+    jrsBlock = `
+      <select id="r_jrs" style="border-color:#f59e0b;width:100%">
+        <option value="">— Select the correct replacement —</option>
+        ${opts}
+      </select>
+      <div style="margin-top:8px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e">
+        <b>⚠ Multiple JRS replacements found</b><br>
+        Original: <code>${originalJrs}</code><br>
+        Select the correct replacement above, then click Submit.
+      </div>`;
+  } else {
+    // deleted / not_found — block submit
+    jrsSubmitBlocked = true;
+    const escalationEmail = getSectorEmail(c.sector);
+    jrsBlock = `
+      <input id="r_jrs" value="${originalJrs}" readonly style="background:#fef2f2;border-color:#fca5a5">
+      <div style="margin-top:8px;padding:10px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#b91c1c">
+        <b>✗ JRS Cannot Be Resolved</b><br>
+        "${originalJrs}" — outcome: <code>${jrsOutcome}</code><br>
+        ${jrsResult.message||'This JRS value is not in the taxonomy.'}<br>
+        <b>Action required:</b> Escalate to CSP team at
+        <a href="mailto:${escalationEmail}" style="color:#b91c1c">${escalationEmail}</a>
+        before this renewal can proceed. Submission is blocked.
+      </div>`;
+  }
 
   // Default new end date: current end + 3 months
   const defaultEnd=(()=>{try{const d=new Date(c.endDate);d.setMonth(d.getMonth()+3);return d.toISOString().slice(0,10);}catch{return '';}})();
@@ -1159,8 +1201,7 @@ function renderRenewalForm(){
       <div class="form-grid">
         <div class="form-group" style="grid-column:span 2">
           <label>JR/S (Job Role &amp; Specialty) <span style="color:#dc2626">*</span></label>
-          <input id="r_jrs" value="${c.jrsTram||''}">
-          <div style="margin-top:6px">${jrsPill}</div>
+          ${jrsBlock}
         </div>
         <div class="form-group">
           <label>Band <span style="color:#dc2626">*</span></label>
@@ -1234,8 +1275,7 @@ function renderRenewalForm(){
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label>New TRAM Request ID <span style="color:#dc2626">*</span></label>
-        <input id="r_tramId" placeholder="e.g. NA202510048216S" style="font-family:monospace;font-size:14px"
-          oninput="document.getElementById('btnSubmitRenewal').disabled=!this.value.trim()">
+        <input id="r_tramId" placeholder="e.g. NA202510048216S" style="font-family:monospace;font-size:14px">
       </div>
     </div>
 
@@ -1243,9 +1283,23 @@ function renderRenewalForm(){
 
   document.getElementById('renewalModalFooter').innerHTML=`
     <button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
-    <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()" disabled>
+    <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()"
+      ${jrsSubmitBlocked ? 'disabled title="Resolve JRS issue before submitting"' : 'disabled'}>
       Submit Renewal — Excel + Email sent automatically
     </button>`;
+
+  if (jrsSubmitBlocked) {
+    // Keep button permanently disabled; don't wire the TRAM ID input to enable it
+    return;
+  }
+
+  // Wire TRAM ID input to enable the submit button
+  const tramInput = document.getElementById('r_tramId');
+  if (tramInput) {
+    tramInput.addEventListener('input', () => {
+      document.getElementById('btnSubmitRenewal').disabled = !tramInput.value.trim();
+    });
+  }
 }
 
 async function submitRenewal(){
@@ -1363,7 +1417,19 @@ function showRenewalSuccess(resp){
     ${emailLine}
     <div class="section-title" style="margin-top:16px">Audit Summary</div>
     <ul class="timeline">
-      <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATED</div><div class="tl-detail">Final JR/S: "${resp.final_jrs||'–'}"</div></div></li>
+      ${(()=>{
+        const jr = resp.jrs_result||{};
+        const outcome = jr.outcome||'active';
+        const original = jr.input || c.jrsTram || '–';
+        const proposed = (jr.replacements||[])[0] || null;
+        const finalJrs = resp.final_jrs || original;
+        let jrsDot = outcome==='active' ? 'green' : 'yellow';
+        let jrsDetail = `Outcome: ${outcome.toUpperCase()} · Original: "${original}"`;
+        if (proposed && proposed !== finalJrs) jrsDetail += ` → Proposed: "${proposed}" → Confirmed: "${finalJrs}"`;
+        else if (finalJrs !== original) jrsDetail += ` → Final: "${finalJrs}"`;
+        else jrsDetail += ` · Final: "${finalJrs}"`;
+        return `<li><div class="tl-dot ${jrsDot}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATED</div><div class="tl-detail">${jrsDetail}</div></div></li>`;
+      })()}
       <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">${resp.excel_filename||'–'} · ${resp.fields_written||'?'} fields written</div></div></li>
       <li><div class="tl-dot ${emailTimelineDot}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${emailOk?'SENT':realFail?'FAILED':'OUTLOOK'}</div><div class="tl-detail">${emailTimelineText}</div></div></li>
       <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">RENEWAL_SUBMITTED</div><div class="tl-detail">TRAM ID: ${resp.tram_id_used||'–'}</div></div></li>

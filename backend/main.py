@@ -414,27 +414,33 @@ def submit_renewal(req: SubmitRenewalRequest):
     """
     Fully automated renewal pipeline triggered by a single PM click:
       1. Resolve contractor from cache
-      2. Validate JRS (auto-apply single replacement)
+      2. Validate confirmed_jrs (the PM-reviewed value from the form)
       3. Populate Excel template
       4. Send renewal email via Microsoft Graph
       5. Write audit record
+
+    JRS policy (per jrs-validation-rules.md):
+      - confirmed_jrs is the value the PM has already reviewed and accepted in the UI.
+      - We validate it to record the outcome; we do NOT silently substitute.
+      - If the outcome is still unresolvable (multi_replacement / not_found / deleted),
+        the UI should have blocked submission — we 422 here as a safety net.
     """
     contractor = _resolve_contractor(req.contractor_id)
 
-    # JRS validation
-    jrs_to_use = req.confirmed_jrs or contractor.get("jrsTram", "")
-    jrs_result = jrs_validation.validate_jrs(jrs_to_use)
-    if jrs_result["outcome"] in ("multi_replacement", "not_found"):
+    # Use the PM-confirmed JRS value (already reviewed/edited in the form)
+    final_jrs  = req.confirmed_jrs or contractor.get("jrsTram", "")
+    # Validate it to capture the outcome for the audit trail
+    jrs_result = jrs_validation.validate_jrs(final_jrs)
+
+    # Safety net: block if still unresolvable (UI should have caught this first)
+    if jrs_result["outcome"] in ("multi_replacement", "not_found", "deleted"):
         raise HTTPException(
             status_code=422,
             detail=(
-                f"JRS '{jrs_to_use}' cannot be auto-resolved: {jrs_result['outcome']}. "
-                "Please correct the JRS field before submitting."
+                f"JRS '{final_jrs}' cannot be used for submission: outcome={jrs_result['outcome']}. "
+                "Escalate to the CSP team before submitting."
             ),
         )
-    final_jrs = jrs_to_use
-    if jrs_result["outcome"] == "one_replacement" and jrs_result.get("replacements"):
-        final_jrs = jrs_result["replacements"][0]
 
     # Build pm_checklist dict
     biz_just_parts = [p for p in [
