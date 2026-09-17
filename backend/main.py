@@ -15,11 +15,17 @@ Endpoints:
   POST /api/audit                 — append an audit record
   GET  /api/audit                 — retrieve audit log
 
+Persistence:
+  Uploaded files are written to DATA_DIR (default /data, override via DATA_DIR env var).
+  On startup the app auto-loads any files already on disk so uploads survive restarts.
+
 Run locally:
   cd backend
   uvicorn main:app --reload --port 8000
 """
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -32,6 +38,16 @@ import ingestion
 import jrs_validation
 import excel_generation
 import email_sender
+
+# ── Persistent storage directory ──────────────────────────────────────────────
+# Railway provides a writable filesystem; we store the three uploaded files here
+# so they survive container restarts without needing re-upload.
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+_REPORT_PATH   = DATA_DIR / "report.bin"      # raw bytes + ext meta
+_TAXONOMY_PATH = DATA_DIR / "taxonomy.xlsx"
+_TEMPLATE_PATH = DATA_DIR / "template.bin"    # raw bytes + ext meta
 
 # ── App setup ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +70,68 @@ app.add_middleware(
 _ingestion_result: dict | None = None
 _template_bytes:   bytes | None = None   # the .xlsm template
 _audit_log:        list[dict] = []
+
+
+# ── Startup: auto-load persisted files from disk ──────────────────────────────
+
+def _persist_report(file_bytes: bytes, filename: str, ext: str) -> None:
+    """Write report bytes + metadata to disk so it survives restarts."""
+    import json
+    _REPORT_PATH.write_bytes(file_bytes)
+    (_REPORT_PATH.parent / "report_meta.json").write_text(
+        json.dumps({"filename": filename, "ext": ext}), encoding="utf-8"
+    )
+
+
+def _persist_template(file_bytes: bytes, filename: str) -> None:
+    import json
+    _TEMPLATE_PATH.write_bytes(file_bytes)
+    (_TEMPLATE_PATH.parent / "template_meta.json").write_text(
+        json.dumps({"filename": filename}), encoding="utf-8"
+    )
+
+
+def _boot_load() -> None:
+    """Called once at startup. Loads any previously persisted files from disk."""
+    import json
+    global _ingestion_result, _template_bytes
+
+    # Report
+    meta_path = _REPORT_PATH.parent / "report_meta.json"
+    if _REPORT_PATH.exists() and meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            file_bytes = _REPORT_PATH.read_bytes()
+            result = ingestion.ingest_from_bytes(file_bytes, meta["filename"], meta["ext"])
+            _ingestion_result = result
+            print(f"[boot] Loaded report from disk: {meta['filename']} — {len(result['contractors'])} contractors")
+        except Exception as exc:
+            print(f"[boot] Failed to load report from disk: {exc}")
+
+    # Taxonomy
+    if _TAXONOMY_PATH.exists():
+        try:
+            tax_bytes = _TAXONOMY_PATH.read_bytes()
+            jrs_validation.load_taxonomy_from_bytes(tax_bytes)
+            print("[boot] Loaded taxonomy from disk")
+            # Re-run JRS batch if report was also loaded
+            if _ingestion_result:
+                _run_jrs_batch()
+        except Exception as exc:
+            print(f"[boot] Failed to load taxonomy from disk: {exc}")
+
+    # Template
+    meta_path = _TEMPLATE_PATH.parent / "template_meta.json"
+    if _TEMPLATE_PATH.exists() and meta_path.exists():
+        try:
+            _template_bytes = _TEMPLATE_PATH.read_bytes()
+            print("[boot] Loaded template from disk")
+        except Exception as exc:
+            print(f"[boot] Failed to load template from disk: {exc}")
+
+
+# Run at module load time (FastAPI startup)
+_boot_load()
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
@@ -115,6 +193,55 @@ def health():
     }
 
 
+@app.get("/api/status")
+def get_status():
+    """
+    Returns the current load state for all three files.
+    Used by the Setup panel to show what is already loaded (especially after restarts).
+    """
+    import json
+
+    report_info = None
+    if _ingestion_result:
+        report_info = {
+            "filename":  _ingestion_result["filename"],
+            "report_date": _ingestion_result["report_date"],
+            "ingested_at": _ingestion_result["ingested_at"],
+            "accepted":  len(_ingestion_result["contractors"]),
+            "dq":        len(_ingestion_result["dq_exceptions"]),
+            "persisted": _REPORT_PATH.exists(),
+        }
+
+    taxonomy_info = None
+    if jrs_validation.get_taxonomy_cache() is not None:
+        taxonomy_info = {
+            "loaded":    True,
+            "persisted": _TAXONOMY_PATH.exists(),
+        }
+
+    template_info = None
+    if _template_bytes is not None:
+        meta_path = _TEMPLATE_PATH.parent / "template_meta.json"
+        tname = None
+        if meta_path.exists():
+            try:
+                tname = json.loads(meta_path.read_text(encoding="utf-8")).get("filename")
+            except Exception:
+                pass
+        template_info = {
+            "filename":  tname,
+            "size":      len(_template_bytes),
+            "persisted": _TEMPLATE_PATH.exists(),
+        }
+
+    return {
+        "report":   report_info,
+        "taxonomy": taxonomy_info,
+        "template": template_info,
+        "all_ready": all([report_info, taxonomy_info, template_info]),
+    }
+
+
 # ── File Upload endpoints ──────────────────────────────────────────────────────
 
 @app.post("/api/upload/report")
@@ -141,6 +268,9 @@ async def upload_report(file: UploadFile = File(...)):
     try:
         result = ingestion.ingest_from_bytes(file_bytes, file.filename, ext)
         _ingestion_result = result
+
+        # Persist to disk so it survives restarts
+        _persist_report(file_bytes, file.filename, ext)
 
         # Run JRS validation batch
         _run_jrs_batch()
@@ -182,6 +312,9 @@ async def upload_taxonomy(file: UploadFile = File(...)):
     try:
         jrs_validation.load_taxonomy_from_bytes(file_bytes)
 
+        # Persist to disk so it survives restarts
+        _TAXONOMY_PATH.write_bytes(file_bytes)
+
         # Re-run JRS batch if report is already loaded
         if _ingestion_result:
             _run_jrs_batch()
@@ -204,6 +337,7 @@ async def upload_template(file: UploadFile = File(...)):
     """
     Upload the Excel renewal template (.xlsm or .xlsx).
     Stored in memory for use by the Excel generation step.
+    Persisted to disk so it survives restarts.
     """
     global _template_bytes
 
@@ -218,6 +352,9 @@ async def upload_template(file: UploadFile = File(...)):
         )
 
     _template_bytes = await file.read()
+
+    # Persist to disk
+    _persist_template(_template_bytes, file.filename)
 
     _append_audit(
         user="current_user",
