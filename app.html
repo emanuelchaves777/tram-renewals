@@ -562,10 +562,36 @@ function checkSetupComplete() {
 }
 
 // ── Load contractors from backend ──────────────
+// Normalise a raw API contractor record so renderTable() can read it identically
+// to the synthetic CONTRACTORS array. Backend uses daysToExpiry; frontend uses c.days.
+// Also handles bucket overrides for renewal/offboard in-progress states.
+function normaliseApiRecord(c) {
+  c.id   = c.serial;
+  c.days = (c.daysToExpiry !== undefined && c.daysToExpiry !== null) ? c.daysToExpiry : daysFrom(c.endDate);
+  // Bucket overrides for workflow state
+  if (!c.bucket) c.bucket = bucket(c.days);
+  const rip = c.renewal  && c.renewal.toLowerCase()  !== 'no' && c.renewal  !== '–';
+  const oip = c.offboard && c.offboard.toLowerCase() !== 'no' && c.offboard !== '–';
+  if (rip) c.bucket = 'renewal-ip';
+  if (oip) c.bucket = 'offboard-ip';
+  // Ensure fields the table reads are never undefined
+  c.contact      = c.contact      || '–';
+  c.contactEmail = c.contactEmail || '';
+  c.vendor       = c.vendor       || '–';
+  c.band         = c.band         || '–';
+  c.jrsTram      = c.jrsTram      || '–';
+  c.jrsStatus    = c.jrsStatus    || 'invalid';
+  c.workLocation = c.workLocation || '–';
+  c.tramId       = c.tramId       || null;
+  c.cnum         = c.cnum         || null;
+  return c;
+}
+
 async function loadContractors() {
   try {
     const data = await apiFetch('/api/contractors');
-    const all  = [...data.contractors, ...data.dq_exceptions];
+    const all  = [...data.contractors, ...data.dq_exceptions].map(normaliseApiRecord);
+    _liveRegistry = all;
     updateFreshnessBar(data.meta);
     renderTable(all);
     updateBucketCounts(all);
@@ -579,7 +605,8 @@ async function loadData() {
   if (!API_BASE) return;
   try {
     const data = await apiFetch('/api/contractors');
-    const all  = [...data.contractors, ...data.dq_exceptions];
+    const all  = [...data.contractors, ...data.dq_exceptions].map(normaliseApiRecord);
+    _liveRegistry = all;
     updateFreshnessBar(data.meta);
     renderTable(all);
     updateBucketCounts(all);
@@ -866,13 +893,20 @@ const CONTRACTORS = [
   },
 ];
 CONTRACTORS.forEach(c=>{
-  c.id = c.serial; // use TalentID/Serial as the unique key throughout
+  c.id = c.serial;
   const d=daysFrom(c.endDate);
   c.days=d;
   c.bucket=bucket(d);
   if(c.renewal==='In Progress') c.bucket='renewal-ip';
   if(c.offboard==='In Progress') c.bucket='offboard-ip';
 });
+
+// Live registry — always points to whatever dataset is currently rendered.
+// Starts with synthetic data; overwritten when real API data loads.
+let _liveRegistry = CONTRACTORS;
+function _findContractor(serial){
+  return _liveRegistry.find(x=>x.serial===serial) || null;
+}
 
 let activeBucketFilter='';
 let sortCol=-1,sortDir=1;
@@ -965,7 +999,7 @@ function showTab(name,btn){
 
 // ── DETAIL PANEL ──────────────────────────────
 function openDetail(serial){
-  const c=CONTRACTORS.find(x=>x.serial===serial);if(!c) return;
+  const c=_findContractor(serial);if(!c) return;
   document.getElementById('detailTitle').textContent=c.name+' — Record Detail';
   const daysLabel=c.days===null?'Unknown (date missing)':c.days<0?`<b style="color:#dc2626">${Math.abs(c.days)} days past due</b>`:`${c.days} days`;
   document.getElementById('detailBody').innerHTML=`
@@ -1045,7 +1079,7 @@ function closeDetailPanel(){document.getElementById('detailOverlay').classList.r
 // ── RENEWAL MODAL — single-screen review + one-click submit ───────────────────
 let renewalData={};
 function openRenewalModal(id){
-  const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
+  const c=_findContractor(id);if(!c) return;
   if(c.renewal==='In Progress'){
     alert('⚠ DUPLICATE DETECTED\n\nAn active renewal request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
@@ -1394,7 +1428,7 @@ function getSectorEmailLabel(sector){
 // ── OFFBOARDING MODAL — single-screen review + one-click submit ───────────────
 let offboardData={};
 function openOffboardModal(id){
-  const c=CONTRACTORS.find(x=>x.serial===id);if(!c) return;
+  const c=_findContractor(id);if(!c) return;
   if(c.offboard==='In Progress'){
     alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
