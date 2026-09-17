@@ -389,7 +389,7 @@
     <div class="panel-body">
 
       <p style="font-size:13px;color:#6b7280;margin-bottom:20px">
-        Upload your three files once. They are held in memory on the server for the current session.
+        Upload your three files once. They are <b>saved to disk on the server</b> and auto-reload on every restart — no re-upload needed.
         No Box connection required.
       </p>
 
@@ -505,7 +505,33 @@ async function apiFetch(path, options={}) {
 }
 
 // ── Setup panel ───────────────────────────────
-function openSetupPanel(){document.getElementById('setupOverlay').classList.add('open');}
+async function openSetupPanel(){
+  document.getElementById('setupOverlay').classList.add('open');
+  if (!API_BASE) return;
+  // Poll /api/status to show what's already loaded (especially after a restart)
+  try {
+    const st = await apiFetch('/api/status');
+    if (st.report) {
+      const el = document.getElementById('statusReport');
+      if (el && !el.innerHTML.includes('✅')) {
+        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded: <b>${st.report.filename}</b> — ${st.report.accepted} contractors, ${st.report.dq} DQ · Report date: ${st.report.report_date}${st.report.persisted?' · 💾 persisted':''}</span>`;
+      }
+    }
+    if (st.taxonomy) {
+      const el = document.getElementById('statusTaxonomy');
+      if (el && !el.innerHTML.includes('✅')) {
+        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded${st.taxonomy.persisted?' · 💾 persisted':''}</span>`;
+      }
+    }
+    if (st.template) {
+      const el = document.getElementById('statusTemplate');
+      if (el && !el.innerHTML.includes('✅')) {
+        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded: <b>${st.template.filename||'template'}</b> · ${(st.template.size/1024).toFixed(0)} KB${st.template.persisted?' · 💾 persisted':''}</span>`;
+      }
+    }
+    checkSetupComplete();
+  } catch(_) {}
+}
 function closeSetupPanel(e){
   if(!e||e.target===document.getElementById('setupOverlay'))
     document.getElementById('setupOverlay').classList.remove('open');
@@ -952,7 +978,7 @@ function renderTable(data){
   }).join('');
 }
 function getFilteredData(){
-  let data=[...CONTRACTORS];
+  let data=[..._liveRegistry];
   const contact=(document.getElementById('f-contact')||{}).value||'';
   const contractor=(document.getElementById('f-contractor')||{}).value||'';
   const client=(document.getElementById('f-client')||{}).value||'';
@@ -960,27 +986,34 @@ function getFilteredData(){
   const bkt=(document.getElementById('f-bucket')||{}).value||'';
   const jrsSt=(document.getElementById('f-jrs')||{}).value||'';
   const active=activeBucketFilter||bkt;
-  if(contact) data=data.filter(c=>c.contact.toLowerCase().includes(contact.toLowerCase())||c.contactEmail.toLowerCase().includes(contact.toLowerCase()));
-  if(contractor) data=data.filter(c=>c.name.toLowerCase().includes(contractor.toLowerCase())||c.email.toLowerCase().includes(contractor.toLowerCase())||c.serial.toLowerCase().includes(contractor.toLowerCase()));
-  if(client) data=data.filter(c=>c.client.toLowerCase().includes(client.toLowerCase()));
-  if(project) data=data.filter(c=>c.project.toLowerCase().includes(project.toLowerCase()));
+  if(contact) data=data.filter(c=>(c.contact||'').toLowerCase().includes(contact.toLowerCase())||(c.contactEmail||'').toLowerCase().includes(contact.toLowerCase()));
+  if(contractor) data=data.filter(c=>(c.name||'').toLowerCase().includes(contractor.toLowerCase())||(c.email||'').toLowerCase().includes(contractor.toLowerCase())||(c.serial||'').toLowerCase().includes(contractor.toLowerCase()));
+  if(client) data=data.filter(c=>(c.client||'').toLowerCase().includes(client.toLowerCase()));
+  if(project) data=data.filter(c=>(c.project||'').toLowerCase().includes(project.toLowerCase()));
   if(active) data=data.filter(c=>c.bucket===active||(active==='dq'&&c.dq));
   if(jrsSt) data=data.filter(c=>c.jrsStatus===jrsSt);
   if(sortCol>=0){
-    // col order: endDate(0), days(1), name(2), serial(3), client(4), project(5),
-    //            contact(6), vendor(7), band(8), jrsTram(9), workLocation(10), tramId(11)
     const keys=['endDate','days','name','serial','client','project','contact','vendor','band','jrsTram','workLocation','tramId'];
     const k=keys[sortCol];
     data.sort((a,b)=>{const av=a[k]??'';const bv=b[k]??'';return (av<bv?-1:av>bv?1:0)*sortDir;});
   }
   return data;
 }
+function updateBucketCounts(data){
+  const counts={'past-due':0,'0-7':0,'8-14':0,'15-30':0,'31-60':0,'60+':0,'renewal-ip':0,'offboard-ip':0,dq:0};
+  data.forEach(c=>{
+    if(c.dq) counts.dq++;
+    if(counts[c.bucket]!==undefined) counts[c.bucket]++;
+  });
+  const map={'past-due':'cnt-past','0-7':'cnt-07','8-14':'cnt-814','15-30':'cnt-1530','31-60':'cnt-3160','60+':'cnt-60p','renewal-ip':'cnt-rip','offboard-ip':'cnt-oip','dq':'cnt-dq'};
+  Object.entries(map).forEach(([k,id])=>{const el=document.getElementById(id);if(el) el.textContent=counts[k]||0;});
+}
 function applyFilters(){renderTable(getFilteredData());}
 function clearFilters(){
   ['f-contact','f-contractor','f-client','f-project','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
   activeBucketFilter='';
   document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));
-  renderTable(CONTRACTORS);
+  renderTable(_liveRegistry);
 }
 function filterBucket(b,card){
   if(activeBucketFilter===b){activeBucketFilter='';card.classList.remove('active-filter');}
