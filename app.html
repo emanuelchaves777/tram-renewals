@@ -690,7 +690,12 @@ let _identity = null;
 function _loadIdentity() {
   try {
     const raw = localStorage.getItem('tram_identity');
-    if (raw) _identity = JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Safety: if both intranetId is set AND viewAll is true, prefer the ID (ignore viewAll)
+      if (parsed && parsed.intranetId && parsed.viewAll) parsed.viewAll = false;
+      _identity = parsed;
+    }
   } catch(_) {}
 }
 
@@ -725,7 +730,11 @@ function closeIdentityModal(viewAll) {
   if (viewAll) {
     _saveIdentityStore('', '', true);
     _updateHeaderBadge();
-    _applyIdentityToView();
+    if (_liveRegistry.length && _liveRegistry !== CONTRACTORS) {
+      _applyIdentityToView();
+    } else {
+      loadData();
+    }
   }
 }
 
@@ -741,14 +750,29 @@ function saveIdentity() {
   _saveIdentityStore(id, client, false);
   document.getElementById('identityModal').classList.remove('open');
   _updateHeaderBadge();
-  _applyIdentityToView();
+  // If live data is already loaded re-filter immediately; else trigger a full reload
+  if (_liveRegistry.length && _liveRegistry !== CONTRACTORS) {
+    _applyIdentityToView();
+  } else {
+    loadData();
+  }
 }
 
 function _applyIdentityToView() {
-  if (!_liveRegistry.length) return;
-  const filtered = _identityFilter(_liveRegistry);
+  const filtered = _identityFilter([..._liveRegistry]);
   renderTable(filtered);
   updateBucketCounts(filtered);
+  // Update banner row-count message
+  const total = _liveRegistry.length;
+  const shown = filtered.length;
+  const b = document.getElementById('appBanner');
+  if (b && total > 0) {
+    const filterMsg = (_identity && !_identity.viewAll && _identity.intranetId)
+      ? `✓ Live data loaded from backend · showing ${shown} of ${total} for ${_identity.intranetId}`
+      : `✓ Live data loaded from backend · ${total} contractors`;
+    b.style.background = '#15803d';
+    b.innerHTML = filterMsg;
+  }
 }
 
 // Returns the subset of data that belongs to this PM, or all if viewAll/admin.
