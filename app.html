@@ -186,9 +186,9 @@
   <div class="id-modal">
     <h2>👤 Who are you?</h2>
     <p>Enter your IBM Intranet ID (e.g. <code>jsmith@us.ibm.com</code>) to filter the dashboard to <b>your contractors only</b>. You can also filter by account/client name.<br><br>Your identity is saved in this browser and never sent to any server.</p>
-    <label>Your IBM Intranet ID (PM Intranet ID)</label>
+    <label>Your IBM Intranet ID (BP Manager Intranet ID)</label>
     <input id="id-intranetId" type="email" placeholder="jsmith@us.ibm.com" autocomplete="email">
-    <div class="id-hint">This must match the <em>PM Intranet ID</em> field in the CMO report.</div>
+    <div class="id-hint">This must match the <em>BP Manager Intranet ID</em> field (column CL) in the CMO report.</div>
     <label>Account / Client (optional)</label>
     <input id="id-client" type="text" placeholder="e.g. AT&T INC">
     <div class="id-hint">Leave blank to see all accounts you are the PM for.</div>
@@ -624,7 +624,7 @@ async function uploadFile(type) {
     if (type === 'report') {
       const ledgerNote = data.ledger_applied ? ` · 📋 ${data.ledger_applied} ledger overrides applied` : '';
       statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ exceptions${ledgerNote}</span>`;
-      await loadContractors();
+      await loadData();   // identity-aware reload (replaces orphan loadContractors)
     } else if (type === 'taxonomy') {
       statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
     } else {
@@ -659,9 +659,10 @@ function normaliseApiRecord(c) {
   if (rip) c.bucket = 'renewal-ip';
   if (oip) c.bucket = 'offboard-ip';
   // Ensure fields the table reads are never undefined
-  c.contact      = c.contact      || '–';
-  c.contactEmail = c.contactEmail || '';
-  c.vendor       = c.vendor       || '–';
+  c.contact              = c.contact              || '–';
+  c.contactEmail         = c.contactEmail         || '';
+  c.bpManagerIntranetId  = c.bpManagerIntranetId  || '';
+  c.vendor               = c.vendor               || '–';
   c.band         = c.band         || '–';
   c.jrsTram      = c.jrsTram      || '–';
   c.jrsStatus    = c.jrsStatus    || 'invalid';
@@ -751,19 +752,44 @@ function _applyIdentityToView() {
 }
 
 // Returns the subset of data that belongs to this PM, or all if viewAll/admin.
+// Primary match: bpManagerIntranetId (CMO column "CL" — BP Manager Intranet ID).
+// Fallback chain: pmIntranetId → contactEmail → contact username prefix.
 function _identityFilter(data) {
   if (!_identity || _identity.viewAll || !_identity.intranetId) return data;
-  const id = _identity.intranetId;
-  const cl = (_identity.client || '').toLowerCase();
-  return data.filter(c => {
+  const id = _identity.intranetId.trim().toLowerCase();
+  const cl = (_identity.client || '').trim().toLowerCase();
+
+  const result = data.filter(c => {
+    const bpId  = (c.bpManagerIntranetId || '').trim().toLowerCase();
+    const pmId  = (c.pmIntranetId        || '').trim().toLowerCase();
+    const ce    = (c.contactEmail        || '').trim().toLowerCase();
+    const uname = id.split('@')[0];
+
     const pmMatch =
-      (c.pmIntranetId || '').toLowerCase() === id ||
-      (c.contactEmail  || '').toLowerCase() === id ||
-      (c.contact       || '').toLowerCase().includes(id.split('@')[0]);
+      bpId === id ||
+      pmId === id ||
+      ce   === id ||
+      (uname.length > 2 && (c.contact || '').toLowerCase().includes(uname));
+
     if (!pmMatch) return false;
     if (!cl) return true;
     return (c.client || '').toLowerCase().includes(cl);
   });
+
+  // Debug: log first-time to console so we can diagnose 0-row issues
+  if (data.length > 0 && result.length === 0) {
+    const sample = data.slice(0, 3).map(c => ({
+      bpManagerIntranetId: c.bpManagerIntranetId,
+      pmIntranetId: c.pmIntranetId,
+      contactEmail: c.contactEmail,
+    }));
+    console.warn('[identityFilter] 0 rows matched for:', id,
+      '\nSample bpManagerIntranetId values from first 3 rows:', sample);
+  } else {
+    console.info(`[identityFilter] ${result.length}/${data.length} rows for: ${id}`);
+  }
+
+  return result;
 }
 
 function initIdentity() {
@@ -785,17 +811,39 @@ async function loadData() {
     return;
   }
   try {
-    const data = await apiFetch('/api/contractors');
+    const resp = await fetch(API_BASE + '/api/contractors');
+    if (resp.status === 503) {
+      // Backend up but no CMO uploaded yet — this is expected on first visit
+      showLoadingBanner('No data loaded — click ⚙ Setup / Upload Files to get started.');
+      return;
+    }
+    if (!resp.ok) {
+      showErrorBanner(`Backend error ${resp.status} — check Railway logs.`);
+      return;
+    }
+    const data = await resp.json();
     const all  = [...data.contractors, ...data.dq_exceptions].map(normaliseApiRecord);
     _liveRegistry = all;
+    // Debug: log the fields present on the first record so identity filter issues are visible
+    if (all.length > 0) {
+      console.info('[loadData] total rows:', all.length,
+        '| first record bpManagerIntranetId:', all[0].bpManagerIntranetId,
+        '| pmIntranetId:', all[0].pmIntranetId);
+    }
     updateFreshnessBar(data.meta);
     const filtered = _identityFilter(all);
     renderTable(filtered);
     updateBucketCounts(filtered);
+    const total = all.length;
+    const shown = filtered.length;
+    const filterMsg = (_identity && !_identity.viewAll && _identity.intranetId)
+      ? ` · showing ${shown} of ${total} for ${_identity.intranetId}`
+      : ` · ${total} contractors`;
     hideBanner();
-  } catch(_) {
-    // No data loaded yet — show setup prompt
-    showLoadingBanner('No data loaded — click ⚙ Setup / Upload Files to get started.');
+    const b = document.getElementById('appBanner');
+    if (b) b.innerHTML += filterMsg;
+  } catch(err) {
+    showErrorBanner(`Could not reach backend: ${err.message}`);
   }
 }
 
@@ -1232,7 +1280,7 @@ function openDetail(serial){
       <div class="info-item"><label>Project Contact (TRAM)</label><span>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></span></div>
       <div class="info-item"><label>Contractor Assignee</label><span>${c.contractorAssignee}</span></div>
       <div class="info-item"><label>PM Notes ID</label><span>${c.pmNotesId}</span></div>
-      <div class="info-item"><label>PM Intranet ID</label><span>${c.pmIntranetId}</span></div>
+      <div class="info-item"><label>BP Manager Intranet ID</label><span>${c.bpManagerIntranetId || c.pmIntranetId || '–'}</span></div>
     </div>
 
     <div class="section-title">Role &amp; JRS</div>

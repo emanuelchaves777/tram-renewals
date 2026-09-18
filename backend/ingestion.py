@@ -251,10 +251,12 @@ def _build_contractor_records(
             "tramRequester":      row.get("TRAM Requester"),
             "contractorAssignee": row.get("Contractor Assignee"),
             # People
-            "contact":            row.get("Project Contact (TRAM)"),
-            "contactEmail":       row.get("PM Intranet ID"),
-            "pmNotesId":          row.get("PM Notes ID"),
-            "pmIntranetId":       row.get("PM Intranet ID"),
+            "contact":               row.get("Project Contact (TRAM)"),
+            "contactEmail":          row.get("PM Intranet ID"),
+            "pmNotesId":             row.get("PM Notes ID"),
+            "pmIntranetId":          row.get("PM Intranet ID"),
+            # BP Manager Intranet ID (CMO column "CL") — used as the primary PM identity filter
+            "bpManagerIntranetId":   row.get("BP Manager Intranet ID"),
             # Role
             "band":               row.get("Actual Band"),
             "jrsTram":            row.get("JR/S (TRAM)"),

@@ -129,6 +129,10 @@ HEADER_ALIASES = {
     "contractor assignee":             "Contractor Assignee",
     "pm notes id":                     "PM Notes ID",
     "pm intranet id":                  "PM Intranet ID",
+    # BP Manager Intranet ID — column "CL" in real CMO; this is the correct PM filter field
+    "bp manager intranet id":          "BP Manager Intranet ID",
+    "bp manager intranet address":     "BP Manager Intranet ID",
+    "bp mgr intranet id":              "BP Manager Intranet ID",
     # Workflow status columns
     "renewal in progress":             "Renewal In Progress",
     "offboard in progress":            "Offboard In Progress",

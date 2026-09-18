@@ -451,6 +451,20 @@ def get_contractors():
     }
 
 
+# ── Debug endpoint — inspect raw field names in first N rows ──────────────────
+
+@app.get("/api/debug/sample")
+def debug_sample(n: int = 5):
+    """Returns the first N contractor records with all fields, so you can verify
+    that column aliases resolved correctly (e.g. bpManagerIntranetId is populated)."""
+    if _ingestion_result is None:
+        raise HTTPException(status_code=503, detail="No report loaded.")
+    rows = _ingestion_result["contractors"][:n]
+    # Also show the set of ALL unique keys in those rows
+    all_keys = sorted({k for r in rows for k in r})
+    return {"keys": all_keys, "sample": rows}
+
+
 # ── JRS Validation ─────────────────────────────────────────────────────────────
 
 @app.get("/api/jrs/{jrs_value}")
