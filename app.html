@@ -192,8 +192,20 @@
     <label>Account / Client (optional)</label>
     <input id="id-client" type="text" placeholder="e.g. AT&T INC">
     <div class="id-hint">Leave blank to see all accounts you are the PM for.</div>
-    <div class="id-actions">
-      <button class="btn btn-secondary" onclick="closeIdentityModal(true)">View All (Admin)</button>
+    <!-- Admin PIN gate — hidden until "View All" is clicked -->
+    <div id="adminPinSection" style="display:none;margin-top:12px;padding:12px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px">
+      <label style="font-size:13px;font-weight:600;color:#374151">Admin PIN</label>
+      <input id="adminPinInput" type="password" placeholder="Enter admin PIN"
+             style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:14px;margin-top:4px;box-sizing:border-box"
+             onkeydown="if(event.key==='Enter') confirmAdminPin()">
+      <div id="adminPinError" style="color:#dc2626;font-size:12px;margin-top:4px;display:none">Incorrect PIN. Try again.</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-secondary" style="flex:1" onclick="hideAdminPin()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmAdminPin()">Confirm</button>
+      </div>
+    </div>
+    <div class="id-actions" id="adminPinActions">
+      <button class="btn btn-secondary" onclick="showAdminPin()">View All (Admin)</button>
       <button class="btn btn-primary" onclick="saveIdentity()">Confirm &amp; Continue →</button>
     </div>
   </div>
@@ -727,6 +739,7 @@ function openIdentityModal() {
 
 function closeIdentityModal(viewAll) {
   document.getElementById('identityModal').classList.remove('open');
+  hideAdminPin();
   if (viewAll) {
     _saveIdentityStore('', '', true);
     _updateHeaderBadge();
@@ -735,6 +748,40 @@ function closeIdentityModal(viewAll) {
     } else {
       loadData();
     }
+  }
+}
+
+function showAdminPin() {
+  document.getElementById('adminPinSection').style.display = 'block';
+  document.getElementById('adminPinActions').style.display = 'none';
+  document.getElementById('adminPinInput').value = '';
+  document.getElementById('adminPinError').style.display = 'none';
+  document.getElementById('adminPinInput').focus();
+}
+
+function hideAdminPin() {
+  document.getElementById('adminPinSection').style.display = 'none';
+  document.getElementById('adminPinActions').style.display = 'flex';
+  document.getElementById('adminPinError').style.display = 'none';
+}
+
+async function confirmAdminPin() {
+  const pin = (document.getElementById('adminPinInput').value || '').trim();
+  const errEl = document.getElementById('adminPinError');
+  errEl.style.display = 'none';
+  try {
+    const resp = await fetch(`${API_BASE}/api/verify-pin?pin=${encodeURIComponent(pin)}`);
+    if (resp.ok) {
+      // PIN correct — proceed as admin
+      closeIdentityModal(true);
+    } else {
+      errEl.style.display = 'block';
+      document.getElementById('adminPinInput').value = '';
+      document.getElementById('adminPinInput').focus();
+    }
+  } catch(_) {
+    errEl.textContent = 'Could not reach server. Try again.';
+    errEl.style.display = 'block';
   }
 }
 

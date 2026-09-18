@@ -451,6 +451,20 @@ def get_contractors():
     }
 
 
+# ── Admin PIN verification ────────────────────────────────────────────────────
+
+@app.get("/api/verify-pin")
+def verify_pin(pin: str = ""):
+    """Returns 200 OK if the PIN is correct, 403 if not.
+    Used by the frontend 'View All (Admin)' gate."""
+    if not UPLOAD_PIN:
+        # No PIN configured — admin mode is open (dev/staging)
+        return {"ok": True, "dev_mode": True}
+    if pin != UPLOAD_PIN:
+        raise HTTPException(status_code=403, detail="Invalid PIN.")
+    return {"ok": True}
+
+
 # ── Debug endpoint — inspect raw field names in first N rows ──────────────────
 
 @app.get("/api/debug/sample")
