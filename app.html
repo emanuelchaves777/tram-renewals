@@ -162,16 +162,49 @@
   .sd-red{background:#dc2626}
   .sd-yellow{background:#d97706}
   .sd-blue{background:#2563eb}
+  /* Identity / Who-are-you modal */
+  .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center}
+  .id-modal-overlay.open{display:flex}
+  .id-modal{background:#fff;border-radius:12px;width:480px;max-width:96vw;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.28)}
+  .id-modal h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#1f2937}
+  .id-modal p{font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5}
+  .id-modal label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+  .id-modal input{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:14px;outline:none;margin-bottom:14px}
+  .id-modal input:focus{border-color:#1d4ed8}
+  .id-modal .id-hint{font-size:11px;color:#9ca3af;margin-top:-10px;margin-bottom:14px}
+  .id-modal .id-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+  .id-active-badge{background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;cursor:pointer;border:none}
+  .id-active-badge:hover{background:#bfdbfe}
 </style>
 </head>
 <body>
 
-<div class="banner">⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.</div>
+<!-- ═══════════════════════════════════════════
+     IDENTITY MODAL — shown before dashboard if no identity saved
+═══════════════════════════════════════════ -->
+<div class="id-modal-overlay" id="identityModal">
+  <div class="id-modal">
+    <h2>👤 Who are you?</h2>
+    <p>Enter your IBM Intranet ID (e.g. <code>jsmith@us.ibm.com</code>) to filter the dashboard to <b>your contractors only</b>. You can also filter by account/client name.<br><br>Your identity is saved in this browser and never sent to any server.</p>
+    <label>Your IBM Intranet ID (PM Intranet ID)</label>
+    <input id="id-intranetId" type="email" placeholder="jsmith@us.ibm.com" autocomplete="email">
+    <div class="id-hint">This must match the <em>PM Intranet ID</em> field in the CMO report.</div>
+    <label>Account / Client (optional)</label>
+    <input id="id-client" type="text" placeholder="e.g. AT&T INC">
+    <div class="id-hint">Leave blank to see all accounts you are the PM for.</div>
+    <div class="id-actions">
+      <button class="btn btn-secondary" onclick="closeIdentityModal(true)">View All (Admin)</button>
+      <button class="btn btn-primary" onclick="saveIdentity()">Confirm &amp; Continue →</button>
+    </div>
+  </div>
+</div>
+
+<div class="banner" id="appBanner">⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.</div>
 
 <header>
   <div class="logo">IBM</div>
   <div class="title">Subcontractor Renewal &amp; Offboarding</div>
-  <div class="role-badge">👤 A. Martinez — renewal_user</div>
+  <div class="role-badge" id="headerBadge">👤 —</div>
 </header>
 
 <nav>
@@ -649,18 +682,116 @@ async function loadContractors() {
   } catch(_) {}
 }
 
-// Called on page load — show synthetic data, check if backend already has data
+// ── IDENTITY / FILTER-FIRST ────────────────────────────────────────────
+// Stores: { intranetId, client, viewAll }
+let _identity = null;
+
+function _loadIdentity() {
+  try {
+    const raw = localStorage.getItem('tram_identity');
+    if (raw) _identity = JSON.parse(raw);
+  } catch(_) {}
+}
+
+function _saveIdentityStore(id, client, viewAll) {
+  _identity = { intranetId: id.trim().toLowerCase(), client: client.trim(), viewAll: !!viewAll };
+  try { localStorage.setItem('tram_identity', JSON.stringify(_identity)); } catch(_) {}
+}
+
+function _updateHeaderBadge() {
+  const badge = document.getElementById('headerBadge');
+  if (!badge) return;
+  if (!_identity || _identity.viewAll) {
+    badge.innerHTML = '👤 Admin (all contractors) <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>';
+  } else {
+    const label = _identity.client
+      ? `${_identity.intranetId} · ${_identity.client}`
+      : _identity.intranetId;
+    badge.innerHTML = `👤 ${label} <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>`;
+  }
+}
+
+function openIdentityModal() {
+  if (_identity) {
+    document.getElementById('id-intranetId').value = _identity.intranetId || '';
+    document.getElementById('id-client').value     = _identity.client     || '';
+  }
+  document.getElementById('identityModal').classList.add('open');
+}
+
+function closeIdentityModal(viewAll) {
+  document.getElementById('identityModal').classList.remove('open');
+  if (viewAll) {
+    _saveIdentityStore('', '', true);
+    _updateHeaderBadge();
+    _applyIdentityToView();
+  }
+}
+
+function saveIdentity() {
+  const id     = (document.getElementById('id-intranetId').value || '').trim();
+  const client = (document.getElementById('id-client').value     || '').trim();
+  if (!id) {
+    document.getElementById('id-intranetId').style.borderColor = '#dc2626';
+    document.getElementById('id-intranetId').focus();
+    return;
+  }
+  document.getElementById('id-intranetId').style.borderColor = '';
+  _saveIdentityStore(id, client, false);
+  document.getElementById('identityModal').classList.remove('open');
+  _updateHeaderBadge();
+  _applyIdentityToView();
+}
+
+function _applyIdentityToView() {
+  if (!_liveRegistry.length) return;
+  const filtered = _identityFilter(_liveRegistry);
+  renderTable(filtered);
+  updateBucketCounts(filtered);
+}
+
+// Returns the subset of data that belongs to this PM, or all if viewAll/admin.
+function _identityFilter(data) {
+  if (!_identity || _identity.viewAll || !_identity.intranetId) return data;
+  const id = _identity.intranetId;
+  const cl = (_identity.client || '').toLowerCase();
+  return data.filter(c => {
+    const pmMatch =
+      (c.pmIntranetId || '').toLowerCase() === id ||
+      (c.contactEmail  || '').toLowerCase() === id ||
+      (c.contact       || '').toLowerCase().includes(id.split('@')[0]);
+    if (!pmMatch) return false;
+    if (!cl) return true;
+    return (c.client || '').toLowerCase().includes(cl);
+  });
+}
+
+function initIdentity() {
+  _loadIdentity();
+  if (!_identity) {
+    // First visit — show the modal, block the dashboard
+    openIdentityModal();
+  } else {
+    _updateHeaderBadge();
+  }
+}
+
+// Called on page load — show empty state, then load real API data
 async function loadData() {
-  renderTable(CONTRACTORS);
-  updateBucketCounts(CONTRACTORS);
-  if (!API_BASE) return;
+  renderTable([]);
+  updateBucketCounts([]);
+  if (!API_BASE) {
+    showLoadingBanner('No API configured — running in prototype mode. Upload a report via ⚙ Setup.');
+    return;
+  }
   try {
     const data = await apiFetch('/api/contractors');
     const all  = [...data.contractors, ...data.dq_exceptions].map(normaliseApiRecord);
     _liveRegistry = all;
     updateFreshnessBar(data.meta);
-    renderTable(all);
-    updateBucketCounts(all);
+    const filtered = _identityFilter(all);
+    renderTable(filtered);
+    updateBucketCounts(filtered);
     hideBanner();
   } catch(_) {
     // No data loaded yet — show setup prompt
@@ -679,19 +810,16 @@ async function postAudit(action, contractor, detail, outcome='success') {
 }
 
 function showLoadingBanner(msg) {
-  const b = document.querySelector('.banner');
-  b.style.background = '#1d4ed8';
-  b.innerHTML = `⏳ ${msg}`;
+  const b = document.getElementById('appBanner');
+  if (b) { b.style.background = '#1d4ed8'; b.innerHTML = `⏳ ${msg}`; }
 }
 function showErrorBanner(msg) {
-  const b = document.querySelector('.banner');
-  b.style.background = '#b91c1c';
-  b.innerHTML = `⚠ ${msg}`;
+  const b = document.getElementById('appBanner');
+  if (b) { b.style.background = '#b91c1c'; b.innerHTML = `⚠ ${msg}`; }
 }
 function hideBanner() {
-  const b = document.querySelector('.banner');
-  b.style.background = '#1d4ed8';
-  b.innerHTML = `⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.`;
+  const b = document.getElementById('appBanner');
+  if (b) { b.style.background = '#15803d'; b.innerHTML = '✓ Live data loaded from backend.'; }
 }
 
 function updateFreshnessBar(meta) {
@@ -1007,7 +1135,7 @@ function renderTable(data){
   }).join('');
 }
 function getFilteredData(){
-  let data=[..._liveRegistry];
+  let data=_identityFilter([..._liveRegistry]);
   const contact=(document.getElementById('f-contact')||{}).value||'';
   const contractor=(document.getElementById('f-contractor')||{}).value||'';
   const client=(document.getElementById('f-client')||{}).value||'';
@@ -1042,7 +1170,9 @@ function clearFilters(){
   ['f-contact','f-contractor','f-client','f-project','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
   activeBucketFilter='';
   document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));
-  renderTable(_liveRegistry);
+  const filtered=_identityFilter([..._liveRegistry]);
+  renderTable(filtered);
+  updateBucketCounts(filtered);
 }
 function filterBucket(b,card){
   if(activeBucketFilter===b){activeBucketFilter='';card.classList.remove('active-filter');}
@@ -1831,7 +1961,8 @@ function renderOffboardingTab(){
 // ── INIT ──────────────────────────────────────
 renderRenewalTab();
 renderOffboardingTab();
-loadData();   // tries real API first; falls back to synthetic data
+initIdentity();  // show identity modal on first visit; restore on return
+loadData();      // load real API data; identity filter applied on render
 
 // ── Dual scrollbar sync ────────────────────────────────────────────────────
 // The top scrollbar div mirrors the bottom one so the user can scroll

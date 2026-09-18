@@ -39,6 +39,11 @@ import jrs_validation
 import excel_generation
 import email_sender
 import ledger as ledger_module
+try:
+    import seed_data as _seed
+    _HAS_SEED = True
+except ImportError:
+    _HAS_SEED = False
 
 # ── Persistent storage directory ──────────────────────────────────────────────
 # Railway provides a writable filesystem; we store the three uploaded files here
@@ -103,7 +108,10 @@ def _persist_template(file_bytes: bytes, filename: str) -> None:
 
 
 def _boot_load() -> None:
-    """Called once at startup. Loads any previously persisted files from disk."""
+    """Called once at startup. Loads any previously persisted files from disk.
+    If a file is missing from disk but seed_data.py is available, the seed is
+    used as a fallback so fresh deploys work without manual re-uploads.
+    """
     import json
     global _ingestion_result, _template_bytes
 
@@ -125,19 +133,30 @@ def _boot_load() -> None:
         except Exception as exc:
             print(f"[boot] Failed to load report from disk: {exc}")
 
-    # Taxonomy
+    # Taxonomy — disk first, seed fallback
     if _TAXONOMY_PATH.exists():
         try:
             tax_bytes = _TAXONOMY_PATH.read_bytes()
             jrs_validation.load_taxonomy_from_bytes(tax_bytes)
             print("[boot] Loaded taxonomy from disk")
-            # Re-run JRS batch if report was also loaded
             if _ingestion_result:
                 _run_jrs_batch()
         except Exception as exc:
             print(f"[boot] Failed to load taxonomy from disk: {exc}")
+    elif _HAS_SEED:
+        try:
+            import base64 as _b64
+            tax_bytes = _b64.b64decode(_seed.SEED_FILES["taxonomy"]["b64"])
+            jrs_validation.load_taxonomy_from_bytes(tax_bytes)
+            # Persist to disk so future restarts use the faster disk path
+            _TAXONOMY_PATH.write_bytes(tax_bytes)
+            print("[boot] Loaded taxonomy from seed (written to disk for future restarts)")
+            if _ingestion_result:
+                _run_jrs_batch()
+        except Exception as exc:
+            print(f"[boot] Failed to load taxonomy from seed: {exc}")
 
-    # Template
+    # Template — disk first, seed fallback
     meta_path = _TEMPLATE_PATH.parent / "template_meta.json"
     if _TEMPLATE_PATH.exists() and meta_path.exists():
         try:
@@ -145,6 +164,20 @@ def _boot_load() -> None:
             print("[boot] Loaded template from disk")
         except Exception as exc:
             print(f"[boot] Failed to load template from disk: {exc}")
+    elif _HAS_SEED:
+        try:
+            import base64 as _b64
+            tpl_bytes = _b64.b64decode(_seed.SEED_FILES["template"]["b64"])
+            _template_bytes = tpl_bytes
+            tpl_name = _seed.SEED_FILES["template"]["filename"]
+            # Persist to disk
+            _TEMPLATE_PATH.write_bytes(tpl_bytes)
+            (_TEMPLATE_PATH.parent / "template_meta.json").write_text(
+                json.dumps({"filename": tpl_name}), encoding="utf-8"
+            )
+            print(f"[boot] Loaded template from seed: {tpl_name} (written to disk)")
+        except Exception as exc:
+            print(f"[boot] Failed to load template from seed: {exc}")
 
 
 # Run at module load time (FastAPI startup)
