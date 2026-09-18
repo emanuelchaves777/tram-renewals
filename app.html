@@ -242,7 +242,7 @@
       <span id="freshnessIngested" style="margin-left:12px"></span>
       <span id="freshnessStale" style="margin-left:12px;color:#d97706;font-weight:600"></span>
     </div>
-    <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="openSetupPanel()">⚙ Setup / Upload Files</button>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto" id="setupBtn" onclick="openSetupPanel()">⚙ Setup</button>
   </div>
 
   <div class="cards" id="bucketCards">
@@ -442,66 +442,75 @@
 <div class="overlay" id="setupOverlay" onclick="closeSetupPanel(event)">
   <div class="panel" id="setupPanel">
     <div class="panel-header">
-      <h2>⚙ Setup — Upload Files</h2>
+      <h2 id="setupPanelTitle">⚙ Setup</h2>
       <button class="btn btn-secondary btn-sm" onclick="closeSetupPanel()">✕ Close</button>
     </div>
     <div class="panel-body">
 
-      <p style="font-size:13px;color:#6b7280;margin-bottom:20px">
-        Upload your three files once. They are <b>saved to disk on the server</b> and auto-reload on every restart — no re-upload needed.
-        No Box connection required.
-      </p>
-
-      <!-- Upload PIN -->
-      <div style="border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;background:#fefce8">
-        <div style="font-weight:700;margin-bottom:6px;font-size:13px">🔒 Upload PIN <span style="color:#dc2626">*</span></div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Required to upload or replace files. Set on Railway as <code>UPLOAD_PIN</code>. Leave blank if no PIN is configured.</div>
-        <input type="password" id="uploadPin" placeholder="Enter upload PIN" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;width:220px">
+      <!-- Status-only view for non-admins -->
+      <div id="setupStatusOnly">
+        <p style="font-size:13px;color:#6b7280;margin-bottom:16px">
+          Files are loaded and managed by the app admin. Data is shared across all users — no action needed.
+        </p>
+        <div id="statusReport" style="font-size:13px;margin-bottom:8px"></div>
+        <div id="statusTaxonomy" style="font-size:13px;margin-bottom:8px"></div>
+        <div id="statusTemplate" style="font-size:13px;margin-bottom:8px"></div>
+        <div id="setupSummary" style="margin-top:12px"></div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
+        <button id="setupAdminBtn" class="btn btn-secondary btn-sm" onclick="setupEnterAdminMode()">🔒 Admin: Upload / Replace Files</button>
       </div>
 
-      <!-- Report -->
-      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-        <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#dc2626">*</span></div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
-          The <code>.xlsb</code> or <code>.xlsx</code> contractor management report from Box.<br>
-          Filename example: <code>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</code>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="file" id="fileReport" accept=".xlsb,.xlsx" style="font-size:13px">
-          <button class="btn btn-primary btn-sm" onclick="uploadFile('report')">Upload</button>
-        </div>
-        <div id="statusReport" style="margin-top:8px;font-size:13px"></div>
-      </div>
+      <!-- Admin upload controls — hidden until PIN verified -->
+      <div id="setupAdminControls" style="display:none">
 
-      <!-- Taxonomy -->
-      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-        <div style="font-weight:700;margin-bottom:4px">2. JRS Taxonomy <span style="color:#dc2626">*</span></div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
-          The M389 taxonomy <code>.xlsx</code> file (IBM Consulting Taxonomy Shortlist).<br>
-          Contains "Consulting Short List" and "Change Log" tabs.
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="file" id="fileTaxonomy" accept=".xlsx" style="font-size:13px">
-          <button class="btn btn-primary btn-sm" onclick="uploadFile('taxonomy')">Upload</button>
-        </div>
-        <div id="statusTaxonomy" style="margin-top:8px;font-size:13px"></div>
-      </div>
+        <p style="font-size:13px;color:#6b7280;margin-bottom:20px">
+          Upload your three files once. They are <b>saved to disk on the server</b> and auto-reload on every restart — no re-upload needed.
+        </p>
 
-      <!-- Template -->
-      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-        <div style="font-weight:700;margin-bottom:4px">3. Excel Renewal Template <span style="color:#dc2626">*</span></div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
-          The <code>Request Form Template_Contractor Team.xlsm</code> file.<br>
-          Must contain an "Onboardings" tab with headers in row 1.
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="file" id="fileTemplate" accept=".xlsm,.xlsx" style="font-size:13px">
-          <button class="btn btn-primary btn-sm" onclick="uploadFile('template')">Upload</button>
-        </div>
-        <div id="statusTemplate" style="margin-top:8px;font-size:13px"></div>
-      </div>
+        <input type="hidden" id="uploadPin">
 
-      <div id="setupSummary" style="margin-top:4px"></div>
+        <!-- Report -->
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+          <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#dc2626">*</span></div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+            The <code>.xlsb</code> or <code>.xlsx</code> CMO report.<br>
+            Filename: <code>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</code>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="file" id="fileReport" accept=".xlsb,.xlsx" style="font-size:13px">
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('report')">Upload</button>
+          </div>
+          <div id="statusReportAdmin" style="margin-top:8px;font-size:13px"></div>
+        </div>
+
+        <!-- Taxonomy -->
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+          <div style="font-weight:700;margin-bottom:4px">2. JRS Taxonomy <span style="color:#dc2626">*</span></div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+            The M389 taxonomy <code>.xlsx</code> file (IBM Consulting Taxonomy Shortlist).
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="file" id="fileTaxonomy" accept=".xlsx" style="font-size:13px">
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('taxonomy')">Upload</button>
+          </div>
+          <div id="statusTaxonomyAdmin" style="margin-top:8px;font-size:13px"></div>
+        </div>
+
+        <!-- Template -->
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
+          <div style="font-weight:700;margin-bottom:4px">3. Excel Renewal Template <span style="color:#dc2626">*</span></div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+            The <code>Request Form Template_Contractor Team.xlsm</code> file.
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="file" id="fileTemplate" accept=".xlsm,.xlsx" style="font-size:13px">
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('template')">Upload</button>
+          </div>
+          <div id="statusTemplateAdmin" style="margin-top:8px;font-size:13px"></div>
+        </div>
+
+      </div><!-- /setupAdminControls -->
+
     </div>
   </div>
 </div>
@@ -571,61 +580,78 @@ async function apiFetch(path, options={}) {
 }
 
 // ── Setup panel ───────────────────────────────
-async function openSetupPanel(){
+// Tracks whether the current session has verified the admin PIN for Setup.
+let _setupAdminVerified = false;
+
+async function openSetupPanel() {
   document.getElementById('setupOverlay').classList.add('open');
-  if (!API_BASE) return;
-  // Poll /api/status to show what's already loaded (especially after a restart)
-  try {
-    const st = await apiFetch('/api/status');
-    if (st.report) {
-      const el = document.getElementById('statusReport');
-      if (el && !el.innerHTML.includes('✅')) {
-        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded: <b>${st.report.filename}</b> — ${st.report.accepted} contractors, ${st.report.dq} DQ · Report date: ${st.report.report_date}${st.report.persisted?' · 💾 persisted':''}</span>`;
-      }
-    }
-    if (st.taxonomy) {
-      const el = document.getElementById('statusTaxonomy');
-      if (el && !el.innerHTML.includes('✅')) {
-        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded${st.taxonomy.persisted?' · 💾 persisted':''}</span>`;
-      }
-    }
-    if (st.template) {
-      const el = document.getElementById('statusTemplate');
-      if (el && !el.innerHTML.includes('✅')) {
-        el.innerHTML = `<span style="color:#16a34a">✅ Already loaded: <b>${st.template.filename||'template'}</b> · ${(st.template.size/1024).toFixed(0)} KB${st.template.persisted?' · 💾 persisted':''}</span>`;
-      }
-    }
-    checkSetupComplete();
-  } catch(_) {}
+
+  // Populate status rows from /api/status for everyone
+  if (API_BASE) {
+    try {
+      const st = await apiFetch('/api/status');
+      const rEl = document.getElementById('statusReport');
+      const tEl = document.getElementById('statusTaxonomy');
+      const tmEl= document.getElementById('statusTemplate');
+      if (rEl)  rEl.innerHTML  = st.report   ? `<span style="color:#16a34a">✅ CMO loaded: <b>${st.report.filename}</b> — ${st.report.accepted} contractors · ${st.report.report_date}${st.report.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ CMO report: not loaded</span>`;
+      if (tEl)  tEl.innerHTML  = st.taxonomy ? `<span style="color:#16a34a">✅ JRS Taxonomy loaded${st.taxonomy.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ JRS Taxonomy: not loaded</span>`;
+      if (tmEl) tmEl.innerHTML = st.template ? `<span style="color:#16a34a">✅ Template loaded: <b>${st.template.filename||'template'}</b> · ${(st.template.size/1024).toFixed(0)} KB${st.template.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ Renewal template: not loaded</span>`;
+    } catch(_) {}
+  }
+
+  // Show admin controls only if PIN already verified this session
+  _showSetupMode(_setupAdminVerified);
 }
-function closeSetupPanel(e){
-  if(!e||e.target===document.getElementById('setupOverlay'))
+
+function _showSetupMode(isAdmin) {
+  document.getElementById('setupStatusOnly').style.display     = isAdmin ? 'none' : 'block';
+  document.getElementById('setupAdminControls').style.display  = isAdmin ? 'block' : 'none';
+  document.getElementById('setupPanelTitle').textContent       = isAdmin ? '⚙ Setup — Upload Files (Admin)' : '⚙ Setup — Status';
+  // Show/hide the "Admin Upload" button in the status-only view
+  const adminBtn = document.getElementById('setupAdminBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin ? 'none' : 'inline-block';
+}
+
+async function setupEnterAdminMode() {
+  const pin = prompt('Enter admin PIN to access upload controls:');
+  if (pin === null) return; // cancelled
+  try {
+    const resp = await fetch(`${API_BASE}/api/verify-pin?pin=${encodeURIComponent(pin.trim())}`);
+    if (resp.ok) {
+      _setupAdminVerified = true;
+      // Store verified PIN for upload calls
+      document.getElementById('uploadPin').value = pin.trim();
+      _showSetupMode(true);
+    } else {
+      alert('Incorrect PIN.');
+    }
+  } catch(_) {
+    alert('Could not reach server.');
+  }
+}
+
+function closeSetupPanel(e) {
+  if (!e || e.target === document.getElementById('setupOverlay'))
     document.getElementById('setupOverlay').classList.remove('open');
 }
 
 async function uploadFile(type) {
-  const fileInput = document.getElementById('file' + type.charAt(0).toUpperCase() + type.slice(1));
-  const statusEl  = document.getElementById('status' + type.charAt(0).toUpperCase() + type.slice(1));
+  const capType   = type.charAt(0).toUpperCase() + type.slice(1);
+  const fileInput = document.getElementById('file' + capType);
+  // Admin status elements have "Admin" suffix; fallback to plain id
+  const statusEl  = document.getElementById('status' + capType + 'Admin')
+                 || document.getElementById('status' + capType);
   if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-    statusEl.innerHTML = `<span style="color:#dc2626">Please select a file first.</span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">Please select a file first.</span>`;
     return;
   }
   const file = fileInput.files[0];
   const pin  = (document.getElementById('uploadPin') || {}).value || '';
-  statusEl.innerHTML = `<span style="color:#6b7280">⏳ Uploading ${file.name}…</span>`;
-
-  if (!API_BASE) {
-    // Prototype mode — simulate upload
-    await new Promise(r=>setTimeout(r,800));
-    statusEl.innerHTML = `<span style="color:#16a34a">✅ ${file.name} — loaded (prototype mode)</span>`;
-    checkSetupComplete();
-    return;
-  }
+  if (statusEl) statusEl.innerHTML = `<span style="color:#6b7280">⏳ Uploading ${file.name}…</span>`;
 
   try {
     const form = new FormData();
     form.append('file', file);
-    // PIN sent as query param (not in FormData body, easier to pass through FastAPI)
     const url = `${API_BASE}/api/upload/${type}?pin=${encodeURIComponent(pin)}`;
     const res = await fetch(url, {method:'POST', body: form});
     if (!res.ok) {
@@ -635,27 +661,19 @@ async function uploadFile(type) {
     const data = await res.json();
     if (type === 'report') {
       const ledgerNote = data.ledger_applied ? ` · 📋 ${data.ledger_applied} ledger overrides applied` : '';
-      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ exceptions${ledgerNote}</span>`;
-      await loadData();   // identity-aware reload (replaces orphan loadContractors)
+      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ${ledgerNote}</span>`;
+      await loadData();
     } else if (type === 'taxonomy') {
-      statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
     } else {
-      statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — template ready (${(data.size/1024).toFixed(0)} KB)</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — template ready (${(data.size/1024).toFixed(0)} KB)</span>`;
     }
-    checkSetupComplete();
   } catch(e) {
-    statusEl.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
   }
 }
 
-function checkSetupComplete() {
-  const allDone = ['statusReport','statusTaxonomy','statusTemplate']
-    .every(id => document.getElementById(id).innerHTML.includes('✅'));
-  const summaryEl = document.getElementById('setupSummary');
-  if (allDone) {
-    summaryEl.innerHTML = `<div class="confirm-row">✅ <b>All files loaded.</b> You can close this panel and start processing renewals.</div>`;
-  }
-}
+function checkSetupComplete() { /* no-op — status shown via openSetupPanel */ }
 
 // ── Load contractors from backend ──────────────
 // Normalise a raw API contractor record so renderTable() can read it identically
