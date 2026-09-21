@@ -289,7 +289,7 @@
       <input id="f-contact" type="text" placeholder="Project contact name or email" oninput="applyFilters()">
       <input id="f-contractor" type="text" placeholder="Contractor name or email" oninput="applyFilters()">
       <input id="f-client" type="text" placeholder="Client" oninput="applyFilters()">
-      <input id="f-project" type="text" placeholder="Project" oninput="applyFilters()">
+      <input id="f-serial" type="text" placeholder="Serial / TalentID" oninput="applyFilters()">
       <select id="f-bucket" onchange="applyFilters()">
         <option value="">All Buckets</option>
         <option value="past-due">Past Due</option>
@@ -325,16 +325,11 @@
             <th onclick="sortTable(2)">Contractor ↕</th>
             <th onclick="sortTable(3)">Serial / CNUM</th>
             <th onclick="sortTable(4)">Client ↕</th>
-            <th onclick="sortTable(5)">Project</th>
-            <th onclick="sortTable(6)">Project Contact</th>
-            <th onclick="sortTable(7)">Vendor</th>
-            <th onclick="sortTable(8)">Band</th>
-            <th onclick="sortTable(9)">JRS (TRAM)</th>
-            <th onclick="sortTable(10)">Work Location</th>
-            <th onclick="sortTable(11)">TRAM Request ID</th>
-            <th>Renewal</th>
-            <th>Offboard</th>
-            <th>DQ</th>
+            <th onclick="sortTable(5)">Project Contact</th>
+            <th onclick="sortTable(6)">Vendor</th>
+            <th onclick="sortTable(7)">Band</th>
+            <th onclick="sortTable(8)">JRS (TRAM)</th>
+            <th onclick="sortTable(9)">TRAM Request ID</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -883,11 +878,12 @@ function _identityFilter(data) {
 
 function initIdentity() {
   _loadIdentity();
+  // Always update the badge — modal is now optional, not blocking
+  _updateHeaderBadge();
+  // If no identity saved yet, show a soft prompt in the badge area but DON'T block data load
   if (!_identity) {
-    // First visit — show the modal, block the dashboard
-    openIdentityModal();
-  } else {
-    _updateHeaderBadge();
+    const badge = document.getElementById('headerBadge');
+    if (badge) badge.innerHTML = '👤 <button class="id-active-badge" onclick="openIdentityModal()" title="Set your ID to filter to your contractors">Set my ID to filter view</button>';
   }
 }
 
@@ -1250,24 +1246,18 @@ function renderTable(data){
     const ghostBadge = c._ghost ? '<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO — kept from history">📋 ledger</span>' : '';
     return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
       <td class="col-action" onclick="event.stopPropagation()">
-        <button class="btn btn-primary btn-sm" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Renewal already in progress')+'"':''}>Renewal</button>
-        <button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Offboarding already in progress')+'"':''}>Offboard</button>
+        <button class="btn btn-secondary btn-sm" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Offboarding already in progress')+'"':''}>Offboard</button>
       </td>
       <td>${expDate}</td>
       <td>${daysCell}</td>
       <td><b>${c.name}</b>${ghostBadge}</td>
       <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
       <td>${c.client}</td>
-      <td>${c.project}</td>
       <td>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></td>
       <td style="font-size:12px">${c.vendor}</td>
       <td style="text-align:center">${c.band}</td>
       <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram}</span></td>
-      <td style="font-size:12px">${c.workLocation}</td>
       <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
-      <td>${renewalBadge(c.renewal)}</td>
-      <td>${offboardBadge(c.offboard)}</td>
-      <td>${dqCell}</td>
       </tr>`;
   }).join('');
 }
@@ -1276,18 +1266,18 @@ function getFilteredData(){
   const contact=(document.getElementById('f-contact')||{}).value||'';
   const contractor=(document.getElementById('f-contractor')||{}).value||'';
   const client=(document.getElementById('f-client')||{}).value||'';
-  const project=(document.getElementById('f-project')||{}).value||'';
+  const serial=(document.getElementById('f-serial')||{}).value||'';
   const bkt=(document.getElementById('f-bucket')||{}).value||'';
   const jrsSt=(document.getElementById('f-jrs')||{}).value||'';
   const active=activeBucketFilter||bkt;
   if(contact) data=data.filter(c=>(c.contact||'').toLowerCase().includes(contact.toLowerCase())||(c.contactEmail||'').toLowerCase().includes(contact.toLowerCase()));
-  if(contractor) data=data.filter(c=>(c.name||'').toLowerCase().includes(contractor.toLowerCase())||(c.email||'').toLowerCase().includes(contractor.toLowerCase())||(c.serial||'').toLowerCase().includes(contractor.toLowerCase()));
+  if(contractor) data=data.filter(c=>(c.name||'').toLowerCase().includes(contractor.toLowerCase())||(c.email||'').toLowerCase().includes(contractor.toLowerCase()));
   if(client) data=data.filter(c=>(c.client||'').toLowerCase().includes(client.toLowerCase()));
-  if(project) data=data.filter(c=>(c.project||'').toLowerCase().includes(project.toLowerCase()));
+  if(serial) data=data.filter(c=>(c.serial||'').toLowerCase().includes(serial.toLowerCase())||(c.cnum||'').toLowerCase().includes(serial.toLowerCase()));
   if(active) data=data.filter(c=>c.bucket===active||(active==='dq'&&c.dq));
   if(jrsSt) data=data.filter(c=>c.jrsStatus===jrsSt);
   if(sortCol>=0){
-    const keys=['endDate','days','name','serial','client','project','contact','vendor','band','jrsTram','workLocation','tramId'];
+    const keys=['endDate','days','name','serial','client','contact','vendor','band','jrsTram','tramId'];
     const k=keys[sortCol];
     data.sort((a,b)=>{const av=a[k]??'';const bv=b[k]??'';return (av<bv?-1:av>bv?1:0)*sortDir;});
   }
@@ -1304,7 +1294,7 @@ function updateBucketCounts(data){
 }
 function applyFilters(){renderTable(getFilteredData());}
 function clearFilters(){
-  ['f-contact','f-contractor','f-client','f-project','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
+  ['f-contact','f-contractor','f-client','f-serial','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
   activeBucketFilter='';
   document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));
   const filtered=_identityFilter([..._liveRegistry]);
