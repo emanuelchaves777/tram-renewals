@@ -1705,7 +1705,6 @@ function openDetail(serial){
     </div>
     <hr class="divider">
     <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>Initiate Renewal</button>
       <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');

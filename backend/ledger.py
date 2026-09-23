@@ -129,3 +129,21 @@ def apply_to_contractors(contractors: list[dict]) -> list[dict]:
 def get_all() -> dict:
     """Return the full ledger (for debug/status endpoint)."""
     return dict(_ledger)
+
+
+def delete_entry(serial: str) -> bool:
+    """Remove a single ledger entry by serial. Returns True if it existed."""
+    if serial in _ledger:
+        del _ledger[serial]
+        _save()
+        return True
+    return False
+
+
+def clear_all() -> int:
+    """Wipe the entire ledger. Returns number of entries removed."""
+    global _ledger
+    count = len(_ledger)
+    _ledger = {}
+    _save()
+    return count

@@ -700,6 +700,29 @@ def get_ledger():
     return {"entries": ledger_module.get_all(), "count": len(ledger_module.get_all())}
 
 
+@app.delete("/api/ledger/{serial}")
+def delete_ledger_entry(serial: str, pin: str = ""):
+    """PIN-protected: remove a single ledger entry by contractor serial."""
+    _verify_pin(pin)
+    found = ledger_module.delete_entry(serial)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"No ledger entry for serial '{serial}'.")
+    # Re-apply ledger to live data so the in-memory state is consistent
+    if _ingestion_result:
+        _ingestion_result["contractors"] = ledger_module.apply_to_contractors(
+            _ingestion_result["contractors"]
+        )
+    return {"deleted": serial}
+
+
+@app.delete("/api/ledger")
+def clear_ledger(pin: str = ""):
+    """PIN-protected: wipe the entire ledger."""
+    _verify_pin(pin)
+    count = ledger_module.clear_all()
+    return {"cleared": count}
+
+
 # ── Audit log ──────────────────────────────────────────────────────────────────
 
 @app.post("/api/audit")
