@@ -286,10 +286,10 @@
 
   <div class="filters">
     <div class="filters-row">
-      <input id="f-contact" type="text" placeholder="Project contact name or email" oninput="applyFilters()">
-      <input id="f-contractor" type="text" placeholder="Contractor name or email" oninput="applyFilters()">
-      <input id="f-client" type="text" placeholder="Client" oninput="applyFilters()">
-      <input id="f-serial" type="text" placeholder="Serial / TalentID" oninput="applyFilters()">
+      <input id="f-contact" type="text" placeholder="Project contact name or email" oninput="debouncedFilter()">
+      <input id="f-contractor" type="text" placeholder="Contractor name or email" oninput="debouncedFilter()">
+      <input id="f-client" type="text" placeholder="Client" oninput="debouncedFilter()">
+      <input id="f-serial" type="text" placeholder="Serial / TalentID" oninput="debouncedFilter()">
       <select id="f-bucket" onchange="applyFilters()">
         <option value="">All Buckets</option>
         <option value="past-due">Past Due</option>
@@ -311,6 +311,7 @@
     </div>
   </div>
 
+  <div style="font-size:12px;color:#6b7280;text-align:right;padding:4px 8px" id="tableRowCount"></div>
   <div class="table-outer">
     <div class="table-scroll-top" id="tableScrollTop">
       <div class="table-scroll-top-inner" id="tableScrollTopInner"></div>
@@ -1223,44 +1224,82 @@ function _findContractor(serial){
 let activeBucketFilter='';
 let sortCol=-1,sortDir=1;
 
+// ── Debounce: text inputs wait 250ms after last keystroke before filtering ──
+let _filterTimer=null;
+function debouncedFilter(){
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(applyFilters, 250);
+}
+
+// ── Pagination: render max 150 rows, show "Load more" for the rest ──────────
+const PAGE_SIZE = 150;
+let _currentPage = 1;
+let _lastFilteredData = [];
+
+function _buildRow(c) {
+  let daysCell;
+  if(c.days===null) daysCell='<span style="color:#9ca3af">?</span>';
+  else if(c.days<0) daysCell=`<span style="color:#dc2626;font-weight:700;background:#fee2e2;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+  else if(c.days<=7) daysCell=`<span style="color:#c2410c;font-weight:700;background:#ffedd5;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+  else if(c.days<=14) daysCell=`<span style="color:#92400e;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
+  else daysCell=`<span style="color:#374151">${c.days}d</span>`;
+  const expDate=c.endDate
+    ?(c.days!==null&&c.days<0?`<b style="color:#dc2626">${c.endDate}</b>`:`<b>${c.endDate}</b>`)
+    :'<span style="color:#9ca3af">–</span>';
+  const ghostStyle=c._ghost?' style="opacity:0.65;background:#fafafa"':'';
+  const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
+  return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
+    <td class="col-action" onclick="event.stopPropagation()">
+      <button class="btn btn-secondary btn-sm" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already in progress')+'"':''}>Offboard</button>
+    </td>
+    <td>${expDate}</td>
+    <td>${daysCell}</td>
+    <td><b>${c.name}</b>${ghostBadge}</td>
+    <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
+    <td>${c.client||'–'}</td>
+    <td>${c.contact||'–'}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail||''}</span></td>
+    <td style="font-size:12px">${c.vendor||'–'}</td>
+    <td style="text-align:center">${c.band||'–'}</td>
+    <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram||'–'}</span></td>
+    <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
+  </tr>`;
+}
+
 function renderTable(data){
+  _lastFilteredData = data;
+  _currentPage = 1;
+  _renderPage();
+}
+
+function _renderPage(){
   const tbody=document.getElementById('tableBody');
   if(!tbody) return;
-  tbody.innerHTML=data.map(c=>{
-    // days remaining cell — coloured by urgency
-    let daysCell;
-    if(c.days===null) daysCell='<span style="color:#9ca3af">?</span>';
-    else if(c.days<0) daysCell=`<span style="color:#dc2626;font-weight:700;background:#fee2e2;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-    else if(c.days<=7) daysCell=`<span style="color:#c2410c;font-weight:700;background:#ffedd5;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-    else if(c.days<=14) daysCell=`<span style="color:#92400e;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-    else daysCell=`<span style="color:#374151">${c.days}d</span>`;
-    const dqCell=c.dq?'<span class="badge badge-warn">⚠</span>':'';
-    // expiration date — bold red if past due
-    const expDate=c.endDate
-      ? (c.days!==null&&c.days<0
-          ? `<b style="color:#dc2626">${c.endDate}</b>`
-          : `<b>${c.endDate}</b>`)
-      : '<span style="color:#9ca3af">–</span>';
-    // Ghost rows — contractor no longer in CMO but preserved from ledger
-    const ghostStyle = c._ghost ? ' style="opacity:0.65;background:#fafafa"' : '';
-    const ghostBadge = c._ghost ? '<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO — kept from history">📋 ledger</span>' : '';
-    return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
-      <td class="col-action" onclick="event.stopPropagation()">
-        <button class="btn btn-secondary btn-sm" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record — not in current CMO':'Offboarding already in progress')+'"':''}>Offboard</button>
-      </td>
-      <td>${expDate}</td>
-      <td>${daysCell}</td>
-      <td><b>${c.name}</b>${ghostBadge}</td>
-      <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
-      <td>${c.client}</td>
-      <td>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></td>
-      <td style="font-size:12px">${c.vendor}</td>
-      <td style="text-align:center">${c.band}</td>
-      <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram}</span></td>
-      <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
-      </tr>`;
-  }).join('');
+  const slice=_lastFilteredData.slice(0, _currentPage * PAGE_SIZE);
+  const remaining=_lastFilteredData.length - slice.length;
+  tbody.innerHTML = slice.map(_buildRow).join('');
+  // "Load more" sentinel row
+  const sentinel = document.getElementById('tableLoadMore');
+  if(sentinel) sentinel.remove();
+  if(remaining > 0){
+    const tr = document.createElement('tr');
+    tr.id = 'tableLoadMore';
+    tr.innerHTML = `<td colspan="11" style="text-align:center;padding:14px;color:#6b7280;font-size:13px">
+      <button class="btn btn-secondary btn-sm" onclick="loadMoreRows()">
+        Load ${Math.min(remaining, PAGE_SIZE)} more (${remaining} remaining)
+      </button>
+    </td>`;
+    tbody.appendChild(tr);
+  }
+  // Row count indicator
+  const countEl = document.getElementById('tableRowCount');
+  if(countEl) countEl.textContent = `Showing ${slice.length} of ${_lastFilteredData.length}`;
 }
+
+function loadMoreRows(){
+  _currentPage++;
+  _renderPage();
+}
+
 function getFilteredData(){
   let data=_identityFilter([..._liveRegistry]);
   const contact=(document.getElementById('f-contact')||{}).value||'';
