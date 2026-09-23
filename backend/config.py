@@ -36,25 +36,45 @@ CORS_ORIGIN    = os.getenv("CORS_ORIGIN", "https://emanuelchaves777.github.io")
 
 # ── Sector → CSP email routing (confirmed) ────────────────────────────────────
 SECTOR_EMAIL_MAP = {
-    "public":             "pubcontr@cr.ibm.com",
-    "government":         "pubcontr@cr.ibm.com",
-    "education":          "pubcontr@cr.ibm.com",
-    "healthcare":         "pubcontr@cr.ibm.com",
-    "financial services": "fsscontr@cr.ibm.com",
-    "banking":            "fsscontr@cr.ibm.com",
-    "insurance":          "fsscontr@cr.ibm.com",
-    "capital markets":    "fsscontr@cr.ibm.com",
-    "industrial":         "indcontr@cr.ibm.com",
-    "manufacturing":      "indcontr@cr.ibm.com",
-    "automotive":         "indcontr@cr.ibm.com",
-    "energy":             "indcontr@cr.ibm.com",
-    "chemicals":          "indcontr@cr.ibm.com",
-    "technology":         "commsctr@cr.ibm.com",
-    "communications":     "commsctr@cr.ibm.com",
-    "telecommunications": "commsctr@cr.ibm.com",
-    "media":              "commsctr@cr.ibm.com",
+    # Security
+    "security":                    "securepo@us.ibm.com",
+    # Communications
+    "communications":              "commsctr@cr.ibm.com",
+    "technology":                  "commsctr@cr.ibm.com",
+    "telecommunications":          "commsctr@cr.ibm.com",
+    "media":                       "commsctr@cr.ibm.com",
+    "cross sector":                "commsctr@cr.ibm.com",
+    # FSS — Financial Services
+    "fss":                         "fsscontr@cr.ibm.com",
+    "financial services":          "fsscontr@cr.ibm.com",
+    "banking":                     "fsscontr@cr.ibm.com",
+    "insurance":                   "fsscontr@cr.ibm.com",
+    "capital markets":             "fsscontr@cr.ibm.com",
+    # Public
+    "public":                      "pubcontr@cr.ibm.com",
+    "government":                  "pubcontr@cr.ibm.com",
+    "education":                   "pubcontr@cr.ibm.com",
+    "healthcare":                  "pubcontr@cr.ibm.com",
+    # Distribution
+    "distribution":                "distrctr@cr.ibm.com",
+    "retail":                      "distrctr@cr.ibm.com",
+    "consumer products":           "distrctr@cr.ibm.com",
+    "travel & transportation":     "distrctr@cr.ibm.com",
+    "travel and transportation":   "distrctr@cr.ibm.com",
+    # Industrial
+    "industrial":                  "indcontr@cr.ibm.com",
+    "manufacturing":               "indcontr@cr.ibm.com",
+    "automotive":                  "indcontr@cr.ibm.com",
+    "energy":                      "indcontr@cr.ibm.com",
+    "chemicals":                   "indcontr@cr.ibm.com",
+    # Canada
+    "canada":                      "cancontr@cr.ibm.com",
+    # Internal
+    "internal":                    "gbstccpo@cr.ibm.com",
+    "gbs":                         "gbstccpo@cr.ibm.com",
 }
-SECTOR_EMAIL_DEFAULT = "gbstccon@cr.ibm.com"
+# Default for anything that does not match — GBS email
+SECTOR_EMAIL_DEFAULT = "gbstccpo@cr.ibm.com"
 
 # ── Mandatory report headers (canonical names) ────────────────────────────────
 MANDATORY_HEADERS = [
