@@ -741,12 +741,13 @@ function checkSetupComplete() { /* no-op — status shown via openSetupPanel */ 
 function normaliseApiRecord(c) {
   c.id   = c.serial;
   c.days = (c.daysToExpiry !== undefined && c.daysToExpiry !== null) ? c.daysToExpiry : daysFrom(c.endDate);
-  // Bucket overrides for workflow state
+  // Bucket is date-driven only — CMO renewal/offboard columns are ignored
   if (!c.bucket) c.bucket = bucket(c.days);
-  const rip = c.renewal  && c.renewal.toLowerCase()  !== 'no' && c.renewal  !== '–';
-  const oip = c.offboard && c.offboard.toLowerCase() !== 'no' && c.offboard !== '–';
-  if (rip) c.bucket = 'renewal-ip';
-  if (oip) c.bucket = 'offboard-ip';
+  // Only the ledger (set by PM actions in this app) can override the bucket
+  if (c._ledger) {
+    if (c._ledger.renewal  === 'Submitted') { c.renewal  = 'Submitted'; c.bucket = 'renewal-ip'; }
+    if (c._ledger.offboard === 'Submitted') { c.offboard = 'Submitted'; c.bucket = 'offboard-ip'; }
+  }
   // Ensure fields the table reads are never undefined
   c.contact              = c.contact              || '–';
   c.contactEmail         = c.contactEmail         || '';
@@ -1273,8 +1274,7 @@ CONTRACTORS.forEach(c=>{
   const d=daysFrom(c.endDate);
   c.days=d;
   c.bucket=bucket(d);
-  if(c.renewal==='In Progress') c.bucket='renewal-ip';
-  if(c.offboard==='In Progress') c.bucket='offboard-ip';
+  // Synthetic data — no CMO-driven bucket overrides
 });
 
 // Live registry — always points to whatever dataset is currently rendered.
@@ -1313,7 +1313,7 @@ function _buildRow(c) {
   const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
     <td class="col-action" onclick="event.stopPropagation()">
-      <button class="btn btn-secondary btn-sm" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='In Progress'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already in progress')+'"':''}>Offboard</button>
+      <button class="btn btn-secondary btn-sm" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>Offboard</button>
     </td>
     <td>${expDate}</td>
     <td>${daysCell}</td>
@@ -1705,8 +1705,8 @@ function openDetail(serial){
     </div>
     <hr class="divider">
     <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='In Progress'?'disabled':''}>Initiate Renewal</button>
-      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='In Progress'?'disabled':''}>Initiate Offboarding</button>
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>Initiate Renewal</button>
+      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
 }
@@ -1717,7 +1717,7 @@ function closeDetailPanel(){document.getElementById('detailOverlay').classList.r
 let renewalData={};
 function openRenewalModal(id){
   const c=_findContractor(id);if(!c) return;
-  if(c.renewal==='In Progress'){
+  if(c.renewal==='Submitted'){
     alert('⚠ DUPLICATE DETECTED\n\nAn active renewal request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
@@ -2016,7 +2016,7 @@ async function submitRenewal(){
 
 function showRenewalSuccess(resp){
   const c=renewalData.c;
-  c.renewal='In Progress';
+  c.renewal='Submitted';
   const now=new Date(resp.submitted_at||Date.now()).toLocaleString();
 
   const graphNotConfigured = resp.email_error && resp.email_error.includes('not configured');
@@ -2132,7 +2132,7 @@ function getSectorEmailLabel(sector){
 let offboardData={};
 function openOffboardModal(id){
   const c=_findContractor(id);if(!c) return;
-  if(c.offboard==='In Progress'){
+  if(c.offboard==='Submitted'){
     alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
@@ -2347,7 +2347,7 @@ function _offboardConfirmSent(resp){
 }
 
 function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
-  c.offboard='In Progress';
+  c.offboard='Submitted';
   const icon  = autoSent ? '✅' : manualSent ? '✅' : '❌';
   const color = (autoSent||manualSent) ? '#15803d' : '#b91c1c';
   const title = autoSent ? 'Offboarding Successfully Submitted'

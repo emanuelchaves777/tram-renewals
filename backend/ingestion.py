@@ -284,9 +284,10 @@ def _build_contractor_records(
                                           row.get("TRAM Request ID End Date"),
                                       )
                                   ),
-            # Workflow state — read from report columns if present, else default
-            "renewal":    row.get("Renewal In Progress") or "–",
-            "offboard":   row.get("Offboard In Progress") or "–",
+            # Workflow state — NEVER read from CMO columns (unreliable).
+            # Only the app ledger sets these after a PM submits through the app.
+            "renewal":  "–",
+            "offboard": "–",
             # Data quality
             "dq":         len(issues) > 0,
             "dqIssues":   issues,
