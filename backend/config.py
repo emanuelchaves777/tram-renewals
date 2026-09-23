@@ -121,6 +121,10 @@ HEADER_ALIASES = {
     "geography":                       "Geography",
     "market/gmt":                      "Market/GMT",
     "market":                          "Market/GMT",
+    # Market/Sector — column GM in real CMO
+    "market/sector":                   "Market/Sector",
+    "marketsector":                    "Market/Sector",
+    "gm":                              "Market/Sector",
     "country":                         "Country",
     "hr lob":                          "HR LOB",
     # TRAM / people

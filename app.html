@@ -352,7 +352,7 @@
     <!-- Filters -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px">
       <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Sector</label>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Market / Sector (col GM)</label>
         <select id="an-sector" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px">
           <option value="">All Sectors</option>
         </select>
@@ -1428,7 +1428,8 @@ function _analyticsData() {
 }
 
 function _populateAnalyticsFilters(data) {
-  const sectors = [...new Set(data.map(c=>c.sector||'').filter(Boolean))].sort();
+  // Use marketSector (col GM) as primary; fall back to sector if not populated
+  const sectors = [...new Set(data.map(c=>c.marketSector||c.sector||'').filter(Boolean))].sort();
   const sEl = document.getElementById('an-sector');
   const cur = sEl.value;
   sEl.innerHTML = '<option value="">All Sectors</option>' +
@@ -1436,7 +1437,7 @@ function _populateAnalyticsFilters(data) {
 
   // clients filtered by chosen sector
   const sectorVal = sEl.value;
-  const clientData = sectorVal ? data.filter(c=>c.sector===sectorVal) : data;
+  const clientData = sectorVal ? data.filter(c=>(c.marketSector||c.sector)===sectorVal) : data;
   const clients = [...new Set(clientData.map(c=>c.client||'').filter(Boolean))].sort();
   const cEl = document.getElementById('an-client');
   const curC = cEl.value;
@@ -1448,7 +1449,7 @@ function _getAnalyticsFiltered() {
   let data = _analyticsData();
   const sec = (document.getElementById('an-sector')||{}).value||'';
   const cli = (document.getElementById('an-client')||{}).value||'';
-  if(sec) data = data.filter(c=>c.sector===sec);
+  if(sec) data = data.filter(c=>(c.marketSector||c.sector)===sec);
   if(cli) data = data.filter(c=>c.client===cli);
   return data;
 }
@@ -1556,7 +1557,8 @@ function _renderSectorChart(data) {
   const el = document.getElementById('an-chart-sector');
   if(!el) return;
   const counts = {};
-  data.forEach(c=>{ const s=c.sector||'Unknown'; counts[s]=(counts[s]||0)+1; });
+  // Use marketSector (col GM) — fall back to sector
+  data.forEach(c=>{ const s=c.marketSector||c.sector||'Unknown'; counts[s]=(counts[s]||0)+1; });
   const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const total = entries.reduce((s,[,v])=>s+v,0);
   if(!total){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }

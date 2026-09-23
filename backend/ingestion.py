@@ -239,6 +239,7 @@ def _build_contractor_records(
             # Assignment
             "geography":          row.get("Geography"),
             "market":             row.get("Market/GMT"),
+            "marketSector":       row.get("Market/Sector"),
             "country":            row.get("Country"),
             "hrLob":              row.get("HR LOB"),
             "sector":             row.get("Sector"),
