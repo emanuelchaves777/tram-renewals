@@ -223,6 +223,7 @@
   <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
   <button onclick="showTab('renewal',this)">Renewal Workflow</button>
   <button onclick="showTab('offboarding',this)">Offboarding Workflow</button>
+  <button onclick="showTab('analytics',this)">📊 Analytics</button>
   <button onclick="showTab('dq',this)">Data Quality</button>
   <button onclick="showTab('audit',this)">Audit Trail</button>
 </nav>
@@ -342,6 +343,68 @@
 <!-- ═══════════════════════════════════════════
      TAB: RENEWAL WORKFLOW
 ═══════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════
+     TAB: ANALYTICS
+═══════════════════════════════════════════ -->
+<div id="tab-analytics" style="display:none">
+  <div style="padding:24px">
+
+    <!-- Filters -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px">
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Sector</label>
+        <select id="an-sector" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px">
+          <option value="">All Sectors</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Client</label>
+        <select id="an-client" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:200px">
+          <option value="">All Clients</option>
+        </select>
+      </div>
+      <div style="margin-left:auto;font-size:12px;color:#6b7280" id="an-scope"></div>
+    </div>
+
+    <!-- Summary cards row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:28px" id="an-cards"></div>
+
+    <!-- Charts grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+      <!-- Expiry bucket bar chart -->
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Contractors by Expiry Bucket</div>
+        <div id="an-chart-bucket"></div>
+      </div>
+      <!-- Sector donut -->
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Distribution by Sector</div>
+        <div id="an-chart-sector"></div>
+      </div>
+    </div>
+
+    <!-- Top clients bar + Top vendors bar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Top 10 Clients</div>
+        <div id="an-chart-clients"></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Top 10 Vendors</div>
+        <div id="an-chart-vendors"></div>
+      </div>
+    </div>
+
+    <!-- Expiry timeline -->
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:24px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:#1f2328">Expiry Timeline — Contractors expiring per month</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:16px">Each bar = number of contractors whose contract ends in that month</div>
+      <div id="an-chart-timeline"></div>
+    </div>
+
+  </div>
+</div>
+
 <div id="tab-renewal" style="display:none">
   <div id="renewal-content"></div>
 </div>
@@ -1348,11 +1411,225 @@ function filterBucket(b,card){
 function sortTable(col){if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}applyFilters();}
 
 function showTab(name,btn){
-  ['dashboard','renewal','offboarding','dq','audit'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el) el.style.display=t===name?'block':'none';});
+  ['dashboard','renewal','offboarding','analytics','dq','audit'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el) el.style.display=t===name?'block':'none';});
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   if(name==='renewal') renderRenewalTab();
   if(name==='offboarding') renderOffboardingTab();
+  if(name==='analytics') renderAnalytics();
+}
+
+// ══════════════════════════════════════════════════════
+// ANALYTICS TAB
+// ══════════════════════════════════════════════════════
+function _analyticsData() {
+  // Always scoped to identity filter
+  return _identityFilter([..._liveRegistry]);
+}
+
+function _populateAnalyticsFilters(data) {
+  const sectors = [...new Set(data.map(c=>c.sector||'').filter(Boolean))].sort();
+  const sEl = document.getElementById('an-sector');
+  const cur = sEl.value;
+  sEl.innerHTML = '<option value="">All Sectors</option>' +
+    sectors.map(s=>`<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
+
+  // clients filtered by chosen sector
+  const sectorVal = sEl.value;
+  const clientData = sectorVal ? data.filter(c=>c.sector===sectorVal) : data;
+  const clients = [...new Set(clientData.map(c=>c.client||'').filter(Boolean))].sort();
+  const cEl = document.getElementById('an-client');
+  const curC = cEl.value;
+  cEl.innerHTML = '<option value="">All Clients</option>' +
+    clients.map(c=>`<option value="${c}" ${c===curC?'selected':''}>${c}</option>`).join('');
+}
+
+function _getAnalyticsFiltered() {
+  let data = _analyticsData();
+  const sec = (document.getElementById('an-sector')||{}).value||'';
+  const cli = (document.getElementById('an-client')||{}).value||'';
+  if(sec) data = data.filter(c=>c.sector===sec);
+  if(cli) data = data.filter(c=>c.client===cli);
+  return data;
+}
+
+function renderAnalytics() {
+  const base = _analyticsData();
+  _populateAnalyticsFilters(base);
+  const data = _getAnalyticsFiltered();
+
+  // Scope label
+  const scopeEl = document.getElementById('an-scope');
+  if(scopeEl) scopeEl.textContent = `${data.length} contractors in current view`;
+
+  _renderAnCards(data);
+  _renderBucketChart(data);
+  _renderSectorChart(data);
+  _renderTopBar('an-chart-clients', data, 'client', 'Top 10 Clients', '#3b82f6');
+  _renderTopBar('an-chart-vendors', data, 'vendor', 'Top 10 Vendors', '#8b5cf6');
+  _renderTimeline(data);
+}
+
+// ── Summary cards ──────────────────────────────────────────────────────────
+function _renderAnCards(data) {
+  const el = document.getElementById('an-cards');
+  if(!el) return;
+  const total      = data.length;
+  const pastDue    = data.filter(c=>c.bucket==='past-due').length;
+  const next30     = data.filter(c=>c.bucket==='0-7'||c.bucket==='8-14'||c.bucket==='15-30').length;
+  const renewalIP  = data.filter(c=>c.bucket==='renewal-ip').length;
+  const offboardIP = data.filter(c=>c.bucket==='offboard-ip').length;
+  const dqCount    = data.filter(c=>c.dq).length;
+  const cards = [
+    {label:'Total',       val:total,      color:'#1f2328'},
+    {label:'Past Due',    val:pastDue,    color:'#dc2626'},
+    {label:'Next 30 Days',val:next30,     color:'#d97706'},
+    {label:'Renewal IP',  val:renewalIP,  color:'#7c3aed'},
+    {label:'Offboard IP', val:offboardIP, color:'#0891b2'},
+    {label:'DQ Issues',   val:dqCount,    color:'#6b7280'},
+  ];
+  el.innerHTML = cards.map(c=>`
+    <div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;text-align:center">
+      <div style="font-size:26px;font-weight:700;color:${c.color}">${c.val}</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:2px;text-transform:uppercase;letter-spacing:.5px">${c.label}</div>
+    </div>`).join('');
+}
+
+// ── Horizontal bar chart (generic) ────────────────────────────────────────
+function _renderTopBar(containerId, data, field, title, color) {
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const counts = {};
+  data.forEach(c=>{ const v=c[field]||'Unknown'; counts[v]=(counts[v]||0)+1; });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if(!sorted.length){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }
+  const max = sorted[0][1];
+  const rowH = 28, gap = 4, labelW = 160, barAreaW = 220, numW = 36;
+  const svgH = sorted.length * (rowH + gap);
+  const rows = sorted.map(([name,count],i)=>{
+    const barW = Math.round((count/max)*barAreaW);
+    const y = i*(rowH+gap);
+    const label = name.length>22 ? name.slice(0,21)+'…' : name;
+    return `
+      <text x="${labelW-6}" y="${y+rowH/2+4}" text-anchor="end" font-size="11" fill="#374151">${label}</text>
+      <rect x="${labelW}" y="${y+4}" width="${barW}" height="${rowH-8}" rx="3" fill="${color}" opacity="0.85"/>
+      <text x="${labelW+barW+5}" y="${y+rowH/2+4}" font-size="11" fill="#6b7280">${count}</text>`;
+  }).join('');
+  el.innerHTML = `<svg width="100%" viewBox="0 0 ${labelW+barAreaW+numW} ${svgH}" style="overflow:visible">${rows}</svg>`;
+}
+
+// ── Bucket bar chart ───────────────────────────────────────────────────────
+function _renderBucketChart(data) {
+  const el = document.getElementById('an-chart-bucket');
+  if(!el) return;
+  const buckets = [
+    {key:'past-due', label:'Past Due',      color:'#dc2626'},
+    {key:'0-7',      label:'Next 7d',       color:'#f97316'},
+    {key:'8-14',     label:'8–14d',         color:'#f59e0b'},
+    {key:'15-30',    label:'15–30d',        color:'#3b82f6'},
+    {key:'31-60',    label:'31–60d',        color:'#10b981'},
+    {key:'60+',      label:'60+ d',         color:'#8b5cf6'},
+    {key:'renewal-ip',  label:'Renewal IP', color:'#7c3aed'},
+    {key:'offboard-ip', label:'Offboard IP',color:'#0891b2'},
+  ];
+  const counts = buckets.map(b=>({...b, count:data.filter(c=>c.bucket===b.key).length}));
+  const max = Math.max(...counts.map(c=>c.count), 1);
+  const barW=44, gap=10, chartH=160, labelH=30;
+  const svgW = counts.length*(barW+gap);
+  const bars = counts.map((b,i)=>{
+    const bh = Math.round((b.count/max)*chartH);
+    const x = i*(barW+gap);
+    const y = chartH-bh;
+    const lx = x+barW/2;
+    const labelLines = b.label.split(' ');
+    const labelSvg = labelLines.map((l,li)=>`<text x="${lx}" y="${chartH+14+(li*13)}" text-anchor="middle" font-size="10" fill="#6b7280">${l}</text>`).join('');
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${b.color}" opacity="0.85"/>
+      <text x="${lx}" y="${y-4}" text-anchor="middle" font-size="11" fill="#374151" font-weight="600">${b.count}</text>
+      ${labelSvg}`;
+  }).join('');
+  el.innerHTML = `<svg width="100%" viewBox="0 0 ${svgW} ${chartH+labelH}" style="overflow:visible">${bars}</svg>`;
+}
+
+// ── Sector donut ───────────────────────────────────────────────────────────
+function _renderSectorChart(data) {
+  const el = document.getElementById('an-chart-sector');
+  if(!el) return;
+  const counts = {};
+  data.forEach(c=>{ const s=c.sector||'Unknown'; counts[s]=(counts[s]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const total = entries.reduce((s,[,v])=>s+v,0);
+  if(!total){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }
+  const colors=['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#0891b2','#f97316','#6b7280'];
+  const cx=110, cy=100, R=80, r=44;
+  let angle = -Math.PI/2;
+  const slices = entries.map(([name,count],i)=>{
+    const slice = (count/total)*2*Math.PI;
+    const x1=cx+R*Math.cos(angle), y1=cy+R*Math.sin(angle);
+    angle+=slice;
+    const x2=cx+R*Math.cos(angle), y2=cy+R*Math.sin(angle);
+    const ix1=cx+r*Math.cos(angle-slice), iy1=cy+r*Math.sin(angle-slice);
+    const ix2=cx+r*Math.cos(angle), iy2=cy+r*Math.sin(angle);
+    const large=slice>Math.PI?1:0;
+    return `<path d="M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${ix2},${iy2} A${r},${r} 0 ${large},0 ${ix1},${iy1} Z" fill="${colors[i%colors.length]}" opacity="0.9"/>`;
+  }).join('');
+  // Legend
+  const legend = entries.map(([name,count],i)=>{
+    const pct = Math.round(count/total*100);
+    const label = name.length>20?name.slice(0,19)+'…':name;
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#374151;margin-bottom:3px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
+      <span>${label}</span><span style="color:#9ca3af;margin-left:auto">${pct}%</span></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <svg viewBox="0 0 220 200" style="width:180px;flex-shrink:0">
+        ${slices}
+        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13" fill="#374151" font-weight="600">${total}</text>
+      </svg>
+      <div style="flex:1;padding-top:8px">${legend}</div>
+    </div>`;
+}
+
+// ── Expiry timeline bar chart ──────────────────────────────────────────────
+function _renderTimeline(data) {
+  const el = document.getElementById('an-chart-timeline');
+  if(!el) return;
+  const monthly = {};
+  const now = new Date();
+  data.forEach(c=>{
+    if(!c.endDate) return;
+    const d = new Date(c.endDate);
+    if(isNaN(d)) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    monthly[key]=(monthly[key]||0)+1;
+  });
+  // Show next 18 months + past 3 months
+  const months = [];
+  for(let i=-3;i<=18;i++){
+    const d=new Date(now.getFullYear(), now.getMonth()+i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const entries = months.map(m=>({m, count:monthly[m]||0}));
+  const max = Math.max(...entries.map(e=>e.count),1);
+  const barW=28, gap=4, chartH=120, labelH=34;
+  const svgW = entries.length*(barW+gap);
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const bars = entries.map((e,i)=>{
+    const bh = Math.round((e.count/max)*chartH);
+    const x = i*(barW+gap);
+    const y = chartH-bh;
+    const isToday = e.m===todayKey;
+    const col = isToday?'#f97316':e.count===0?'#e5e7eb':'#3b82f6';
+    const label = e.m.slice(5)+'\n'+e.m.slice(0,4);
+    const [mm,yyyy] = [e.m.slice(5), e.m.slice(0,4)];
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(bh,2)}" rx="2" fill="${col}" opacity="0.85"/>
+      ${e.count>0?`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="#374151">${e.count}</text>`:''}
+      <text x="${x+barW/2}" y="${chartH+12}" text-anchor="middle" font-size="9" fill="${isToday?'#f97316':'#9ca3af'}">${mm}</text>
+      <text x="${x+barW/2}" y="${chartH+23}" text-anchor="middle" font-size="8" fill="#d1d5db">${yyyy.slice(2)}</text>`;
+  }).join('');
+  el.innerHTML = `<svg width="100%" viewBox="0 0 ${svgW} ${chartH+labelH}" style="overflow:visible">${bars}</svg>`;
 }
 
 // ── DETAIL PANEL ──────────────────────────────
