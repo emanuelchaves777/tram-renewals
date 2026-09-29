@@ -1795,55 +1795,74 @@ function _rnwRender() {
 // ══════════════════════════════════════════════════════════════════════════════
 function _rnwRenderStep1() {
   const c = renewalData.c;
-  // Helper: show current value as reference
-  const ref = (label, val) => val && val !== '–'
-    ? `<span style="color:#6b7280">${label}:</span> <b>${val}</b>`
-    : `<span style="color:#9ca3af">${label}: <i>not on record</i></span>`;
+  // Show current CMO value as a reference chip
+  const val = (v) => v && v !== '–'
+    ? `<code style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;font-size:12px;color:#1e40af">${v}</code>`
+    : `<span style="color:#9ca3af;font-size:12px;font-style:italic">not on record</span>`;
+
+  // Checkbox row helper
+  const chk = (label, note='') => `
+    <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:13px">
+      <input type="checkbox" style="width:15px;height:15px;margin-top:1px;flex-shrink:0;accent-color:#1d4ed8" onchange="_rnwChecklistChanged()">
+      <span><b>${label}</b>${note?`<span style="color:#6b7280;font-weight:400;font-size:12px"> — ${note}</span>`:''}</span>
+    </label>`;
 
   document.getElementById('renewalModalBody').innerHTML = `
     ${_rnwStepperHTML(1)}
     ${_rnwContractorBar()}
 
-    <!-- TRAM checklist -->
-    <div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:12px">
-        🔗 Open TRAM → Import from prior request → update these fields → Submit
-        <a href="https://tram.ibm.com" target="_blank" style="margin-left:10px;font-size:12px;color:#1d4ed8;text-decoration:none;font-weight:400">Open TRAM ↗</a>
-      </div>
+    <!-- Nav path -->
+    <div style="font-size:12px;color:#6b7280;margin-bottom:12px;padding:7px 12px;background:#f7f8fa;border-radius:6px;border:1px solid #e5e7eb">
+      TRAM path: <b>My Requests</b> → <b>Create New Requests</b> → <b>Spend</b> →
+      set <b>"Import from Existing TRAM request?"</b> to <b>Yes</b> → paste <code style="font-size:12px">${c.tramId||'prior TRAM ID'}</code>
+      &nbsp;&nbsp;<a href="https://tram.ibm.com" target="_blank" style="color:#1d4ed8;font-weight:600;text-decoration:none">Open TRAM ↗</a>
+    </div>
 
-      <!-- Fields that auto-import (PM just confirms) -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;margin-bottom:6px">✓ Auto-imported from prior TRAM — confirm only</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:14px;padding:10px 12px;background:#fff;border-radius:6px;border:1px solid #fde68a">
-        <div>${ref('Contractor', c.name)}</div>
-        <div>${ref('Client', c.client)}</div>
-        <div>${ref('Vendor', c.vendor)}</div>
-        <div>${ref('JR/S', c.jrsTram)}</div>
-        <div>${ref('Band', c.band)}</div>
-        <div>${ref('Work Location', c.workLocation)}</div>
+    <!-- Auto-imported section -->
+    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px">
+      <div style="background:#f0fdf4;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#15803d;display:flex;align-items:center;gap:6px">
+        ✓ These fields auto-import from the prior request — just confirm they look right
       </div>
+      <div style="padding:2px 14px 6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px">
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Contractor:</span> ${val(c.name)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Client / Project:</span> ${val(c.client)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Vendor:</span> ${val(c.vendor)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">JR/S:</span> ${val(c.jrsTram)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Band Equivalent:</span> ${val(c.band)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Location:</span> ${val(c.workLocation)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Sector / Geography / Market:</span> ${val(c.sector||c.marketSector)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Staffing / Contract Type:</span> <span style="color:#9ca3af;font-size:12px;font-style:italic">from prior request</span></div>
+      </div>
+    </div>
 
-      <!-- Fields PM MUST update -->
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#dc2626;margin-bottom:6px">⚠ You must update these in TRAM</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;padding:10px 12px;background:#fff;border-radius:6px;border:1px solid #fca5a5">
-        <div style="grid-column:span 2;color:#374151">
-          <b>Start Date</b> — set to the new contract start
-          &nbsp;·&nbsp; <b>End Date</b> — set to the new contract end
-          &nbsp;&nbsp;<span style="color:#9ca3af">(current: ${c.endDate||'unknown'})</span>
-        </div>
-        <div style="color:#374151"><b>Rate Cap</b> — update if changed</div>
-        <div style="color:#374151"><b>Bill Rate</b> — update if changed</div>
-        <div style="color:#374151"><b>GP%</b> — update if changed</div>
-        <div style="color:#374151"><b>JR/S</b> — update if role changed from <code style="font-size:12px">${c.jrsTram||'?'}</code></div>
+    <!-- Must-update section (checklist) -->
+    <div style="border:1px solid #fca5a5;border-radius:8px;overflow:hidden;margin-bottom:14px">
+      <div style="background:#fee2e2;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#b91c1c">
+        ⚠ You must update these fields in TRAM — check each one off as you complete it
       </div>
+      <div style="padding:2px 14px 6px" id="tramChecklist">
+        ${chk('Expected Start Date', `set to the new contract start date`)}
+        ${chk('Planned End Date', `set to the new contract end date &nbsp;·&nbsp; current end: <b>${c.endDate||'unknown'}</b>`)}
+        ${chk('Cost Rate &amp; Bill Rate', 'update if rates have changed')}
+        ${chk('Contractor Cost Rate &amp; Contractor Bill Rate', 'update if rates have changed')}
+        ${chk('Resource GP% &amp; Project GP%', 'recalculate based on new rates')}
+        ${chk('JR/S', `only if the role has changed from <code style="font-size:12px">${c.jrsTram||'?'}</code>`)}
+        ${chk('Internal Search Performed → <span style="color:#dc2626">Yes</span>', 'TRAM requires this — confirm bench review was done')}
+        ${chk('Resources available meeting all requirements → <span style="color:#dc2626">No</span>', 'must select No to justify using a subcontractor')}
+        ${chk('Business Justification', 'enter justification text in the TRAM Comments field')}
+      </div>
+    </div>
+    <div id="tramChecklistWarning" style="display:none;color:#92400e;font-size:12px;margin-bottom:8px;padding:6px 10px;background:#fef3c7;border-radius:4px">
+      ⚠ Check off all required TRAM fields above before continuing — or continue if you've already submitted TRAM.
     </div>
 
     <!-- New TRAM ID input -->
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px 16px;margin-bottom:4px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#15803d">✓ Done in TRAM? Paste your new TRAM ID here</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#15803d">✓ Submitted in TRAM? Paste the new TRAM ID here</div>
       <input id="r_tramId" placeholder="e.g. NA202510048216S" autocomplete="off"
              style="font-family:monospace;font-size:18px;letter-spacing:.06em;padding:10px 14px;width:100%;border:2px solid #86efac;border-radius:6px;outline:none"
-             oninput="this.style.borderColor=this.value.trim()?'#16a34a':'#86efac';document.getElementById('btnRnwNext1').disabled=!this.value.trim()">
-      <div style="font-size:11px;color:#6b7280;margin-top:6px">Copy the new TRAM ID exactly as shown after submitting in TRAM. The app will use it in the Excel file and email.</div>
+             oninput="this.style.borderColor=this.value.trim()?'#16a34a':'#86efac';_rnwChecklistChanged()">
+      <div style="font-size:11px;color:#6b7280;margin-top:6px">Copy the new TRAM ID exactly as it appears after submitting. The app will embed it in the Excel file and the email subject.</div>
     </div>
     <div id="rnwStep1Error" style="display:none;color:#dc2626;font-size:12px;margin-top:6px;margin-bottom:4px;padding:6px 10px;background:#fee2e2;border-radius:4px"></div>`;
 
@@ -1852,6 +1871,12 @@ function _rnwRenderStep1() {
     <button class="btn btn-primary" id="btnRnwNext1" onclick="_rnwStep1Next()" disabled>
       Next: Fill Renewal Form →
     </button>`;
+}
+
+// Enable the Next button only once the TRAM ID is pasted (checklist is advisory, not blocking)
+function _rnwChecklistChanged() {
+  const tramId = (document.getElementById('r_tramId') || {}).value || '';
+  document.getElementById('btnRnwNext1').disabled = !tramId.trim();
 }
 
 function _rnwStep1Next() {
