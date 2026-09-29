@@ -429,12 +429,43 @@ async def upload_template(file: UploadFile = File(...), pin: str = ""):
 # ── Contractors ────────────────────────────────────────────────────────────────
 
 @app.get("/api/contractors")
-def get_contractors():
+def get_contractors(bp_manager_id: str = ""):
+    """Return contractor list, optionally filtered server-side by BP Manager Intranet ID.
+
+    When bp_manager_id is provided the backend filters rows before serialising,
+    keeping the JSON payload small enough for Railway's response timeout.
+    Without a filter (admin / View All) all rows are returned — the admin should
+    be aware this is a large payload (~4 k rows).
+    """
     if _ingestion_result is None:
         raise HTTPException(
             status_code=503,
             detail="No report loaded. Upload the contractor report via POST /api/upload/report.",
         )
+
+    all_contractors  = _ingestion_result["contractors"]
+    all_dq           = _ingestion_result["dq_exceptions"]
+
+    # Server-side filter — only apply when a specific PM id is given
+    if bp_manager_id.strip():
+        needle = bp_manager_id.strip().lower()
+        def _pm_match(c: dict) -> bool:
+            bp  = (c.get("bpManagerIntranetId") or "").strip().lower()
+            pm  = (c.get("pmIntranetId")        or "").strip().lower()
+            ce  = (c.get("contactEmail")        or "").strip().lower()
+            uname = needle.split("@")[0]
+            return (
+                bp == needle or
+                pm == needle or
+                ce == needle or
+                (len(uname) > 2 and uname in (c.get("contact") or "").lower())
+            )
+        contractors = [c for c in all_contractors if _pm_match(c)]
+        dq          = [c for c in all_dq          if _pm_match(c)]
+    else:
+        contractors = all_contractors
+        dq          = all_dq
+
     return {
         "meta": {
             "filename":        _ingestion_result["filename"],
@@ -443,11 +474,13 @@ def get_contractors():
             "staleness_days":  _ingestion_result["staleness_days"],
             "is_stale":        _ingestion_result["is_stale"],
             "missing_headers": _ingestion_result["missing_headers"],
-            "total_accepted":  len(_ingestion_result["contractors"]),
-            "total_dq":        len(_ingestion_result["dq_exceptions"]),
+            "total_accepted":  len(all_contractors),
+            "total_dq":        len(all_dq),
+            "filtered":        bp_manager_id.strip() != "",
+            "filtered_accepted": len(contractors),
         },
-        "contractors":   _ingestion_result["contractors"],
-        "dq_exceptions": _ingestion_result["dq_exceptions"],
+        "contractors":   contractors,
+        "dq_exceptions": dq,
     }
 
 

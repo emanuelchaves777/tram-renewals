@@ -862,7 +862,14 @@ async function loadData() {
     return;
   }
   try {
-    const resp = await fetch(API_BASE + '/api/contractors');
+    // Pass the PM's intranet ID to the backend so it filters server-side.
+    // This keeps the JSON payload small (~200 rows vs 4,355) and avoids Railway timeouts.
+    // Admin (viewAll / no identity) gets all rows — larger payload but acceptable.
+    let url = API_BASE + '/api/contractors';
+    if (_identity && !_identity.viewAll && _identity.intranetId) {
+      url += '?bp_manager_id=' + encodeURIComponent(_identity.intranetId);
+    }
+    const resp = await fetch(url);
     if (resp.status === 503) {
       // Backend up but no CMO uploaded yet — this is expected on first visit
       showLoadingBanner('No data loaded — click ⚙ Setup / Upload Files to get started.');
@@ -877,22 +884,27 @@ async function loadData() {
     _liveRegistry = all;
     // Debug: log the fields present on the first record so identity filter issues are visible
     if (all.length > 0) {
-      console.info('[loadData] total rows:', all.length,
-        '| first record bpManagerIntranetId:', all[0].bpManagerIntranetId,
-        '| pmIntranetId:', all[0].pmIntranetId);
+      console.info('[loadData] rows received:', all.length,
+        '| total in CMO:', data.meta.total_accepted,
+        '| server-filtered:', data.meta.filtered,
+        '| first bpManagerIntranetId:', all[0].bpManagerIntranetId);
     }
     updateFreshnessBar(data.meta);
+    // Client-side filter still runs to handle the optional client/account sub-filter
     const filtered = _identityFilter(all);
     renderTable(filtered);
     updateBucketCounts(filtered);
-    const total = all.length;
+    // Banner: show PM's row count vs total in CMO
+    const totalInCmo = data.meta.total_accepted || all.length;
     const shown = filtered.length;
-    const filterMsg = (_identity && !_identity.viewAll && _identity.intranetId)
-      ? ` · showing ${shown} of ${total} for ${_identity.intranetId}`
-      : ` · ${total} contractors`;
     hideBanner();
     const b = document.getElementById('appBanner');
-    if (b) b.innerHTML += filterMsg;
+    if (b) {
+      const filterMsg = (_identity && !_identity.viewAll && _identity.intranetId)
+        ? ` · showing ${shown} of ${totalInCmo} for ${_identity.intranetId}`
+        : ` · ${totalInCmo} contractors`;
+      b.innerHTML += filterMsg;
+    }
   } catch(err) {
     showErrorBanner(`Could not reach backend: ${err.message}`);
   }
