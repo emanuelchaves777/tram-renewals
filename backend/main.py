@@ -208,6 +208,7 @@ class SubmitRenewalRequest(BaseModel):
     niche_skills:     str
     scope_of_work:    str = ""
     manager_email:    str = ""
+    supplier_contact: str = ""   # Col 8 — Supplier's Contact (PM provides)
     biz_just_1:       str
     biz_just_2:       str = ""
     biz_just_3:       str = ""
@@ -571,8 +572,14 @@ def submit_renewal(req: SubmitRenewalRequest):
     ] if p.strip()]
     biz_just = "\n".join(f"{i+1}. {p}" for i, p in enumerate(biz_just_parts))
 
+    # Col 2 — Fulfilment Specialist Email = sector CSP email (same routing as the email recipient)
+    sector_key = (contractor.get("sector") or contractor.get("marketSector") or "").strip().lower()
+    fulfilment_email = SECTOR_EMAIL_MAP.get(sector_key, SECTOR_EMAIL_DEFAULT)
+
     pm_checklist = {
         "manager_email":    req.manager_email or contractor.get("pmIntranetId", ""),
+        "fulfilment_email": fulfilment_email,                             # Col 2 — auto from sector
+        "supplier_contact": req.supplier_contact,                         # Col 8 — PM provides
         "start_date":       req.new_start_date,
         "end_date":         req.new_end_date,
         "tram_id_new":      req.tram_id_new or contractor.get("tramId", ""),

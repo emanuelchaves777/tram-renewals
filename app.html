@@ -1957,7 +1957,12 @@ function _rnwRenderStep2() {
         <div class="form-group" style="grid-column:span 2">
           <label>Hiring Manager Email (U.S. Manager) <span style="color:#dc2626">*</span></label>
           <input id="r_mgrEmail" type="email" value="${c.contactEmail||c.pmIntranetId||''}" placeholder="manager@us.ibm.com">
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">Goes into column 1 of the Excel form — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:3px">Excel col 1 — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label>Supplier's Contact <span style="color:#dc2626">*</span></label>
+          <input id="r_supplierContact" type="text" placeholder="e.g. John Smith — vendor account manager name or email">
+          <div style="font-size:11px;color:#6b7280;margin-top:3px">Excel col 8 — your vendor / supplier point of contact for this contractor.</div>
         </div>
       </div>
     </div>
@@ -2109,6 +2114,7 @@ function _rnwStep2Next() {
     ['r_newStart','New Start Date'],['r_newEnd','New End Date'],
     ['r_location','Work Location'],['r_phone','Contractor Phone'],
     ['r_mgrEmail','Hiring Manager Email'],
+    ['r_supplierContact','Supplier\'s Contact'],
     ['r_jrs','JR/S'],['r_band','Band'],['r_skills','Niche Skills'],['r_scope','Scope of Work'],
     ['r_rateCap','Rate Cap'],['r_billRate','Bill Rate'],['r_gp','GP%'],['r_contractType','Contract Type'],
     ['r_usCitizen','US Citizenship'],['r_secAccess','Security Technologies Access'],
@@ -2128,6 +2134,7 @@ function _rnwStep2Next() {
     newStart: get('r_newStart'), newEnd: get('r_newEnd'),
     location: get('r_location'), phone: get('r_phone'),
     mgrEmail: get('r_mgrEmail'),
+    supplierContact: get('r_supplierContact'),
     jrs: get('r_jrs'), band: get('r_band'),
     skills: get('r_skills'), scope: get('r_scope'),
     rateCap: get('r_rateCap'), billRate: get('r_billRate'),
@@ -2177,6 +2184,7 @@ function _rnwRenderStep3() {
         ${row('Old TRAM ID', c.tramId ? `<code>${c.tramId}</code>` : '')}
         ${row('Contract Period', `${f.newStart} → ${f.newEnd}`)}
         ${row('Hiring Manager Email', f.mgrEmail)}
+        ${row('Supplier\'s Contact', f.supplierContact)}
         ${row('Work Location', f.location)}
         ${row('JR/S', `<code>${f.jrs}</code>`)}
         ${row('Band', f.band)}
@@ -2248,6 +2256,7 @@ async function submitRenewal() {
         confirmed_band:   f.band,
         work_location:    f.location,
         manager_email:    f.mgrEmail,
+        supplier_contact: f.supplierContact,
         rate_cap:         f.rateCap,
         bill_rate:        f.billRate,
         gp_pct:           f.gp,

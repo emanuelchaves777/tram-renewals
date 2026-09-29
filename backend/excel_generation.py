@@ -28,15 +28,15 @@ DATA_ROW          = 2   # row 1 = headers, row 2 = first data row
 COLUMN_MAP = [
     # (col_index, header,                                          data_key)
     (1,  "Contractor's Hiring Manager (U.S. Manager Email)",      "manager_email"),
-    (2,  "Fulfilment Specialist Email",                           "fulfilment_email"),   # ⏳ Pending CSP
+    (2,  "Fulfilment Specialist Email",                           "fulfilment_email"),   # auto-set = sector CSP email
     (3,  "Contractor's Full Name",                                "contractor_name"),
     (4,  "Start Date",                                            "start_date"),
     (5,  "End Date",                                              "end_date"),
     (6,  "Account/Client",                                        "client"),
     (7,  "Supplier's Name",                                       "vendor"),
-    (8,  "Supplier's Contact",                                    "supplier_contact"),   # ⏳ Pending CSP
+    (8,  "Supplier's Contact",                                    "supplier_contact"),   # PM provides
     (9,  "Open Seat #",                                           "tram_id_new"),
-    (10, "Job Posting ID",                                        "job_posting_id"),     # ⏳ Pending
+    # Col 10 "Job Posting ID" — not applicable to renewals, left blank intentionally
     (11, "TRAM",                                                  "tram_id_new"),
     (12, "Does the contractor have US citizenship?",              "us_citizenship"),
     (13, "Brief scope of work",                                   "scope_of_work"),
@@ -54,7 +54,7 @@ MANDATORY_KEYS = {
     "manager_email", "contractor_name", "start_date", "end_date",
     "client", "vendor", "tram_id_new", "us_citizenship",
     "scope_of_work", "security_access", "pen_testing",
-    "requires_laptop", "contractor_phone", "comments",
+    "requires_laptop", "contractor_phone", "supplier_contact", "comments",
 }
 
 
