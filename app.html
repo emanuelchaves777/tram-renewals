@@ -221,11 +221,7 @@
 
 <nav>
   <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
-  <button onclick="showTab('renewal',this)">Renewal Workflow</button>
-  <button onclick="showTab('offboarding',this)">Offboarding Workflow</button>
   <button onclick="showTab('analytics',this)">📊 Analytics</button>
-  <button onclick="showTab('dq',this)">Data Quality</button>
-  <button onclick="showTab('audit',this)">Audit Trail</button>
 </nav>
 
 <div class="main">
@@ -406,93 +402,6 @@
   </div>
 </div>
 
-<div id="tab-renewal" style="display:none">
-  <div id="renewal-content"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     TAB: OFFBOARDING WORKFLOW
-═══════════════════════════════════════════ -->
-<div id="tab-offboarding" style="display:none">
-  <div id="offboarding-content"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     TAB: DATA QUALITY
-═══════════════════════════════════════════ -->
-<div id="tab-dq" style="display:none">
-  <h2 style="margin-bottom:16px;font-size:18px">Data Quality Panel</h2>
-
-  <div class="dq-card">
-    <h3><span class="tag tag-error">BLOCKING</span> Missing Required Header</h3>
-    <p>The column <code>JR/S (TRAM)</code> could not be resolved in the current source file. This field is required for TRAM reconciliation. Renewal workflows are not blocked but TRAM comparison will show "header missing" for this field.</p>
-    <p style="font-size:12px;color:#9ca3af">Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · Detected at ingestion · Header row line 1</p>
-  </div>
-
-  <div class="dq-card">
-    <h3><span class="tag tag-warn">WARNING</span> Invalid Date Value</h3>
-    <p>Contractor <b>B. Torres</b> (TalentID: SYN-0042) has an unparseable value in <code>Expected End Date</code>: <code>"TBD"</code>. This record is placed in the "Unknown" bucket and cannot be actioned until the date is corrected in the source report.</p>
-    <p style="font-size:12px;color:#9ca3af">Row 47 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
-  </div>
-
-  <div class="dq-card">
-    <h3><span class="tag tag-warn">WARNING</span> Duplicate Contractor Identifier</h3>
-    <p>TalentID <b>SYN-0019</b> appears in two rows with different contractor names: <b>C. Nguyen</b> and <b>C. Nguyen-Tran</b>. Both records are shown in the dashboard with a duplicate flag. The first occurrence (row 22) is used for display. Verify the source report.</p>
-    <p style="font-size:12px;color:#9ca3af">Rows 22, 55 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
-  </div>
-
-  <div class="dq-card">
-    <h3><span class="tag tag-warn">WARNING</span> Missing Old TRAM ID</h3>
-    <p>Contractor <b>P. Okafor</b> (TalentID: SYN-0088) has no value in <code>Old TRAM ID</code>. Dashboard display is not affected, but the renewal workflow cannot proceed until a Old TRAM ID is available.</p>
-    <p style="font-size:12px;color:#9ca3af">Row 103 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
-  </div>
-
-  <div class="dq-card">
-    <h3><span class="tag tag-warn">WARNING</span> Unrecognized JRS Value</h3>
-    <p>Contractor <b>R. Singh</b> (TalentID: SYN-0067) has JRS value <code>"AI Strategy &amp; Transformation"</code> which does not match any entry in the current taxonomy cache (pub: TAX-2025-Q2). JRS validation will surface this during renewal.</p>
-    <p style="font-size:12px;color:#9ca3af">Row 78 · Taxonomy publication: TAX-2025-Q2</p>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     TAB: AUDIT TRAIL
-═══════════════════════════════════════════ -->
-<div id="tab-audit" style="display:none">
-  <h2 style="margin-bottom:4px;font-size:18px">Audit Trail</h2>
-  <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Read-only. Showing 15 most recent events (synthetic). All times UTC.</p>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Timestamp</th>
-          <th>User</th>
-          <th>Action</th>
-          <th>Contractor</th>
-          <th>Detail</th>
-          <th>Outcome</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>2025-07-14 09:31:02</td><td>a.martinez</td><td>EMAIL_SENT</td><td>SYN-0023</td><td>Renewal email sent · TRAM-R-88821 · File: TRAM_Renewal_SYN0023_Williams_20250714.xlsx</td><td><span class="badge badge-green">success</span></td></tr>
-        <tr><td>2025-07-14 09:30:44</td><td>a.martinez</td><td>EXCEL_GENERATED</td><td>SYN-0023</td><td>Template populated · 14 fields · SHA-256: a3f1...9d02</td><td><span class="badge badge-green">success</span></td></tr>
-        <tr><td>2025-07-14 09:28:11</td><td>a.martinez</td><td>TRAM_SUBMISSION_COMPLETED</td><td>SYN-0023</td><td>New TRAM ID: TRAM-R-88821 · Method: assisted_manual</td><td><span class="badge badge-green">success</span></td></tr>
-        <tr><td>2025-07-14 09:26:55</td><td>a.martinez</td><td>TRAM_CORRECTION_APPROVED</td><td>SYN-0023</td><td>Field: work_location_city · Old: "Austin" · New: "Dallas" · Reason: "Updated per project move"</td><td><span class="badge badge-blue">recorded</span></td></tr>
-        <tr><td>2025-07-14 09:25:30</td><td>a.martinez</td><td>TRAM_MISMATCH_DETECTED</td><td>SYN-0023</td><td>Field: work_location_city — Source: Dallas · TRAM: Austin</td><td><span class="badge badge-warn">mismatch</span></td></tr>
-        <tr><td>2025-07-14 09:24:00</td><td>a.martinez</td><td>JRS_REPLACEMENT_ACCEPTED</td><td>SYN-0023</td><td>Original: "Data &amp; Analytics Specialist" (deleted) → Accepted: "Data Analytics Consultant" · Rule: ONE_REPLACEMENT · Taxonomy: TAX-2025-Q2</td><td><span class="badge badge-green">accepted</span></td></tr>
-        <tr><td>2025-07-14 09:23:40</td><td>a.martinez</td><td>JRS_VALIDATION_RUN</td><td>SYN-0023</td><td>Outcome: ONE_REPLACEMENT · Taxonomy pub: TAX-2025-Q2</td><td><span class="badge badge-warn">proposed</span></td></tr>
-        <tr><td>2025-07-14 09:22:10</td><td>a.martinez</td><td>ATTESTATION_COMPLETED</td><td>SYN-0023</td><td>All 3 attestations confirmed · Version: ATTEST-v2.1 · Hash: b7c2...1a44</td><td><span class="badge badge-green">success</span></td></tr>
-        <tr><td>2025-07-14 09:21:00</td><td>a.martinez</td><td>RENEWAL_STARTED</td><td>SYN-0023</td><td>K. Williams · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</td><td><span class="badge badge-blue">started</span></td></tr>
-        <tr><td>2025-07-14 09:18:50</td><td>a.martinez</td><td>CONTRACTOR_RECORD_VIEWED</td><td>SYN-0023</td><td>K. Williams · Acme Financial</td><td><span class="badge badge-gray">info</span></td></tr>
-        <tr><td>2025-07-14 08:55:00</td><td>a.martinez</td><td>DUPLICATE_REQUEST_DETECTED</td><td>SYN-0056</td><td>Active renewal TRAM-R-88799 already in progress. New request blocked.</td><td><span class="badge badge-red">blocked</span></td></tr>
-        <tr><td>2025-07-14 08:42:31</td><td>system</td><td>INGESTION_COMPLETED</td><td>—</td><td>File: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · 247 rows accepted · 4 rejected · 1 header warning</td><td><span class="badge badge-green">success</span></td></tr>
-        <tr><td>2025-07-14 08:42:05</td><td>system</td><td>INGESTION_STARTED</td><td>—</td><td>File: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx · Box folder: /Contractor-Mgmt/Reports</td><td><span class="badge badge-blue">started</span></td></tr>
-        <tr><td>2025-07-13 16:04:22</td><td>a.martinez</td><td>JRS_ESCALATED</td><td>SYN-0067</td><td>JRS "AI Strategy &amp; Transformation" not found in taxonomy. Escalated to process owner. Renewal blocked.</td><td><span class="badge badge-purple">escalated</span></td></tr>
-        <tr><td>2025-07-13 14:12:05</td><td>a.martinez</td><td>USER_SESSION_STARTED</td><td>—</td><td>Role: renewal_user · Auth: IBM SSO</td><td><span class="badge badge-green">success</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
 
 </div><!-- /main -->
 
@@ -1471,11 +1380,9 @@ function filterBucket(b,card){
 function sortTable(col){if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}applyFilters();}
 
 function showTab(name,btn){
-  ['dashboard','renewal','offboarding','analytics','dq','audit'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el) el.style.display=t===name?'block':'none';});
+  ['dashboard','analytics'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el) el.style.display=t===name?'block':'none';});
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  if(name==='renewal') renderRenewalTab();
-  if(name==='offboarding') renderOffboardingTab();
   if(name==='analytics') renderAnalytics();
 }
 
