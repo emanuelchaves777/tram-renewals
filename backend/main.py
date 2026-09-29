@@ -700,6 +700,25 @@ def get_ledger():
     return {"entries": ledger_module.get_all(), "count": len(ledger_module.get_all())}
 
 
+@app.post("/api/pm-status/{serial}")
+def set_pm_status(serial: str, body: dict):
+    """PM sets a workflow status (Pending/In Progress/Renewed/Offboarded) on a contractor."""
+    VALID = {"Pending", "In Progress", "Renewed", "Offboarded"}
+    status = (body.get("status") or "").strip()
+    if status not in VALID:
+        raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {sorted(VALID)}")
+    ledger_module.record_pm_status(serial, status)
+    # Patch in-memory record immediately so next /api/contractors call reflects it
+    if _ingestion_result:
+        for c in _ingestion_result["contractors"] + _ingestion_result.get("dq_exceptions", []):
+            if c.get("serial") == serial:
+                STATUS_PCT = {"Pending": 0, "In Progress": 50, "Renewed": 100, "Offboarded": 100}
+                c["pmStatus"]    = status
+                c["pmStatusPct"] = STATUS_PCT[status]
+                break
+    return {"serial": serial, "pmStatus": status, "pmStatusPct": {"Pending":0,"In Progress":50,"Renewed":100,"Offboarded":100}[status]}
+
+
 @app.delete("/api/ledger/{serial}")
 def delete_ledger_entry(serial: str, pin: str = ""):
     """PIN-protected: remove a single ledger entry by contractor serial."""

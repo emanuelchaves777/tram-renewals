@@ -332,6 +332,7 @@
             <th onclick="sortTable(7)">Band</th>
             <th onclick="sortTable(8)">JRS (TRAM)</th>
             <th onclick="sortTable(9)">TRAM Request ID</th>
+            <th>PM Status</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -752,6 +753,8 @@ function normaliseApiRecord(c) {
   c.contact              = c.contact              || '–';
   c.contactEmail         = c.contactEmail         || '';
   c.bpManagerIntranetId  = c.bpManagerIntranetId  || '';
+  c.pmStatus             = c.pmStatus             || 'Pending';
+  c.pmStatusPct          = c.pmStatusPct          !== undefined ? c.pmStatusPct : 0;
   c.vendor               = c.vendor               || '–';
   c.band         = c.band         || '–';
   c.jrsTram      = c.jrsTram      || '–';
@@ -1299,6 +1302,52 @@ const PAGE_SIZE = 150;
 let _currentPage = 1;
 let _lastFilteredData = [];
 
+// PM Status helpers
+const PM_STATUS_CFG = {
+  'Pending':     { color:'#6b7280', bg:'#f3f4f6', pct:0   },
+  'In Progress': { color:'#d97706', bg:'#fef3c7', pct:50  },
+  'Renewed':     { color:'#16a34a', bg:'#dcfce7', pct:100 },
+  'Offboarded':  { color:'#0891b2', bg:'#e0f2fe', pct:100 },
+};
+
+function _pmStatusPill(c) {
+  const st  = c.pmStatus || 'Pending';
+  const cfg = PM_STATUS_CFG[st] || PM_STATUS_CFG['Pending'];
+  const pct = cfg.pct;
+  return `<div style="min-width:100px">
+    <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${cfg.bg};color:${cfg.color}">${st}</span>
+    <div style="margin-top:4px;background:#e5e7eb;border-radius:4px;height:5px;overflow:hidden">
+      <div style="width:${pct}%;background:${cfg.color};height:100%;border-radius:4px;transition:width .3s"></div>
+    </div>
+    <div style="font-size:10px;color:#9ca3af;margin-top:1px;text-align:right">${pct}%</div>
+  </div>`;
+}
+
+async function setPmStatus(serial, status) {
+  try {
+    const resp = await fetch(`${API_BASE}/api/pm-status/${serial}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status})
+    });
+    if(!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    // Update in-memory record
+    const c = _findContractor(serial);
+    if(c){ c.pmStatus = data.pmStatus; c.pmStatusPct = data.pmStatusPct; }
+    // Re-render the row pill without full table rebuild
+    const pill = document.getElementById('pmPill-'+serial);
+    if(pill && c) pill.innerHTML = _pmStatusPill(c);
+    // Refresh detail panel status section if open
+    const detailSt = document.getElementById('detailPmStatus');
+    if(detailSt) detailSt.value = status;
+    const detailPill = document.getElementById('detailPmPill');
+    if(detailPill && c) detailPill.innerHTML = _pmStatusPill(c);
+  } catch(e) {
+    alert('Could not save status: ' + e.message);
+  }
+}
+
 function _buildRow(c) {
   let daysCell;
   if(c.days===null) daysCell='<span style="color:#9ca3af">?</span>';
@@ -1325,6 +1374,13 @@ function _buildRow(c) {
     <td style="text-align:center">${c.band||'–'}</td>
     <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram||'–'}</span></td>
     <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
+    <td onclick="event.stopPropagation()" style="min-width:110px">
+      <div id="pmPill-${c.serial}">${_pmStatusPill(c)}</div>
+      <select style="margin-top:4px;font-size:11px;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;width:100%;background:#fff"
+        onchange="setPmStatus('${c.serial}',this.value);this.blur()">
+        ${Object.keys(PM_STATUS_CFG).map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </td>
   </tr>`;
 }
 
@@ -1702,6 +1758,19 @@ function openDetail(serial){
       <div class="info-item"><label>Source File</label><span>CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</span></div>
       <div class="info-item"><label>Report Date</label><span>2025-06-20</span></div>
       <div class="info-item"><label>Ingested</label><span>2025-07-14 08:42 UTC</span></div>
+    </div>
+    <hr class="divider">
+    <div class="section-title">PM Workflow Status</div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:4px 0 12px">
+      <div id="detailPmPill">${_pmStatusPill(c)}</div>
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Change status</label>
+        <select id="detailPmStatus"
+          style="padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"
+          onchange="setPmStatus('${c.serial}',this.value)">
+          ${Object.keys(PM_STATUS_CFG).map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <hr class="divider">
     <div style="display:flex;gap:10px;margin-top:8px">

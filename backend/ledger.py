@@ -82,6 +82,18 @@ def record_renewal(serial: str, renewal_data: dict) -> None:
     _save()
 
 
+def record_pm_status(serial: str, pm_status: str) -> None:
+    """Called when a PM manually sets a workflow status on a contractor."""
+    STATUS_PCT = {"Pending": 0, "In Progress": 50, "Renewed": 100, "Offboarded": 100}
+    entry = _ledger.get(serial, {"serial": serial})
+    entry["pm_status"]     = pm_status
+    entry["pm_status_pct"] = STATUS_PCT.get(pm_status, 0)
+    entry["updated_at"]    = datetime.utcnow().isoformat() + "Z"
+    entry["updated_by"]    = "PM_STATUS_SET"
+    _ledger[serial] = entry
+    _save()
+
+
 def apply_to_contractors(contractors: list[dict]) -> list[dict]:
     """
     Merge ledger state into a freshly parsed contractor list.
@@ -102,6 +114,9 @@ def apply_to_contractors(contractors: list[dict]) -> list[dict]:
                 c["offboard"] = entry["offboard"]
             if entry.get("renewal"):
                 c["renewal"] = entry["renewal"]
+            if entry.get("pm_status"):
+                c["pmStatus"]    = entry["pm_status"]
+                c["pmStatusPct"] = entry.get("pm_status_pct", 0)
             # Store full ledger data on the record for detail panel display
             c["_ledger"] = entry
         else:
