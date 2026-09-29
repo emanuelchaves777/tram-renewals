@@ -175,6 +175,7 @@
   .sd-yellow{background:#d97706}
   .sd-blue{background:#2563eb}
   /* Identity / Who-are-you modal */
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;pointer-events:none}
   .id-modal-overlay.open{display:flex;pointer-events:all}
   .id-modal{background:#fff;border-radius:12px;width:480px;max-width:96vw;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.28)}
@@ -2169,9 +2170,10 @@ function _rnwRenderStep3() {
     ${_rnwContractorBar()}
 
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#15803d">
-      <b>✓ Ready to submit.</b> Click <b>Submit Renewal</b> below — the app will automatically:<br>
+      <b>✓ Ready to submit.</b> Click <b>Submit Renewal</b> below — the app will:<br>
       <span style="display:inline-block;margin-top:4px">
-        1. Validate JRS &nbsp;·&nbsp; 2. Generate the Excel renewal file &nbsp;·&nbsp;
+        1. Send all data to Power Automate → PAD submits TRAM automatically &nbsp;·&nbsp;
+        2. Generate the Excel renewal file &nbsp;·&nbsp;
         3. Send email to <b>${sectorEmail}</b> &nbsp;·&nbsp; 4. Record audit trail
       </span>
     </div>
@@ -2206,9 +2208,9 @@ function _rnwRenderStep3() {
     <div id="renewalSubmitStatus" style="margin-top:8px"></div>`;
 
   document.getElementById('renewalModalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="_rnwBack(3)">← Back</button>
+    <button class="btn btn-secondary" id="btnRnwBack3" onclick="_rnwBack(3)">← Back</button>
     <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()">
-      ✅ Submit Renewal — Excel + Email →
+      🤖 Submit — Power Automate will handle TRAM →
     </button>`;
 }
 
@@ -2219,48 +2221,50 @@ function _rnwBack(fromStep) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SUBMIT — called from Step 3
+// SUBMIT — creates a TRAM job, Power Automate Desktop handles TRAM
 // ══════════════════════════════════════════════════════════════════════════════
 async function submitRenewal() {
   const c = renewalData.c;
   const f = renewalData.form;
-  const tramIdNew = renewalData.tramIdNew;
 
-  const btn = document.getElementById('btnSubmitRenewal');
+  const btn      = document.getElementById('btnSubmitRenewal');
+  const backBtn  = document.getElementById('btnRnwBack3');
   const statusEl = document.getElementById('renewalSubmitStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ Submitting…';
-  statusEl.innerHTML = `<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">
-    ⏳ <b>Processing…</b> Validating JRS · Generating Excel · Sending email…</div>`;
+  if (backBtn) backBtn.disabled = true;
+  btn.textContent = '⏳ Sending to Power Automate…';
 
   // Prototype mode (no API_BASE)
   if (!API_BASE) {
-    await new Promise(r => setTimeout(r, 1400));
-    const xlsxName = `${c.name.replace(/\W/g,'_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`;
+    await new Promise(r => setTimeout(r, 1200));
+    _rnwShowPolling('demo-job-id');
+    await new Promise(r => setTimeout(r, 2500));
     showRenewalSuccess({
-      excel_filename: xlsxName, final_jrs: f.jrs, tram_id_used: tramIdNew,
-      email: { to: getSectorEmail(c.sector), subject: `${tramIdNew} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} RENEWAL` },
-      email_error: null, submitted_at: new Date().toISOString(), mailto_fallback: null, _prototype: true,
+      excel_filename: `${c.name.replace(/\W/g,'_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`,
+      final_jrs: f.jrs, tram_id_used: 'NA' + Date.now(),
+      email: { to: getSectorEmail(c.sector), subject: 'DEMO RENEWAL' },
+      email_error: null, submitted_at: new Date().toISOString(),
+      mailto_fallback: null, _prototype: true,
     });
     return;
   }
 
   try {
-    const resp = await apiFetch('/api/submit-renewal', {
+    // Create the job — backend queues it for Power Automate Desktop
+    const job = await apiFetch('/api/tram-jobs', {
       method: 'POST',
       body: JSON.stringify({
         contractor_id:    c.serial,
-        new_end_date:     f.newEnd,
         new_start_date:   f.newStart,
+        new_end_date:     f.newEnd,
+        rate_cap:         f.rateCap,
+        bill_rate:        f.billRate,
+        gp_pct:           f.gp,
         confirmed_jrs:    f.jrs,
         confirmed_band:   f.band,
         work_location:    f.location,
         manager_email:    f.mgrEmail,
         supplier_contact: f.supplierContact,
-        rate_cap:         f.rateCap,
-        bill_rate:        f.billRate,
-        gp_pct:           f.gp,
-        contract_type:    f.contractType,
         niche_skills:     f.skills,
         scope_of_work:    f.scope,
         us_citizenship:   f.usCitizen,
@@ -2270,18 +2274,94 @@ async function submitRenewal() {
         laptop_os:        f.laptopOs,
         laptop_address:   f.laptopAddr,
         contractor_phone: f.phone,
+        contract_type:    f.contractType,
         biz_just_1:       f.bj1,
         biz_just_2:       f.bj2,
         biz_just_3:       f.bj3,
         biz_just_4:       f.bj4,
-        tram_id_new:      tramIdNew,
       })
     });
-    showRenewalSuccess(resp);
+    // Switch to polling UI — PAD is now handling TRAM
+    _rnwShowPolling(job.job_id);
+    _rnwPoll(job.job_id);
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = '✅ Submit Renewal — Excel + Email →';
-    statusEl.innerHTML = `<div class="dq-warn">❌ Submission failed: ${e.message}</div>`;
+    if (backBtn) backBtn.disabled = false;
+    btn.textContent = '🤖 Submit — Power Automate will handle TRAM →';
+    statusEl.innerHTML = `<div class="dq-warn">❌ Failed to queue job: ${e.message}</div>`;
+  }
+}
+
+// Show the "Power Automate is working" waiting screen
+function _rnwShowPolling(jobId) {
+  document.getElementById('renewalModalBody').innerHTML = `
+    ${_rnwStepperHTML(3)}
+    ${_rnwContractorBar()}
+    <div style="text-align:center;padding:32px 0 16px">
+      <div style="font-size:48px;margin-bottom:16px;animation:spin 2s linear infinite;display:inline-block">⚙️</div>
+      <div style="font-size:18px;font-weight:700;color:#1d4ed8;margin-bottom:8px">Power Automate is filling TRAM…</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:24px">
+        The desktop flow is navigating TRAM, filling all fields, and submitting.<br>
+        This usually takes <b>1–2 minutes</b>. Do not close this window.
+      </div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:13px;color:#1e40af;max-width:420px;margin:0 auto;text-align:left">
+        <div style="font-weight:700;margin-bottom:8px">What's happening right now:</div>
+        <div id="padStep1" style="padding:3px 0">⏳ Opening TRAM in Chrome…</div>
+        <div id="padStep2" style="padding:3px 0;color:#9ca3af">◦ Importing from prior request ${renewalData.c.tramId||''}</div>
+        <div id="padStep3" style="padding:3px 0;color:#9ca3af">◦ Filling dates, rates, JRS, justification</div>
+        <div id="padStep4" style="padding:3px 0;color:#9ca3af">◦ Submitting &amp; reading new TRAM ID</div>
+        <div id="padStep5" style="padding:3px 0;color:#9ca3af">◦ Generating Excel + sending email</div>
+      </div>
+      <div style="margin-top:20px;font-size:12px;color:#9ca3af">Job ID: <code>${jobId}</code></div>
+    </div>`;
+  document.getElementById('renewalModalFooter').innerHTML = `
+    <button class="btn btn-secondary" disabled>← Back</button>
+    <button class="btn btn-primary" disabled>⏳ Waiting for Power Automate…</button>`;
+}
+
+// Animate the step indicators while polling
+let _padAnimStep = 0;
+function _rnwAnimatePadSteps() {
+  const steps = ['padStep1','padStep2','padStep3','padStep4'];
+  _padAnimStep = (_padAnimStep + 1) % (steps.length + 1);
+  steps.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (i < _padAnimStep) el.style.color = '#1d4ed8';
+    else el.style.color = '#9ca3af';
+  });
+}
+
+// Poll the backend every 4s until the job is done or failed
+async function _rnwPoll(jobId, attempt = 0) {
+  if (attempt > 75) {  // 5 minute timeout
+    document.getElementById('renewalModalBody').innerHTML += `
+      <div class="dq-warn" style="margin-top:16px">⏱ Timed out waiting for Power Automate.
+      Check that the desktop flow is running, then try again.</div>`;
+    return;
+  }
+  _rnwAnimatePadSteps();
+  try {
+    const job = await apiFetch(`/api/tram-jobs/${jobId}`);
+    if (job.status === 'done') {
+      showRenewalSuccess(job);
+      return;
+    }
+    if (job.status === 'failed') {
+      document.getElementById('renewalModalBody').innerHTML += `
+        <div class="dq-warn" style="margin-top:16px">
+          ❌ <b>Power Automate reported an error:</b><br>${job.error||'Unknown error'}<br><br>
+          You can <a href="https://tram.ibm.com" target="_blank">open TRAM manually</a>, submit,
+          and then paste the new TRAM ID to complete this renewal manually.
+        </div>`;
+      document.getElementById('renewalModalFooter').innerHTML = `
+        <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
+      return;
+    }
+    // Still pending/claimed — keep polling
+    setTimeout(() => _rnwPoll(jobId, attempt + 1), 4000);
+  } catch (e) {
+    setTimeout(() => _rnwPoll(jobId, attempt + 1), 4000);
   }
 }
 

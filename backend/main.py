@@ -39,6 +39,7 @@ import jrs_validation
 import excel_generation
 import email_sender
 import ledger as ledger_module
+import tram_jobs as tram_jobs_module
 try:
     import seed_data as _seed
     _HAS_SEED = True
@@ -115,9 +116,11 @@ def _boot_load() -> None:
     import json
     global _ingestion_result, _template_bytes
 
-    # Always initialise ledger first so it's ready before report applies it
+    # Always initialise ledger + job queue first
     ledger_module.init(DATA_DIR)
     print(f"[boot] Ledger loaded: {len(ledger_module.get_all())} entries")
+    tram_jobs_module.init(DATA_DIR)
+    print(f"[boot] TRAM job queue loaded: {len(tram_jobs_module.list_jobs())} jobs")
 
     # Report
     meta_path = _REPORT_PATH.parent / "report_meta.json"
@@ -918,3 +921,245 @@ def _build_offboard_mailto(contractor, offboard_data):
     ]
     body = quote("\n".join(lines))
     return f"mailto:{to}?subject={subject}&body={body}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRAM JOB QUEUE — Power Automate Desktop integration
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Flow:
+#   1. PM fills renewal form in app → POST /api/tram-jobs creates a job
+#   2. Power Automate Desktop polls GET /api/tram-jobs/next (every 10s)
+#   3. PAD fills TRAM, reads new TRAM ID from confirmation page
+#   4. PAD calls POST /api/tram-jobs/{job_id}/complete { tram_id_new: "..." }
+#   5. Backend generates Excel + sends email automatically
+#   6. Frontend polls GET /api/tram-jobs/{job_id} until status = done/failed
+#
+# Power Automate Desktop authenticates via the shared UPLOAD_PIN so only
+# your PAD flow can pick up and complete jobs.
+# ──────────────────────────────────────────────────────────────────────────────
+
+class CreateTramJobRequest(BaseModel):
+    """All the data Power Automate needs to fill the TRAM form."""
+    contractor_id:  str
+    new_start_date: str
+    new_end_date:   str
+    rate_cap:       str
+    bill_rate:      str
+    gp_pct:         str
+    confirmed_jrs:  str
+    confirmed_band: str
+    biz_just_1:     str
+    biz_just_2:     str = ""
+    biz_just_3:     str = ""
+    # All remaining renewal fields — passed through to Excel/email after PAD completes
+    work_location:    str = ""
+    niche_skills:     str = ""
+    scope_of_work:    str = ""
+    manager_email:    str = ""
+    supplier_contact: str = ""
+    us_citizenship:   str = ""
+    security_access:  str = ""
+    pen_testing:      str = ""
+    requires_laptop:  str = "No"
+    laptop_os:        str = ""
+    laptop_address:   str = ""
+    contractor_phone: str = ""
+    contract_type:    str = ""
+    biz_just_4:       str = ""
+
+
+class CompleteJobRequest(BaseModel):
+    tram_id_new: str
+    pin: str = ""
+
+
+class FailJobRequest(BaseModel):
+    error: str
+    pin: str = ""
+
+
+@app.post("/api/tram-jobs")
+def create_tram_job(req: CreateTramJobRequest):
+    """
+    PM submits renewal form → creates a TRAM automation job.
+    Returns job_id immediately. Frontend polls until done.
+    """
+    contractor = _resolve_contractor(req.contractor_id)
+    renewal_fields = req.dict()
+    job = tram_jobs_module.create_job(contractor, renewal_fields)
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "contractor_name": job["contractor_name"],
+        "old_tram_id": job["old_tram_id"],
+    }
+
+
+@app.get("/api/tram-jobs/next")
+def get_next_tram_job(pin: str = ""):
+    """
+    Power Automate Desktop calls this to pick up the next pending job.
+    PIN-protected — only PAD (with the UPLOAD_PIN) can call this.
+    Returns 204 if queue is empty.
+    """
+    _verify_pin(pin)
+    job = tram_jobs_module.get_next_pending()
+    if not job:
+        from fastapi.responses import Response as _Resp
+        return _Resp(status_code=204)
+    # Claim it atomically to prevent double-pickup
+    tram_jobs_module.claim_job(job["job_id"])
+    return job
+
+
+@app.get("/api/tram-jobs/{job_id}")
+def get_tram_job(job_id: str):
+    """Frontend polls this to check job status."""
+    job = tram_jobs_module.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    # Return status + tram_id_new (if done) — enough for frontend
+    return {
+        "job_id":       job["job_id"],
+        "status":       job["status"],
+        "tram_id_new":  job.get("tram_id_new"),
+        "error":        job.get("error"),
+        "updated_at":   job.get("updated_at"),
+    }
+
+
+@app.post("/api/tram-jobs/{job_id}/complete")
+def complete_tram_job(job_id: str, req: CompleteJobRequest):
+    """
+    Power Automate Desktop calls this after successfully submitting in TRAM.
+    Triggers Excel generation + email send automatically.
+    """
+    _verify_pin(req.pin)
+    job = tram_jobs_module.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if job["status"] not in ("claimed", "pending"):
+        raise HTTPException(status_code=409,
+                            detail=f"Job already in status: {job['status']}")
+
+    tram_jobs_module.complete_job(job_id, req.tram_id_new)
+
+    # ── Trigger the same renewal pipeline as submit-renewal ─────────────────
+    try:
+        contractor = _resolve_contractor(job["contractor_id"])
+        f = job   # job dict has all the same fields as renewal_fields
+
+        final_jrs  = f.get("confirmed_jrs") or contractor.get("jrsTram", "")
+        jrs_result = jrs_validation.validate_jrs(final_jrs)
+
+        biz_parts = [p for p in [
+            f.get("biz_just_1",""), f.get("biz_just_2",""),
+            f.get("biz_just_3",""), f.get("biz_just_4",""),
+        ] if str(p).strip()]
+        biz_just = "\n".join(f"{i+1}. {p}" for i, p in enumerate(biz_parts))
+
+        sector_key = (contractor.get("sector") or contractor.get("marketSector") or "").strip().lower()
+        fulfilment_email = SECTOR_EMAIL_MAP.get(sector_key, SECTOR_EMAIL_DEFAULT)
+
+        pm_checklist = {
+            "manager_email":    f.get("manager_email") or contractor.get("pmIntranetId",""),
+            "fulfilment_email": fulfilment_email,
+            "supplier_contact": f.get("supplier_contact",""),
+            "start_date":       f.get("new_start_date",""),
+            "end_date":         f.get("new_end_date",""),
+            "tram_id_new":      req.tram_id_new,
+            "niche_skills":     f.get("niche_skills",""),
+            "scope_of_work":    f.get("scope_of_work",""),
+            "us_citizenship":   f.get("us_citizenship",""),
+            "security_access":  f.get("security_access",""),
+            "pen_testing":      f.get("pen_testing",""),
+            "requires_laptop":  f.get("requires_laptop","No"),
+            "laptop_os":        f.get("laptop_os",""),
+            "laptop_address":   f.get("laptop_address",""),
+            "contractor_phone": f.get("contractor_phone",""),
+            "biz_just_1":       f.get("biz_just_1",""),
+            "biz_just_2":       f.get("biz_just_2",""),
+            "biz_just_3":       f.get("biz_just_3",""),
+            "biz_just_4":       f.get("biz_just_4",""),
+            "comments":         biz_just,
+        }
+
+        contractor_for_excel = {
+            **contractor,
+            "jrsTram":      final_jrs,
+            "band":         f.get("confirmed_band", contractor.get("band","")),
+            "workLocation": f.get("work_location", contractor.get("workLocation","")),
+            "endDate":      f.get("new_end_date", contractor.get("endDate","")),
+        }
+
+        if not _template_bytes:
+            raise ValueError("Excel template not uploaded.")
+
+        excel_result = excel_generation.generate_renewal_excel(
+            contractor=contractor_for_excel,
+            pm_checklist=pm_checklist,
+            template_bytes=_template_bytes,
+        )
+
+        # Email
+        tram_id_for_subject = req.tram_id_new or contractor.get("tramId","–")
+        email_result = None
+        email_error  = None
+        if email_sender.is_configured():
+            try:
+                email_result = email_sender.send_renewal_email(
+                    contractor=contractor_for_excel,
+                    tram_id=tram_id_for_subject,
+                    excel_filename=excel_result["filename"],
+                    excel_bytes=excel_result["file_bytes"],
+                    final_jrs=final_jrs,
+                )
+            except Exception as exc:
+                email_error = str(exc)
+        else:
+            email_error = "Graph not configured"
+
+        mailto_fallback = _build_mailto(contractor, tram_id_for_subject, excel_result["filename"])
+
+        # Write renewal to ledger
+        ledger_module.record_renewal(job["contractor_id"], {
+            "renewal": "Submitted",
+            "tram_id_new": req.tram_id_new,
+        })
+
+        return {
+            "job_id":          job_id,
+            "status":          "done",
+            "tram_id_used":    req.tram_id_new,
+            "excel_filename":  excel_result["filename"],
+            "excel_sha256":    excel_result["sha256"],
+            "fields_written":  excel_result["fields_written"],
+            "final_jrs":       final_jrs,
+            "jrs_result":      jrs_result,
+            "email":           email_result,
+            "email_error":     email_error,
+            "mailto_fallback": mailto_fallback,
+            "submitted_at":    datetime.utcnow().isoformat() + "Z",
+        }
+
+    except Exception as exc:
+        tram_jobs_module.fail_job(job_id, str(exc))
+        raise HTTPException(status_code=500, detail=f"Post-TRAM processing failed: {exc}")
+
+
+@app.post("/api/tram-jobs/{job_id}/fail")
+def fail_tram_job(job_id: str, req: FailJobRequest):
+    """Power Automate Desktop calls this if TRAM automation fails."""
+    _verify_pin(req.pin)
+    job = tram_jobs_module.fail_job(job_id, req.error)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"job_id": job_id, "status": "failed", "error": req.error}
+
+
+@app.get("/api/tram-jobs")
+def list_tram_jobs(pin: str = ""):
+    """Admin: list recent TRAM jobs. PIN-protected."""
+    _verify_pin(pin)
+    return {"jobs": tram_jobs_module.list_jobs(50)}
