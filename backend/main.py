@@ -206,6 +206,8 @@ class SubmitRenewalRequest(BaseModel):
     gp_pct:           str
     contract_type:    str
     niche_skills:     str
+    scope_of_work:    str = ""
+    manager_email:    str = ""
     biz_just_1:       str
     biz_just_2:       str = ""
     biz_just_3:       str = ""
@@ -570,11 +572,12 @@ def submit_renewal(req: SubmitRenewalRequest):
     biz_just = "\n".join(f"{i+1}. {p}" for i, p in enumerate(biz_just_parts))
 
     pm_checklist = {
-        "manager_email":    contractor.get("pmIntranetId", ""),
+        "manager_email":    req.manager_email or contractor.get("pmIntranetId", ""),
         "start_date":       req.new_start_date,
         "end_date":         req.new_end_date,
         "tram_id_new":      req.tram_id_new or contractor.get("tramId", ""),
         "niche_skills":     req.niche_skills,
+        "scope_of_work":    req.scope_of_work,
         "biz_just_1":       req.biz_just_1,
         "biz_just_2":       req.biz_just_2,
         "biz_just_3":       req.biz_just_3,
