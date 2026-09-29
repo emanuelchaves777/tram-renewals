@@ -1303,12 +1303,14 @@ let _currentPage = 1;
 let _lastFilteredData = [];
 
 // PM Status helpers
+// "Offboarded" is read-only — set automatically when offboard is submitted, never manually
 const PM_STATUS_CFG = {
-  'Pending':     { color:'#6b7280', bg:'#f3f4f6', pct:0   },
-  'In Progress': { color:'#d97706', bg:'#fef3c7', pct:50  },
-  'Renewed':     { color:'#16a34a', bg:'#dcfce7', pct:100 },
-  'Offboarded':  { color:'#0891b2', bg:'#e0f2fe', pct:100 },
+  'Pending':     { color:'#6b7280', bg:'#f3f4f6', pct:0,   manual:true  },
+  'In Progress': { color:'#d97706', bg:'#fef3c7', pct:50,  manual:true  },
+  'Renewed':     { color:'#16a34a', bg:'#dcfce7', pct:100, manual:true  },
+  'Offboarded':  { color:'#0891b2', bg:'#e0f2fe', pct:100, manual:false },
 };
+const PM_STATUS_MANUAL = Object.entries(PM_STATUS_CFG).filter(([,v])=>v.manual).map(([k])=>k);
 
 function _pmStatusPill(c) {
   const st  = c.pmStatus || 'Pending';
@@ -1376,10 +1378,12 @@ function _buildRow(c) {
     <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
     <td onclick="event.stopPropagation()" style="min-width:110px">
       <div id="pmPill-${c.serial}">${_pmStatusPill(c)}</div>
-      <select style="margin-top:4px;font-size:11px;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;width:100%;background:#fff"
-        onchange="setPmStatus('${c.serial}',this.value);this.blur()">
-        ${Object.keys(PM_STATUS_CFG).map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
-      </select>
+      ${c.pmStatus==='Offboarded'
+        ? `<div style="font-size:10px;color:#0891b2;margin-top:4px;text-align:center">🔒 Auto-set</div>`
+        : `<select style="margin-top:4px;font-size:11px;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;width:100%;background:#fff"
+            onchange="setPmStatus('${c.serial}',this.value);this.blur()">
+            ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
+          </select>`}
     </td>
   </tr>`;
 }
@@ -1764,12 +1768,14 @@ function openDetail(serial){
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:4px 0 12px">
       <div id="detailPmPill">${_pmStatusPill(c)}</div>
       <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Change status</label>
-        <select id="detailPmStatus"
-          style="padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"
-          onchange="setPmStatus('${c.serial}',this.value)">
-          ${Object.keys(PM_STATUS_CFG).map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
-        </select>
+        ${c.pmStatus==='Offboarded'
+          ? `<div style="font-size:12px;color:#0891b2;padding:6px 0">🔒 Offboarded — set automatically when offboarding was submitted</div>`
+          : `<label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Change status</label>
+             <select id="detailPmStatus"
+               style="padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"
+               onchange="setPmStatus('${c.serial}',this.value)">
+               ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
+             </select>`}
       </div>
     </div>
     <hr class="divider">
@@ -2416,6 +2422,10 @@ function _offboardConfirmSent(resp){
 
 function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   c.offboard='Submitted';
+  // Auto-set PM status to Offboarded — cannot be changed manually after this
+  c.pmStatus = 'Offboarded';
+  c.pmStatusPct = 100;
+  setPmStatus(c.serial, 'Offboarded');
   const icon  = autoSent ? '✅' : manualSent ? '✅' : '❌';
   const color = (autoSent||manualSent) ? '#15803d' : '#b91c1c';
   const title = autoSent ? 'Offboarding Successfully Submitted'
