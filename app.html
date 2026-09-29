@@ -163,8 +163,8 @@
   .sd-yellow{background:#d97706}
   .sd-blue{background:#2563eb}
   /* Identity / Who-are-you modal */
-  .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center}
-  .id-modal-overlay.open{display:flex}
+  .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;pointer-events:none}
+  .id-modal-overlay.open{display:flex;pointer-events:all}
   .id-modal{background:#fff;border-radius:12px;width:480px;max-width:96vw;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.28)}
   .id-modal h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#1f2937}
   .id-modal p{font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5}
@@ -185,9 +185,11 @@
 <div class="id-modal-overlay" id="identityModal">
   <div class="id-modal">
     <h2>👤 Who are you?</h2>
-    <p>Enter your IBM Intranet ID (e.g. <code>jsmith@us.ibm.com</code>) to filter the dashboard to <b>your contractors only</b>. You can also filter by account/client name.<br><br>Your identity is saved in this browser and never sent to any server.</p>
+    <p>Enter your IBM Intranet ID to filter the dashboard to <b>your contractors only</b>. You can also filter by account/client name.<br><br>Your identity is saved in this browser and never sent to any server.</p>
     <label>Your IBM Intranet ID (BP Manager Intranet ID)</label>
-    <input id="id-intranetId" type="email" placeholder="jsmith@us.ibm.com" autocomplete="email">
+    <input id="id-intranetId" type="email" placeholder="jsmith@us.ibm.com" autocomplete="email"
+           oninput="clearIdentityError()" onkeydown="if(event.key==='Enter') saveIdentity()">
+    <div id="id-intranetId-error" style="display:none;color:#dc2626;font-size:12px;font-weight:600;margin-top:-10px;margin-bottom:10px"></div>
     <div class="id-hint">This must match the <em>BP Manager Intranet ID</em> field (column CL) in the CMO report.</div>
     <label>Account / Client (optional)</label>
     <input id="id-client" type="text" placeholder="e.g. AT&T INC">
@@ -764,24 +766,40 @@ async function confirmAdminPin() {
   }
 }
 
+function clearIdentityError() {
+  const el = document.getElementById('id-intranetId-error');
+  if (el) el.style.display = 'none';
+  document.getElementById('id-intranetId').style.borderColor = '';
+}
+
+function _showIdentityError(msg) {
+  const inp = document.getElementById('id-intranetId');
+  const err = document.getElementById('id-intranetId-error');
+  inp.style.borderColor = '#dc2626';
+  err.textContent = msg;
+  err.style.display = 'block';
+  inp.focus();
+}
+
 function saveIdentity() {
   const id     = (document.getElementById('id-intranetId').value || '').trim();
   const client = (document.getElementById('id-client').value     || '').trim();
+  // Must have a value
   if (!id) {
-    document.getElementById('id-intranetId').style.borderColor = '#dc2626';
-    document.getElementById('id-intranetId').focus();
+    _showIdentityError('An IBM Intranet ID is required to continue.');
     return;
   }
-  document.getElementById('id-intranetId').style.borderColor = '';
+  // Must look like an email address
+  if (!id.includes('@') || !id.includes('.')) {
+    _showIdentityError('Enter a valid email address (e.g. jsmith@us.ibm.com).');
+    return;
+  }
+  clearIdentityError();
   _saveIdentityStore(id, client, false);
   document.getElementById('identityModal').classList.remove('open');
   _updateHeaderBadge();
-  // If live data is already loaded re-filter immediately; else trigger a full reload
-  if (_liveRegistry.length && _liveRegistry !== CONTRACTORS) {
-    _applyIdentityToView();
-  } else {
-    loadData();
-  }
+  // Trigger a fresh server-filtered load (always, since the PM ID determines what comes back)
+  loadData();
 }
 
 function _applyIdentityToView() {
@@ -844,12 +862,12 @@ function _identityFilter(data) {
 
 function initIdentity() {
   _loadIdentity();
-  // Always update the badge — modal is now optional, not blocking
   _updateHeaderBadge();
-  // If no identity saved yet, show a soft prompt in the badge area but DON'T block data load
+  // No identity saved → open modal and block. loadData() will only fire after
+  // the user saves a valid email or confirms the admin PIN.
   if (!_identity) {
-    const badge = document.getElementById('headerBadge');
-    if (badge) badge.innerHTML = '👤 <button class="id-active-badge" onclick="openIdentityModal()" title="Set your ID to filter to your contractors">Set my ID to filter view</button>';
+    document.getElementById('identityModal').classList.add('open');
+    setTimeout(() => document.getElementById('id-intranetId').focus(), 50);
   }
 }
 
@@ -2358,8 +2376,9 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
 }
 
 // ── INIT ──────────────────────────────────────
-initIdentity();  // show identity modal on first visit; restore on return
-loadData();      // load real API data; identity filter applied on render
+initIdentity();  // opens identity modal if no ID saved; loadData() fires only after identity confirmed
+// loadData() is called by saveIdentity() or confirmAdminPin() — not here unconditionally
+if (_identity) loadData();  // returning visitor with saved identity — load immediately
 
 // ── Dual scrollbar sync ────────────────────────────────────────────────────
 // The top scrollbar div mirrors the bottom one so the user can scroll
