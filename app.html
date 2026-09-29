@@ -674,17 +674,6 @@ function normaliseApiRecord(c) {
   return c;
 }
 
-async function loadContractors() {
-  try {
-    const data = await apiFetch('/api/contractors');
-    const all  = [...data.contractors, ...data.dq_exceptions].map(normaliseApiRecord);
-    _liveRegistry = all;
-    updateFreshnessBar(data.meta);
-    renderTable(all);
-    updateBucketCounts(all);
-  } catch(_) {}
-}
-
 // ── IDENTITY / FILTER-FIRST ────────────────────────────────────────────
 // Stores: { intranetId, client, viewAll }
 let _identity = null;
@@ -2356,41 +2345,7 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   postAudit('OFFBOARDING_SUBMITTED',c.serial,`Email: ${autoSent?'auto-sent':manualSent?'outlook':'failed'}`,autoSent||manualSent?'success':'error');
 }
 
-// ── TAB CONTENT ───────────────────────────────
-function renderRenewalTab(){
-  document.getElementById('renewal-content').innerHTML=`
-    <h2 style="font-size:18px;margin-bottom:8px">Renewal Workflow</h2>
-    <p style="color:#6b7280;font-size:13px;margin-bottom:16px">Select a contractor from the <b>Dashboard</b> and click <b>Renewal</b>, or click a scenario card below to demo a specific JRS validation outcome.</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-      ${CONTRACTORS.slice(0,6).map(c=>`
-        <div class="dq-card" style="cursor:pointer" onclick="openRenewalModal('${c.id}')">
-          <h3 style="font-size:14px">${c.name}</h3>
-          <p style="margin-bottom:4px">${c.client} · ${c.project}</p>
-          <p style="margin-bottom:4px">${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram}</span></p>
-          <p style="margin-bottom:4px">End: ${c.endDate||'–'} · ${bucketBadge(c.bucket)}</p>
-          <p style="font-size:11px;color:#6b7280;margin-top:4px">Scenario: <b>${c.scenario.replace('_',' ')}</b></p>
-        </div>`).join('')}
-    </div>`;
-}
-function renderOffboardingTab(){
-  document.getElementById('offboarding-content').innerHTML=`
-    <h2 style="font-size:18px;margin-bottom:8px">Offboarding Workflow</h2>
-    <p style="color:#6b7280;font-size:13px;margin-bottom:16px">Select a contractor from the <b>Dashboard</b> or click a card below. The card with "Offboarding In Progress" demonstrates duplicate detection.</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-      ${CONTRACTORS.slice(0,5).map(c=>`
-        <div class="dq-card" style="cursor:pointer" onclick="openOffboardModal('${c.id}')">
-          <h3 style="font-size:14px">${c.name}</h3>
-          <p style="margin-bottom:4px">${c.client} · ${c.project}</p>
-          <p style="margin-bottom:4px">End: ${c.endDate||'–'} · ${bucketBadge(c.bucket)}</p>
-          ${c.offboard==='In Progress'?'<p><span class="badge badge-orange">⚠ In Progress — Duplicate test</span></p>':''}
-          ${!c.tramId?'<p><span class="badge badge-red">⚠ Missing TRAM ID</span></p>':''}
-        </div>`).join('')}
-    </div>`;
-}
-
 // ── INIT ──────────────────────────────────────
-renderRenewalTab();
-renderOffboardingTab();
 initIdentity();  // show identity modal on first visit; restore on return
 loadData();      // load real API data; identity filter applied on render
 
