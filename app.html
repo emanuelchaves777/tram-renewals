@@ -331,7 +331,7 @@
             <th onclick="sortTable(6)">Vendor</th>
             <th onclick="sortTable(7)">Band</th>
             <th onclick="sortTable(8)">JRS (TRAM)</th>
-            <th onclick="sortTable(9)">TRAM Request ID</th>
+            <th onclick="sortTable(9)">Old TRAM ID</th>
             <th>PM Status</th>
           </tr>
         </thead>
@@ -442,8 +442,8 @@
   </div>
 
   <div class="dq-card">
-    <h3><span class="tag tag-warn">WARNING</span> Missing TRAM Request ID</h3>
-    <p>Contractor <b>P. Okafor</b> (TalentID: SYN-0088) has no value in <code>TRAM Request ID</code>. Dashboard display is not affected, but the renewal workflow cannot proceed until a TRAM Request ID is available.</p>
+    <h3><span class="tag tag-warn">WARNING</span> Missing Old TRAM ID</h3>
+    <p>Contractor <b>P. Okafor</b> (TalentID: SYN-0088) has no value in <code>Old TRAM ID</code>. Dashboard display is not affected, but the renewal workflow cannot proceed until a Old TRAM ID is available.</p>
     <p style="font-size:12px;color:#9ca3af">Row 103 · Source: CONTRACTOR_MGMT_REPORT_2025-06-20.xlsx</p>
   </div>
 
@@ -1070,7 +1070,7 @@ function offboardBadge(s){if(!s||s==='–') return '<span class="badge badge-gra
 
 // Field mapping aligned to confirmed report headers:
 // Geography, Market/GMT, Country, HR LOB, TalentID/Serial, Contractor Full Name,
-// Client Name-PO, Project Name-PO, Vendor, PO Number, TRAM Request ID,
+// Client Name-PO, Project Name-PO, Vendor, PO Number, Old TRAM ID,
 // TRAM Requester (Submitter), Contractor Assignee, Project Contact (TRAM),
 // PM Notes ID, PM Intranet ID, Sector, TalentID/CNUM, Actual Band,
 // Skill Description, Work Location, Contractor Notes ID, Contractor Intranet Address,
@@ -1751,7 +1751,7 @@ function openDetail(serial){
 
     <div class="section-title">TRAM &amp; Purchasing</div>
     <div class="info-grid">
-      <div class="info-item"><label>TRAM Request ID</label><span>${c.tramId||'<span class="badge badge-red">Missing</span>'}</span></div>
+      <div class="info-item"><label>Old TRAM ID</label><span>${c.tramId||'<span class="badge badge-red">Missing</span>'}</span></div>
       <div class="info-item"><label>TRAM Requester (Submitter)</label><span>${c.tramRequester}</span></div>
       <div class="info-item"><label>Renewal Status</label><span>${renewalBadge(c.renewal)}</span></div>
       <div class="info-item"><label>Offboard Status</label><span>${offboardBadge(c.offboard)}</span></div>
@@ -1796,7 +1796,7 @@ function openRenewalModal(id){
     return;
   }
   if(!c.tramId){
-    alert('⚠ Missing TRAM Request ID\n\nThis contractor has no TRAM Request ID on record.\nPlease update the source report before proceeding.');
+    alert('⚠ Missing Old TRAM ID\n\nThis contractor has no Old TRAM ID on record.\nPlease update the source report before proceeding.');
     return;
   }
   renewalData={c};
@@ -1981,11 +1981,11 @@ function renderRenewalForm(){
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">TRAM — Update &amp; Capture New ID</div>
       <div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:10px">
         <b>Required:</b> Open TRAM, import from <code>${c.tramId}</code>, update the dates and financial fields, submit.
-        Then paste the new TRAM Request ID below. The application will include it in the Excel and email automatically.
+        Then paste the new TRAM ID below. The application will include it in the Excel and email automatically.
         <br><a href="https://tram.ibm.com" target="_blank" class="btn btn-warn btn-sm" style="text-decoration:none;margin-top:8px;display:inline-flex">🔗 Open TRAM</a>
       </div>
       <div class="form-group" style="margin-bottom:0">
-        <label>New TRAM Request ID <span style="color:#dc2626">*</span></label>
+        <label>New TRAM ID <span style="color:#dc2626">*</span></label>
         <input id="r_tramId" placeholder="e.g. NA202510048216S" style="font-family:monospace;font-size:14px">
       </div>
     </div>
@@ -2023,7 +2023,7 @@ async function submitRenewal(){
     ['r_jrs','JR/S'],['r_band','Band'],['r_skills','Niche Skills'],
     ['r_rateCap','Rate Cap'],['r_billRate','Bill Rate'],['r_gp','GP%'],
     ['r_contractType','Contract Type'],['r_bj1','Business Justification #1'],
-    ['r_tramId','New TRAM Request ID'],
+    ['r_tramId','New TRAM ID'],
   ];
   const missing=required.filter(([id])=>!get(id));
   if(missing.length){
@@ -2119,7 +2119,7 @@ function showRenewalSuccess(resp){
       <div style="font-size:13px;color:#6b7280">${now}</div>
     </div>
     <div class="confirm-row" style="margin-bottom:10px">
-      📋 <b>New TRAM Request ID:</b> <code style="font-size:15px;font-family:monospace">${resp.tram_id_used||'–'}</code>
+      📋 <b>New TRAM ID:</b> <code style="font-size:15px;font-family:monospace">${resp.tram_id_used||'–'}</code>
     </div>
     <div class="confirm-row" style="margin-bottom:10px">
       📄 <b>Excel file generated:</b> ${resp.excel_filename||'–'}
@@ -2253,7 +2253,7 @@ function renderOffboardForm(){
         <input value="${c.poNumber||'–'}" readonly style="background:#f9fafb">
       </div>
       <div class="form-group">
-        <label>TRAM Request ID</label>
+        <label>Old TRAM ID</label>
         <input value="${c.tramId||''}" readonly style="background:#f9fafb" ${!c.tramId?'style="border-color:#dc2626"':''}>
       </div>
       <div class="form-group">
