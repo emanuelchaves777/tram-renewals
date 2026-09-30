@@ -1957,7 +1957,7 @@ function _rnwRenderStep2() {
         </div>
         <div class="form-group" style="grid-column:span 2">
           <label>Hiring Manager Email (U.S. Manager) <span style="color:#dc2626">*</span></label>
-          <input id="r_mgrEmail" type="email" value="${c.contactEmail||c.pmIntranetId||''}" placeholder="manager@us.ibm.com">
+          <input id="r_mgrEmail" type="email" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="manager@us.ibm.com">
           <div style="font-size:11px;color:#6b7280;margin-top:3px">Excel col 1 — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
         </div>
         <div class="form-group" style="grid-column:span 2">
@@ -2526,7 +2526,7 @@ function renderOffboardForm(){
       </div>
       <div class="form-group">
         <label>Manager Email (PM) <span style="color:#dc2626">*</span></label>
-        <input id="ob_mgr" value="${c.pmIntranetId||''}" placeholder="PM email">
+        <input id="ob_mgr" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="PM email">
       </div>
       <div class="form-group">
         <label>PO Number</label>
@@ -2595,7 +2595,7 @@ function renderOffboardForm(){
         <tbody>
           <tr>
             <td style="border:1px solid #000;padding:8px">${c.sector||'–'}</td>
-            <td style="border:1px solid #000;padding:8px">${c.pmIntranetId||'–'}</td>
+            <td style="border:1px solid #000;padding:8px">${c.bpManagerIntranetId||c.pmIntranetId||'–'}</td>
             <td style="border:1px solid #000;padding:8px">${c.name||'–'}</td>
             <td style="border:1px solid #000;padding:8px">${c.poNumber||'–'}</td>
             <td style="border:1px solid #000;padding:8px">${c.serial||'–'}</td>
