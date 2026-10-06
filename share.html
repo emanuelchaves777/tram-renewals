@@ -69,7 +69,7 @@
   thead th{position:sticky;top:0;z-index:2;background:#f9fafb;padding:10px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
   thead th:hover{background:#f3f4f6}
   /* Action column — sticky to left edge */
-  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:110px;max-width:120px;white-space:nowrap;border-right:2px solid #e5e7eb}
+  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:120px;max-width:140px;border-right:2px solid #e5e7eb}
   thead th.col-action{z-index:3;background:#f9fafb}
   /* Date / days columns — fixed width so they never squeeze */
   th.col-date,td.col-date{min-width:100px;max-width:110px;white-space:nowrap}
@@ -1854,8 +1854,11 @@ function _buildRow(c) {
   const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
   const clientDisplay = _normaliseClient(c.client);
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
-    <td class="col-action" onclick="event.stopPropagation()">
-      <button class="btn btn-secondary btn-sm" style="margin-bottom:4px;width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+    <td class="col-action" onclick="event.stopPropagation()" style="padding:6px 8px">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:110px">
+        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+      </div>
     </td>
     <td class="col-date">${expDate}</td>
     <td class="col-days">${daysCell}</td>
@@ -2479,6 +2482,7 @@ function openDetail(serial){
     </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>🔄 Initiate Renewal</button>
       <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
@@ -2697,6 +2701,9 @@ function renderOffboardForm(){
 
   document.getElementById('offboardModalFooter').innerHTML=`
     <button class="btn btn-secondary" onclick="closeOffboardModal()">Cancel</button>
+    <button class="btn btn-secondary" onclick="_downloadOffboardExcel()" title="Download pre-filled Offboards tab for the Request Form Template">
+      📥 Download Pre-filled Excel
+    </button>
     <button class="btn btn-danger" id="btnSubmitOffboard" onclick="submitOffboarding()">
       Submit &amp; Send Offboarding Email
     </button>`;
@@ -2814,8 +2821,12 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
 }
 
 // ── INIT ──────────────────────────────────────
+// Always render the synthetic data immediately so the table + buttons are visible right away.
+// If the backend is configured and the user has a saved identity, loadData() will overwrite
+// the synthetic rows with real data automatically.
+renderTable(CONTRACTORS);
+updateBucketCounts(CONTRACTORS);
 initIdentity();  // opens identity modal if no ID saved; loadData() fires only after identity confirmed
-// loadData() is called by saveIdentity() or confirmAdminPin() — not here unconditionally
 if (_identity) loadData();  // returning visitor with saved identity — load immediately
 
 // ── Dual scrollbar sync ────────────────────────────────────────────────────

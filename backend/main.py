@@ -750,6 +750,26 @@ def submit_offboarding(req: SubmitOffboardingRequest):
         "comments":        req.comments,
     }
 
+    # ── Generate pre-filled Offboards Excel ───────────────────────────────────
+    excel_filename = None
+    excel_bytes    = None
+    excel_error    = None
+
+    if _template_bytes:
+        try:
+            xr = excel_generation.generate_offboard_excel(
+                contractor=contractor,
+                offboard_data=offboard_data,
+                template_bytes=_template_bytes,
+            )
+            excel_filename = xr["filename"]
+            excel_bytes    = xr["file_bytes"]
+        except Exception as e:
+            excel_error = str(e)
+    else:
+        excel_error = "Template not uploaded — Excel not generated."
+
+    # ── Send email with Excel attached ────────────────────────────────────────
     email_result = None
     email_error  = None
 
@@ -758,6 +778,8 @@ def submit_offboarding(req: SubmitOffboardingRequest):
             email_result = email_sender.send_offboarding_email(
                 contractor=contractor,
                 offboard_data=offboard_data,
+                excel_filename=excel_filename,
+                excel_bytes=excel_bytes,
             )
         except Exception as e:
             email_error = str(e)
@@ -779,17 +801,20 @@ def submit_offboarding(req: SubmitOffboardingRequest):
         contractor=req.contractor_id,
         detail=(
             f"Last day: {req.last_day} · Reason: {req.reason} · "
+            f"Excel: {excel_filename or ('error: '+excel_error if excel_error else 'no template')} · "
             f"Email: {'sent' if email_result else 'fallback'}"
         ),
         outcome="success" if email_result else "warning",
     )
 
     return {
-        "status":          "ok" if email_result else "partial",
-        "email":           email_result,
-        "email_error":     email_error,
-        "submitted_at":    datetime.utcnow().isoformat() + "Z",
-        "mailto_fallback": _build_offboard_mailto(contractor, offboard_data),
+        "status":           "ok" if email_result else "partial",
+        "email":            email_result,
+        "email_error":      email_error,
+        "excel_filename":   excel_filename,
+        "excel_error":      excel_error,
+        "submitted_at":     datetime.utcnow().isoformat() + "Z",
+        "mailto_fallback":  _build_offboard_mailto(contractor, offboard_data),
     }
 
 

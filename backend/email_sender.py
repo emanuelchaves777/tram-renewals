@@ -81,10 +81,13 @@ def send_renewal_email(
 def send_offboarding_email(
     contractor: dict,
     offboard_data: dict,
+    excel_filename: str | None = None,
+    excel_bytes: bytes | None = None,
 ) -> dict:
     """
     Send the offboarding notification email to the correct CSP team.
-    Body is an HTML table with one data row and the 10 confirmed columns.
+    Body is an HTML table. If excel_filename/bytes are provided the
+    pre-filled Offboards Excel is attached.
     """
     to_email = _get_sector_email(contractor.get("sector", ""))
     subject  = _build_offboarding_subject(contractor)
@@ -95,8 +98,8 @@ def send_offboarding_email(
         subject=subject,
         body=body,
         body_type="HTML",
-        attachment_filename=None,
-        attachment_bytes=None,
+        attachment_filename=excel_filename,
+        attachment_bytes=excel_bytes,
     )
 
 
