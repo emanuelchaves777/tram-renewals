@@ -490,6 +490,61 @@ def get_contractors(bp_manager_id: str = ""):
     }
 
 
+# ── Identity store — server-side persistence of PM identity across devices ────
+#
+# Stores { intranetId, client, viewAll } keyed by intranetId in /data/identities.json
+# so any device that enters the same email picks up the saved settings automatically.
+# No authentication needed — the intranetId is the key and we only return the record
+# that matches the requested id. Non-sensitive: it only stores email + optional client filter.
+
+_IDENTITIES_PATH = DATA_DIR / "identities.json"
+
+def _load_identities() -> dict:
+    if _IDENTITIES_PATH.exists():
+        try:
+            return json.loads(_IDENTITIES_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+def _save_identities(store: dict) -> None:
+    try:
+        _IDENTITIES_PATH.write_text(
+            json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except Exception:
+        pass
+
+
+@app.get("/api/identity")
+def get_identity(id: str = ""):
+    """Return the stored identity for a given intranetId email."""
+    if not id.strip():
+        raise HTTPException(status_code=400, detail="id is required")
+    store = _load_identities()
+    record = store.get(id.strip().lower())
+    if not record:
+        raise HTTPException(status_code=404, detail="No identity stored for this id")
+    return record
+
+
+@app.put("/api/identity")
+def put_identity(body: dict):
+    """Save/update the identity for a given intranetId email."""
+    intranet_id = (body.get("intranetId") or "").strip().lower()
+    if not intranet_id:
+        raise HTTPException(status_code=400, detail="intranetId is required")
+    store = _load_identities()
+    store[intranet_id] = {
+        "intranetId": intranet_id,
+        "client":     (body.get("client") or "").strip(),
+        "viewAll":    bool(body.get("viewAll", False)),
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    _save_identities(store)
+    return store[intranet_id]
+
+
 # ── Admin PIN verification ────────────────────────────────────────────────────
 
 @app.get("/api/verify-pin")

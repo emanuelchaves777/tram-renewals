@@ -739,24 +739,55 @@ function normaliseApiRecord(c) {
 }
 
 // ── IDENTITY / FILTER-FIRST ────────────────────────────────────────────
-// Stores: { intranetId, client, viewAll }
+// Identity is stored BOTH on the server (per email key) AND in localStorage.
+// Server storage means any device/browser signed in with the same email
+// automatically inherits the session — no re-entry needed.
+// localStorage is the immediate cache so the page loads fast without waiting.
 let _identity = null;
 
 function _loadIdentity() {
+  // Load from localStorage first (instant, no network)
   try {
     const raw = localStorage.getItem('tram_identity');
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Safety: if both intranetId is set AND viewAll is true, prefer the ID (ignore viewAll)
       if (parsed && parsed.intranetId && parsed.viewAll) parsed.viewAll = false;
       _identity = parsed;
     }
   } catch(_) {}
 }
 
-function _saveIdentityStore(id, client, viewAll) {
+async function _syncIdentityFromServer(id) {
+  // Pull identity from server for this email — overwrites localStorage if server has newer data.
+  // Called after login so a different device picks up the same identity automatically.
+  if (!API_BASE || !id) return;
+  try {
+    const resp = await fetch(`${API_BASE}/api/identity?id=${encodeURIComponent(id)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.intranetId) {
+        _identity = data;
+        try { localStorage.setItem('tram_identity', JSON.stringify(_identity)); } catch(_) {}
+        _updateHeaderBadge();
+      }
+    }
+  } catch(_) {} // silent — server may not support this endpoint yet
+}
+
+async function _saveIdentityStore(id, client, viewAll) {
   _identity = { intranetId: id.trim().toLowerCase(), client: client.trim(), viewAll: !!viewAll };
+  // 1. Save locally immediately
   try { localStorage.setItem('tram_identity', JSON.stringify(_identity)); } catch(_) {}
+  // 2. Persist to server so other devices pick it up
+  if (API_BASE && id.trim()) {
+    try {
+      await fetch(`${API_BASE}/api/identity`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_identity),
+      });
+    } catch(_) {} // silent — page still works from localStorage
+  }
 }
 
 function _updateHeaderBadge() {
@@ -843,24 +874,21 @@ function _showIdentityError(msg) {
   inp.focus();
 }
 
-function saveIdentity() {
+async function saveIdentity() {
   const id     = (document.getElementById('id-intranetId').value || '').trim();
   const client = (document.getElementById('id-client').value     || '').trim();
-  // Must have a value
   if (!id) {
     _showIdentityError('An IBM Intranet ID is required to continue.');
     return;
   }
-  // Must look like an email address
   if (!id.includes('@') || !id.includes('.')) {
     _showIdentityError('Enter a valid email address (e.g. jsmith@us.ibm.com).');
     return;
   }
   clearIdentityError();
-  _saveIdentityStore(id, client, false);
+  await _saveIdentityStore(id, client, false);   // saves locally + server
   document.getElementById('identityModal').classList.remove('open');
   _updateHeaderBadge();
-  // Trigger a fresh server-filtered load (always, since the PM ID determines what comes back)
   loadData();
 }
 
@@ -925,11 +953,15 @@ function _identityFilter(data) {
 function initIdentity() {
   _loadIdentity();
   _updateHeaderBadge();
-  // No identity saved → open modal and block. loadData() will only fire after
-  // the user saves a valid email or confirms the admin PIN.
   if (!_identity) {
+    // No local identity — open modal immediately
     document.getElementById('identityModal').classList.add('open');
     setTimeout(() => document.getElementById('id-intranetId').focus(), 50);
+  } else if (_identity.intranetId && !_identity.viewAll) {
+    // Has local identity — silently sync from server in background.
+    // If server has a newer/different record for this email, it will update
+    // and re-render without requiring the user to re-enter anything.
+    _syncIdentityFromServer(_identity.intranetId);
   }
 }
 
@@ -1568,17 +1600,22 @@ function _comboOptions(key, query) {
       if (!v || v === '–') return;
       const vl = v.toLowerCase();
       if (seen.has(v)) return;
+      // No query → show ALL unique values; with query → filter by contains
       if (!q || vl.includes(q)) { seen.add(v); results.push(v); }
     });
   });
+  if (!q) {
+    // No query → A→Z, no cap (show everything scoped to this identity)
+    return results.sort((a, b) => a.localeCompare(b));
+  }
+  // With query → exact-start matches first, then contains, A→Z within each group
   return results.sort((a, b) => {
-    // Exact-start matches first
     const al = a.toLowerCase(), bl = b.toLowerCase();
     const aq = al.startsWith(q), bq = bl.startsWith(q);
     if (aq && !bq) return -1;
     if (!aq && bq) return 1;
     return a.localeCompare(b);
-  }).slice(0, 40);
+  }).slice(0, 60);
 }
 
 function _comboInput(key) {
