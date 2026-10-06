@@ -3600,8 +3600,12 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
 }
 
 // ── INIT ──────────────────────────────────────
+// Always render the synthetic data immediately so the table + buttons are visible right away.
+// If the backend is configured and the user has a saved identity, loadData() will overwrite
+// the synthetic rows with real data automatically.
+renderTable(CONTRACTORS);
+updateBucketCounts(CONTRACTORS);
 initIdentity();  // opens identity modal if no ID saved; loadData() fires only after identity confirmed
-// loadData() is called by saveIdentity() or confirmAdminPin() — not here unconditionally
 if (_identity) loadData();  // returning visitor with saved identity — load immediately
 
 // ── Dual scrollbar sync ────────────────────────────────────────────────────
