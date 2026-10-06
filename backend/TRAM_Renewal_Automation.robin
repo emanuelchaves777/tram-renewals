@@ -1,0 +1,422 @@
+@@v:ComponentVersion='1.28.213.23410'
+
+# ══════════════════════════════════════════════════════════════════════════
+# TRAM Renewal Automation — Power Automate Desktop Flow
+# Version: 2.0  |  Author: Emanuel Chaves Gamboa
+#
+# REAL TRAM FLOW (18 steps confirmed by user):
+#   1. https://tram.projectservices.dal.app.cirrus.ibm.com/
+#   2. My Requests
+#   3. Create New Requests
+#   4. Spend
+#   5. Import from Existing TRAM request? → Yes
+#   6. Paste old TRAM ID
+#   7. Click Import Data
+#   8. Handle result: error dialog (Start Date in future) OR Import Confirmation → OK
+#   9. Spend Type → Renewal
+#  10. Batch Review Date → closest Friday from today
+#  11. Expected Start Date + Planned End Date
+#  12. Band Equivalent
+#  13. JR/S — confirm or change via dropdown
+#  14. Hiring/Bluepages Manager + Project Contact — confirm or update
+#  15. Contractor Cost Rate + Contractor Bill Rate
+#  16. Resource Analytics HUB → Refresh Hub Data
+#  17. Internal Search Performed → Yes  |  Resources available → No
+#  18. Submit → read new TRAM ID from confirmation page
+#
+# SETUP:
+#   1. Import this file into PAD: My flows → Import → select this file
+#   2. Set API_BASE and UPLOAD_PIN below to match your Railway deployment
+#   3. Navigate to the TRAM Spend form manually, then record every element
+#      marked  ★RECORD★  using PAD's "Add UI element" button
+# ══════════════════════════════════════════════════════════════════════════
+
+# ── INPUT VARIABLES ────────────────────────────────────────────────────────
+SET API_BASE   TO $'''https://tram-renewals-production.up.railway.app'''
+SET UPLOAD_PIN TO $'''REPLACE_WITH_YOUR_UPLOAD_PIN'''
+SET TRAM_URL   TO $'''https://tram.projectservices.dal.app.cirrus.ibm.com/'''
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 1: Poll backend for next pending job
+# ══════════════════════════════════════════════════════════════════════════
+Web.InvokeWebService.InvokeWebService Url: $'''%API_BASE%/api/tram-jobs/next?pin=%UPLOAD_PIN%''' Method: Web.Method.Get ContentType: $'''application/json''' ConnectionTimeout: 30 FollowRedirection: True ClearCookies: False FailOnErrorStatus: False UserAgent: $'''Mozilla/5.0''' Encoding: Web.Encoding.AutoDetect AcceptUntrustedCertificates: False ResponseBody=> ResponseBody StatusCode=> StatusCode
+
+# 204 = queue empty — nothing to do
+IF StatusCode = 204 THEN
+    STOP
+END
+
+IF StatusCode <> 200 THEN
+    STOP
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 2: Parse job data
+# ══════════════════════════════════════════════════════════════════════════
+Variables.ConvertJsonToCustomObject Json: ResponseBody CustomObject=> JobData
+
+SET JOB_ID            TO JobData['job_id']
+SET OLD_TRAM_ID       TO JobData['old_tram_id']
+SET NEW_START         TO JobData['new_start_date']
+SET NEW_END           TO JobData['new_end_date']
+SET RATE_CAP          TO JobData['rate_cap']
+SET BILL_RATE         TO JobData['bill_rate']
+SET JRS               TO JobData['confirmed_jrs']
+SET BAND              TO JobData['confirmed_band']
+SET BATCH_REVIEW_DATE TO JobData['batch_review_date']
+SET HIRING_MANAGER    TO JobData['hiring_manager']
+SET BIZ_JUST_1        TO JobData['biz_just_1']
+SET BIZ_JUST_2        TO JobData['biz_just_2']
+SET BIZ_JUST_3        TO JobData['biz_just_3']
+
+# Build combined justification text (newline-separated)
+SET BIZ_JUST_FULL TO BIZ_JUST_1
+IF BIZ_JUST_2 <> $''''' THEN
+    SET BIZ_JUST_FULL TO $'''%BIZ_JUST_FULL%\n%BIZ_JUST_2%'''
+END
+IF BIZ_JUST_3 <> $''''' THEN
+    SET BIZ_JUST_FULL TO $'''%BIZ_JUST_FULL%\n%BIZ_JUST_3%'''
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 3: Open TRAM in Chrome
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Open TRAM'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Failed to open TRAM browser: %LastError%'''
+    END
+    WebAutomation.LaunchChrome.LaunchChrome Url: $'''%TRAM_URL%''' WindowState: WebAutomation.BrowserWindowState.Maximized ClearCacheAndCookies: False WaitForPageToLoadTimeout: 30 Timeout: 60 BrowserInstance=> Browser
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 30
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 4: My Requests → Create New Requests → Spend
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Navigate to Spend form'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Navigation to Spend form failed: %LastError%'''
+    END
+
+    # ★RECORD★ Click the "My Requests" link on the TRAM home page
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['My Requests Link']
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 15
+
+    # ★RECORD★ Click "Create New Requests"
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Create New Requests Link']
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 15
+
+    # ★RECORD★ Click the "Spend" tile on the Select Request Type page
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Spend Tile']
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 20
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 5-6: Import from Existing TRAM request? → Yes, paste old TRAM ID
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set import = Yes and enter old TRAM ID'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Import setup failed: %LastError%'''
+    END
+
+    # ★RECORD★ Click the "Yes" radio button next to
+    #           "Import from Existing TRAM request or Prom Seat ID?"
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Import Yes Radio']
+    WAIT 1
+
+    # Wait for the TRAM ID input field to appear
+    WebAutomation.Wait.WaitForWebPageElementExist BrowserInstance: Browser Control: appmask['Import TRAM ID Input'] WaitTimeout: 15
+
+    # ★RECORD★ The text input that appears for the existing TRAM ID
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Import TRAM ID Input'] Text: OLD_TRAM_ID WaitForPageToLoadTimeout: 10
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 7: Click "Import Data" button
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Click Import Data'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Import Data click failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "-->" or "Import Data" button that triggers the import
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Import Data Button']
+    WAIT 3
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 8: Handle import result dialog
+# Two outcomes:
+#   A) Error: "Start Date must be in the future" → dismiss and continue
+#      (this is expected when the old TRAM start date has passed)
+#   B) "Import Confirmation — Import Completed" → click OK and continue
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Handle import result dialog'
+    ON BLOCK ERROR
+        # If neither dialog appears in time, continue anyway — form may be pre-filled
+    END
+
+    WAIT 2
+
+    # Check if the Import Confirmation (success) dialog is present
+    WebAutomation.IfWebPageContainsElement BrowserInstance: Browser Control: appmask['Import Confirmation OK Button'] WaitForElement: True Timeout: 5 ElementExists=> ImportSuccessVisible
+
+    IF ImportSuccessVisible = True THEN
+        # ★RECORD★ The "OK" button inside the "Import Confirmation / Import Completed" dialog
+        WebAutomation.Click BrowserInstance: Browser Control: appmask['Import Confirmation OK Button']
+        WAIT 1
+    ELSE
+        # Check if the error dialog is present ("Start Date must be in the future")
+        WebAutomation.IfWebPageContainsElement BrowserInstance: Browser Control: appmask['Import Error OK Button'] WaitForElement: True Timeout: 5 ElementExists=> ImportErrorVisible
+        IF ImportErrorVisible = True THEN
+            # ★RECORD★ The "OK" or dismiss button on the import error dialog
+            WebAutomation.Click BrowserInstance: Browser Control: appmask['Import Error OK Button']
+            WAIT 1
+        END
+    END
+
+    # Wait for the form to fully load after dialog dismiss
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 20
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 9: Spend Type → Renewal
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set Spend Type = Renewal'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting Spend Type failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "Spend Type" dropdown
+    WebAutomation.SelectOptionInDropDown BrowserInstance: Browser Control: appmask['Spend Type Dropdown'] OptionSelectionType: WebAutomation.DropDownOptionSelectionType.SelectOptionByText OptionsToSelect: $'''Renewal'''
+    WAIT 2
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 10: Batch Review Date → closest Friday from today
+# The job payload contains the pre-calculated date (backend computes it).
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set Batch Review Date'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting Batch Review Date failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "Batch Review Date" date input field
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Batch Review Date Field'] Text: BATCH_REVIEW_DATE WaitForPageToLoadTimeout: 5
+    WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+    WAIT 1
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 11: Expected Start Date + Planned End Date
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set start and end dates'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting dates failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "Expected Start Date*" field
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Expected Start Date Field'] Text: NEW_START WaitForPageToLoadTimeout: 5
+    WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+    WAIT 1
+
+    # ★RECORD★ The "Planned End Date*" field
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Planned End Date Field'] Text: NEW_END WaitForPageToLoadTimeout: 5
+    WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+    WAIT 1
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 12: Band Equivalent
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set Band Equivalent'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting Band failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "Band Equivalent*" dropdown or input field
+    WebAutomation.SelectOptionInDropDown BrowserInstance: Browser Control: appmask['Band Equivalent Dropdown'] OptionSelectionType: WebAutomation.DropDownOptionSelectionType.SelectOptionByText OptionsToSelect: BAND
+    WAIT 1
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 13: JR/S — confirm current value; change via dropdown only if different
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set JR/S'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting JR/S failed: %LastError%'''
+    END
+
+    # Read current JR/S value to decide whether a change is needed
+    # ★RECORD★ The "JR/S*" dropdown
+    WebAutomation.GetSelectedOptionFromDropDown BrowserInstance: Browser Control: appmask['JRS Dropdown'] OptionName=> CurrentJRS
+
+    IF CurrentJRS <> JRS THEN
+        WebAutomation.SelectOptionInDropDown BrowserInstance: Browser Control: appmask['JRS Dropdown'] OptionSelectionType: WebAutomation.DropDownOptionSelectionType.SelectOptionByText OptionsToSelect: JRS
+        WAIT 1
+    END
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 14: Hiring/Bluepages Manager + Project Contact
+# Update only when the job supplies a new value; otherwise leave as-is.
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Confirm Hiring Manager and Project Contact'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting Hiring Manager failed: %LastError%'''
+    END
+
+    IF HIRING_MANAGER <> $''''' THEN
+        # ★RECORD★ The "Hiring/Bluepages Manager*" input or search field
+        WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Hiring Manager Field'] Text: HIRING_MANAGER WaitForPageToLoadTimeout: 5
+        WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+        WAIT 2
+        # ★RECORD★ The "Project Contact" field (same style as Hiring Manager)
+        WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Project Contact Field'] Text: HIRING_MANAGER WaitForPageToLoadTimeout: 5
+        WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+        WAIT 1
+    END
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 15: Contractor Cost Rate + Contractor Bill Rate
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Set rates'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Setting rates failed: %LastError%'''
+    END
+
+    # ★RECORD★ "Contractor Cost Rate*" field
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Cost Rate Field'] Text: RATE_CAP WaitForPageToLoadTimeout: 5
+    WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+    WAIT 1
+
+    # ★RECORD★ "Contractor Bill Rate*" field
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Bill Rate Field'] Text: BILL_RATE WaitForPageToLoadTimeout: 5
+    WebAutomation.SendKeys BrowserInstance: Browser Keys: $'''{Tab}'''
+    WAIT 2
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 16: Resource Analytics HUB → Refresh Hub Data
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Refresh Hub Data'
+    ON BLOCK ERROR
+        # Non-fatal — log but continue. Hub refresh is best-effort.
+        CALL SendFailure WITH ErrorMessage: $'''Hub Data refresh failed: %LastError%'''
+    END
+
+    # ★RECORD★ The "Resource Analytics HUB Data" section header / expander
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Resource Analytics HUB Section']
+    WAIT 2
+
+    # ★RECORD★ The "Refresh Hub Data" button inside that section
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Refresh Hub Data Button']
+    WAIT 5
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 17: Compliance radios + Business Justification
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Fill compliance fields'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Compliance fields failed: %LastError%'''
+    END
+
+    # ★RECORD★ "Internal Search Performed" → Yes radio
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Internal Search Yes Radio']
+    WAIT 1
+
+    # ★RECORD★ "Are there resources available complying with all of these requirements?" → No radio
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['Resources Available No Radio']
+    WAIT 1
+
+    # ★RECORD★ The "Business Justification" or "Comments" text area
+    WebAutomation.SetTextFieldValue BrowserInstance: Browser Control: appmask['Business Justification Field'] Text: BIZ_JUST_FULL WaitForPageToLoadTimeout: 5
+    WAIT 1
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 18: Submit
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Submit TRAM request'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Submit failed: %LastError%'''
+    END
+
+    # ★RECORD★ The Submit button at the bottom of the TRAM form
+    WebAutomation.Click BrowserInstance: Browser Control: appmask['TRAM Submit Button']
+    WebAutomation.Wait.WaitForWebPageContent BrowserInstance: Browser WaitForPageToLoadTimeout: 30
+    WAIT 3
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 19: Read new TRAM ID from the confirmation page
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Extract new TRAM ID'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Could not read new TRAM ID: %LastError%'''
+    END
+
+    SET NEW_TRAM_ID TO $''''''
+
+    # Method A — direct element (most reliable)
+    # ★RECORD★ On the confirmation page, click the element that shows the new TRAM ID
+    #           (the request ID displayed after submission, e.g. NA202503XXXXXXXXX)
+    WebAutomation.GetDetailsOfElement BrowserInstance: Browser Control: appmask['New TRAM ID Element'] Attribute: $'''Own Text''' AttributeValue=> NEW_TRAM_ID
+
+    Text.TrimText.Trim Text: NEW_TRAM_ID TrimOption: Text.TrimTextOption.TrimBoth TrimmedText=> NEW_TRAM_ID
+
+    # Method B — regex fallback if element gave empty string
+    IF NEW_TRAM_ID = $''''' THEN
+        WebAutomation.GetDetailsOfWebPage BrowserInstance: Browser Property: WebAutomation.WebPageProperty.PageText PageProperty=> PageText
+        Text.RegexMatchesAll.GetAllMatches Text: PageText Regex: $'''NA\d{10,16}[A-Z]?''' IsRegexCaseSensitive: True Matches=> TramIdMatches
+        IF TramIdMatches.Count > 0 THEN
+            SET NEW_TRAM_ID TO TramIdMatches[0]
+        ELSE
+            CALL SendFailure WITH ErrorMessage: $'''Confirmation page loaded but TRAM ID could not be extracted. Page format may have changed.'''
+        END
+    END
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 20: Notify backend — triggers Excel generation + email
+# ══════════════════════════════════════════════════════════════════════════
+BLOCK 'Complete job in backend'
+    ON BLOCK ERROR
+        CALL SendFailure WITH ErrorMessage: $'''Backend completion call failed: %LastError%'''
+    END
+
+    SET CompleteBody TO $'''{"tram_id_new": "%NEW_TRAM_ID%", "pin": "%UPLOAD_PIN%"}'''
+
+    Web.InvokeWebService.InvokeWebService Url: $'''%API_BASE%/api/tram-jobs/%JOB_ID%/complete''' Method: Web.Method.Post ContentType: $'''application/json''' CustomHeaders: $'''''' RequestBody: CompleteBody ConnectionTimeout: 30 FollowRedirection: True ClearCookies: False FailOnErrorStatus: False UserAgent: $'''Mozilla/5.0''' Encoding: Web.Encoding.AutoDetect AcceptUntrustedCertificates: False ResponseBody=> CompleteResponse StatusCode=> CompleteStatus
+
+    IF CompleteStatus <> 200 THEN
+        CALL SendFailure WITH ErrorMessage: $'''Backend returned HTTP %CompleteStatus% on complete: %CompleteResponse%'''
+    END
+END
+
+# ══════════════════════════════════════════════════════════════════════════
+# STEP 21: Close browser
+# ══════════════════════════════════════════════════════════════════════════
+WebAutomation.CloseWebBrowser BrowserInstance: Browser
+
+# ══════════════════════════════════════════════════════════════════════════
+# Done — backend has generated the Excel and sent the email.
+# The PM will see the "Renewal complete" screen in the app.
+# ══════════════════════════════════════════════════════════════════════════
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# SUBROUTINE: SendFailure
+# Marks the job as failed in the backend, then closes the browser.
+# Called from every BLOCK's ON BLOCK ERROR handler.
+# ══════════════════════════════════════════════════════════════════════════
+FUNCTION SendFailure (ErrorMessage)
+    SET FailBody TO $'''{"error": "%ErrorMessage%", "pin": "%UPLOAD_PIN%"}'''
+
+    Web.InvokeWebService.InvokeWebService Url: $'''%API_BASE%/api/tram-jobs/%JOB_ID%/fail''' Method: Web.Method.Post ContentType: $'''application/json''' CustomHeaders: $'''''' RequestBody: FailBody ConnectionTimeout: 15 FollowRedirection: True ClearCookies: False FailOnErrorStatus: False UserAgent: $'''Mozilla/5.0''' Encoding: Web.Encoding.AutoDetect AcceptUntrustedCertificates: False ResponseBody=> FailResponse StatusCode=> FailStatus
+
+    ON ERROR RESUME
+        WebAutomation.CloseWebBrowser BrowserInstance: Browser
+    END
+END

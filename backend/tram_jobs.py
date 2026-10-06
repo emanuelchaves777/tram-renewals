@@ -17,6 +17,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+
+def _to_tram_date(val: str) -> str:
+    """Normalise a date string to MM/DD/YYYY for TRAM.
+    Accepts YYYY-MM-DD (HTML date input) or MM/DD/YYYY (already correct).
+    Returns the value unchanged if it can't be parsed.
+    """
+    raw = (val or "").strip()
+    if not raw:
+        return raw
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").strftime("%m/%d/%Y")
+    except ValueError:
+        pass
+    return raw  # already MM/DD/YYYY or unrecognised — pass through
+
 # ── Storage ────────────────────────────────────────────────────────────────────
 _JOBS_FILE: Optional[Path] = None   # set by init()
 _jobs: dict[str, dict] = {}         # job_id → job dict
@@ -76,16 +91,19 @@ def create_job(contractor: dict, renewal_fields: dict) -> dict:
         "work_location":   contractor.get("workLocation", ""),
         "current_end_date": contractor.get("endDate", ""),
         # Fields PM filled in the app — Power Automate will use these to fill TRAM
-        "new_start_date":  renewal_fields.get("new_start_date", ""),
-        "new_end_date":    renewal_fields.get("new_end_date", ""),
-        "rate_cap":        renewal_fields.get("rate_cap", ""),
-        "bill_rate":       renewal_fields.get("bill_rate", ""),
-        "gp_pct":          renewal_fields.get("gp_pct", ""),
-        "confirmed_jrs":   renewal_fields.get("confirmed_jrs", ""),
-        "confirmed_band":  renewal_fields.get("confirmed_band", ""),
-        "biz_just_1":      renewal_fields.get("biz_just_1", ""),
-        "biz_just_2":      renewal_fields.get("biz_just_2", ""),
-        "biz_just_3":      renewal_fields.get("biz_just_3", ""),
+        # Dates are normalised to MM/DD/YYYY so PAD can paste them directly into TRAM.
+        "new_start_date":    _to_tram_date(renewal_fields.get("new_start_date", "")),
+        "new_end_date":      _to_tram_date(renewal_fields.get("new_end_date", "")),
+        "batch_review_date": _to_tram_date(renewal_fields.get("batch_review_date", "")),
+        "hiring_manager":    renewal_fields.get("hiring_manager", ""),
+        "rate_cap":          renewal_fields.get("rate_cap", ""),
+        "bill_rate":         renewal_fields.get("bill_rate", ""),
+        "gp_pct":            renewal_fields.get("gp_pct", ""),
+        "confirmed_jrs":     renewal_fields.get("confirmed_jrs", ""),
+        "confirmed_band":    renewal_fields.get("confirmed_band", ""),
+        "biz_just_1":        renewal_fields.get("biz_just_1", ""),
+        "biz_just_2":        renewal_fields.get("biz_just_2", ""),
+        "biz_just_3":        renewal_fields.get("biz_just_3", ""),
         # Result — filled in by Power Automate when done
         "tram_id_new":     None,
         "error":           None,

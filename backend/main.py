@@ -952,6 +952,9 @@ class CreateTramJobRequest(BaseModel):
     biz_just_1:     str
     biz_just_2:     str = ""
     biz_just_3:     str = ""
+    # New fields for real TRAM flow
+    batch_review_date: str = ""   # Closest Friday from today — auto-calculated if empty
+    hiring_manager:    str = ""   # Hiring/Bluepages Manager intranet ID (leave empty = no change)
     # All remaining renewal fields — passed through to Excel/email after PAD completes
     work_location:    str = ""
     niche_skills:     str = ""
@@ -979,6 +982,14 @@ class FailJobRequest(BaseModel):
     pin: str = ""
 
 
+def _next_friday(from_date: datetime) -> str:
+    """Return the closest Friday on or after from_date, formatted MM/DD/YYYY."""
+    from datetime import timedelta
+    days_ahead = (4 - from_date.weekday()) % 7   # 4 = Friday
+    friday = from_date + timedelta(days=days_ahead)
+    return friday.strftime("%m/%d/%Y")
+
+
 @app.post("/api/tram-jobs")
 def create_tram_job(req: CreateTramJobRequest):
     """
@@ -987,6 +998,9 @@ def create_tram_job(req: CreateTramJobRequest):
     """
     contractor = _resolve_contractor(req.contractor_id)
     renewal_fields = req.dict()
+    # Auto-calculate batch_review_date if not supplied by the PM
+    if not renewal_fields.get("batch_review_date"):
+        renewal_fields["batch_review_date"] = _next_friday(datetime.utcnow())
     job = tram_jobs_module.create_job(contractor, renewal_fields)
     return {
         "job_id": job["job_id"],
