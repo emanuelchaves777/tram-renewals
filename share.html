@@ -821,11 +821,12 @@ function closeIdentityModal(viewAll) {
   if (viewAll) {
     _saveIdentityStore('', '', true);
     _updateHeaderBadge();
-    if (_liveRegistry.length && _liveRegistry !== CONTRACTORS) {
-      _applyIdentityToView();
-    } else {
-      loadData();
-    }
+    showLoadingBanner('Loading all contractors (Admin view)…');
+    // Clear stale rows from previous identity immediately
+    renderTable([]);
+    updateBucketCounts([]);
+    // Always fetch fresh from backend — admin needs ALL rows, not just the prior PM's subset
+    loadData();
   }
 }
 
@@ -890,9 +891,14 @@ async function saveIdentity() {
     return;
   }
   clearIdentityError();
-  await _saveIdentityStore(id, client, false);   // saves locally + server
+  // Close modal and show loading state immediately — don't wait for network
   document.getElementById('identityModal').classList.remove('open');
+  await _saveIdentityStore(id, client, false);   // saves locally + server
   _updateHeaderBadge();
+  showLoadingBanner(`Loading data for ${id}…`);
+  // Clear table immediately so stale rows from previous identity are gone
+  renderTable([]);
+  updateBucketCounts([]);
   loadData();
 }
 
