@@ -69,7 +69,7 @@
   thead th{position:sticky;top:0;z-index:2;background:#f9fafb;padding:10px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
   thead th:hover{background:#f3f4f6}
   /* Action column — sticky to left edge */
-  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:110px;max-width:120px;white-space:nowrap;border-right:2px solid #e5e7eb}
+  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:120px;max-width:140px;border-right:2px solid #e5e7eb}
   thead th.col-action{z-index:3;background:#f9fafb}
   /* Date / days columns — fixed width so they never squeeze */
   th.col-date,td.col-date{min-width:100px;max-width:110px;white-space:nowrap}
@@ -1866,9 +1866,11 @@ function _buildRow(c) {
   const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
   const clientDisplay = _normaliseClient(c.client);
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
-    <td class="col-action" onclick="event.stopPropagation()">
-      <button class="btn btn-primary btn-sm" style="margin-bottom:4px;width:100%" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
-      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+    <td class="col-action" onclick="event.stopPropagation()" style="padding:6px 8px">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:110px">
+        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+      </div>
     </td>
     <td class="col-date">${expDate}</td>
     <td class="col-days">${daysCell}</td>
