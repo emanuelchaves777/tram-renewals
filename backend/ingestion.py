@@ -30,56 +30,415 @@ from config import (
 # Mirror of the _CLIENT_ALIAS map in app.html so the backend stores canonical names.
 _CLIENT_ALIAS: dict = {
     # T-Mobile
-    "t-mobile":         "T-Mobile",
-    "t-mo":             "T-Mobile",
-    "tmobile":          "T-Mobile",
-    "t mobile":         "T-Mobile",
-    "t-mobile usa":     "T-Mobile",
-    "t-mobile usa inc": "T-Mobile",
-    "t-mobile us inc":  "T-Mobile",
-    "t-mobile us":      "T-Mobile",
-    "t-mobile inc":     "T-Mobile",
+    "t-mobile":                               "T-Mobile",
+    "t-mo":                                   "T-Mobile",
+    "tmobile":                                "T-Mobile",
+    "t mobile":                               "T-Mobile",
+    "t-mobile usa":                           "T-Mobile",
+    "t-mobile usa inc":                       "T-Mobile",
+    "t- mobile usa inc":                      "T-Mobile",
+    "t-mobile us inc":                        "T-Mobile",
+    "t-mobile us":                            "T-Mobile",
+    "t-mobile inc":                           "T-Mobile",
     # AT&T
-    "at&t":             "AT&T",
-    "at&t inc":         "AT&T",
-    "att":              "AT&T",
-    "at & t":           "AT&T",
-    # Verizon
-    "verizon":                   "Verizon",
-    "verizon communications":    "Verizon",
-    "verizon inc":               "Verizon",
-    # Comcast
-    "comcast":            "Comcast",
-    "comcast corporation":"Comcast",
-    "comcast corp":       "Comcast",
-    # JPMorgan
-    "jpmorgan":           "JPMorgan Chase",
-    "jp morgan":          "JPMorgan Chase",
-    "jpmorgan chase":     "JPMorgan Chase",
-    "jp morgan chase":    "JPMorgan Chase",
-    "j.p. morgan":        "JPMorgan Chase",
-    # Bank of America
-    "bank of america":    "Bank of America",
-    "bofa":               "Bank of America",
-    "boa":                "Bank of America",
-    # Wells Fargo
-    "wells fargo":        "Wells Fargo",
-    "wells fargo & co":   "Wells Fargo",
-    # Citi
-    "citibank":           "Citigroup",
-    "citi":               "Citigroup",
-    "citigroup":          "Citigroup",
+    "at&t":                                   "AT&T",
+    "at&t cdo":                               "AT&T",
+    "at&t inc.":                              "AT&T",
+    "at&t services inc":                      "AT&T",
+    "a t & t services inc (p)":              "AT&T",
+    "att":                                    "AT&T",
+    "at & t":                                 "AT&T",
+    # Abbott
+    "abbott":                                 "Abbott",
+    "abbott laboratories":                    "Abbott",
+    # AECC
+    "aecc":                                   "AECC",
+    "aecc ams":                               "AECC",
+    "aecc sf remediation projec":             "AECC",
+    "arkansas (aecc)":                        "AECC",
+    "arkansas (aecc) ams":                    "AECC",
+    # American Electric Power
+    "aep":                                    "American Electric Power",
+    "aep energy services inc":                "American Electric Power",
+    "aep service corp.":                      "American Electric Power",
+    "american electric power":                "American Electric Power",
+    "american electric power (aep)":          "American Electric Power",
+    "american electric power co inc":         "American Electric Power",
+    "american electric power company, inc.":  "American Electric Power",
+    "american electric power service":        "American Electric Power",
+    "american electric power service corp":   "American Electric Power",
     # American Express
-    "amex":               "American Express",
-    "american express":   "American Express",
+    "amex":                                   "American Express",
+    "american express":                       "American Express",
+    "american express co (p)":                "American Express",
+    "american express company":               "American Express",
+    "american express travel":                "American Express",
+    "american express travel rdt vc":         "American Express",
+    "american express travel related":        "American Express",
+    "merican express company":                "American Express",
+    # AmerisourceBergen / Cencora
+    "amerisourcebergen corp":                 "Cencora",
+    "amerisourcebergen corporation":          "Cencora",
+    "amerisourcebergen services":             "Cencora",
+    "cencora":                                "Cencora",
+    "cencora inc.":                           "Cencora",
+    "cencora, inc":                           "Cencora",
+    # Altria
+    "altria client services inc":             "Altria",
+    "altria client services llc":             "Altria",
+    "altria group, inc.":                     "Altria",
+    # Anthem / Elevance Health
+    "anthem":                                 "Elevance Health",
+    "anthem inc":                             "Elevance Health",
+    "anthem inc.":                            "Elevance Health",
+    "elevance":                               "Elevance Health",
+    "elevance health":                        "Elevance Health",
+    "elevance health inc":                    "Elevance Health",
+    "elevance health inc.":                   "Elevance Health",
+    "elevance health, inc.":                  "Elevance Health",
+    # Ahold Delhaize
+    "ahold":                                  "Ahold Delhaize",
+    "ahold delhaize":                         "Ahold Delhaize",
+    "koninklijke ahold delhaize n.v.":        "Ahold Delhaize",
+    "koninklijke ahold n.v.":                 "Ahold Delhaize",
+    # Barclays
+    "barclays":                               "Barclays",
+    "barclays bank plc":                      "Barclays",
+    "barclays plc":                           "Barclays",
+    "barclays services corp":                 "Barclays",
+    # Bank of America
+    "bank of america":                        "Bank of America",
+    "bank of america corporation":            "Bank of America",
+    "bank of america national":               "Bank of America",
+    "bofa":                                   "Bank of America",
+    "boa":                                    "Bank of America",
+    # Bank of Nova Scotia
+    "bank of nova scotia":                    "Bank of Nova Scotia",
+    "bank of nova scotia, the":               "Bank of Nova Scotia",
+    "the bank of nova scotia":                "Bank of Nova Scotia",
+    "the bank of nova scotia use":            "Bank of Nova Scotia",
+    # BCBS / Horizon
+    "blue cross and blue shield of":          "Blue Cross Blue Shield",
+    "blue cross and blue shield of massachusetts": "BCBS Massachusetts",
+    "blue cross blue shield of massachusetts":"BCBS Massachusetts",
+    "bcbsma":                                 "BCBS Massachusetts",
+    "horizon - bcbsnj":                       "Horizon BCBS of NJ",
+    "horizon bcbs":                           "Horizon BCBS of NJ",
+    "horizon bcbs of nj":                     "Horizon BCBS of NJ",
+    "horizon healthcare services inc":        "Horizon BCBS of NJ",
+    # Boeing
+    "boeing company":                         "Boeing",
+    "the boeing co":                          "Boeing",
+    # Bruce Power
+    "bruce power":                            "Bruce Power",
+    "bruce power inc":                        "Bruce Power",
+    "bruce power inc.":                       "Bruce Power",
+    # Caterpillar
+    "caterpillar inc.":                       "Caterpillar",
+    # CIBC
+    "canadian imperial bank of":              "CIBC",
+    "canadian imperial bank of commerce":     "CIBC",
+    # Cigna
+    "cigna":                                  "Cigna",
+    "cigna corp":                             "Cigna",
+    "cigna corporation":                      "Cigna",
+    # Chubb
+    "chubb corporation":                      "Chubb",
+    "chubb ina holdings inc":                 "Chubb",
+    "chubb insurance":                        "Chubb",
+    # Cognitus
+    "cognitus":                               "Cognitus",
+    "cognitus acquisition":                   "Cognitus",
+    "cognitus adquisition":                   "Cognitus",
+    # Comcast
+    "comcast":                                "Comcast",
+    "comcast corporation":                    "Comcast",
+    "comcast corp":                           "Comcast",
+    # Costco
+    "costco wholesale corp":                  "Costco",
+    "costco wholesale corporation":           "Costco",
+    # Discover / DFS
+    "discover financial services":            "Discover Financial Services",
+    "dfs services llc":                       "Discover Financial Services",
+    # DirecTV
+    "directv":                                "DirecTV",
+    "directtb":                               "DirecTV",
+    "directv llc":                            "DirecTV",
+    "directv llc at&t cdo bi":                "DirecTV",
+    "direct tv":                              "DirecTV",
+    "direcTb":                                "DirecTV",
+    # DND
+    "department of national defence":         "DND",
+    "dnd":                                    "DND",
+    "dnd - cfhis":                            "DND",
+    "dnd - dhrim":                            "DND",
+    "dnd - dlps":                             "DND",
+    "dnd - iss":                              "DND",
+    "dnd  misl":                              "DND",
+    "dnd - misl":                             "DND",
+    "dnd - misl - sap ehsm functional analyst":"DND",
+    "dnd - remit project":                    "DND",
+    "dnd / dhrim":                            "DND",
+    "dnd cfhis":                              "DND",
+    "dnd dhrim":                              "DND",
+    "dnd dhrim ta 16":                        "DND",
+    "dnd dlps":                               "DND",
+    "dnd drm":                                "DND",
+    "dnd drmis iss":                          "DND",
+    "dnd iss":                                "DND",
+    "dnd misl":                               "DND",
+    "dnd- misl":                              "DND",
+    "dnd misl ta 09":                         "DND",
+    "dnd/ cfhis":                             "DND",
+    "dnd/ misl":                              "DND",
+    "drmis iss":                              "DND",
+    # eBay
+    "ebay inc":                               "eBay",
+    "ebay inc.":                              "eBay",
+    # Enbridge
+    "enbridge inc.":                          "Enbridge",
+    # Ernst & Young
+    "ernst & young":                          "Ernst & Young",
+    "ernst & young llp":                      "Ernst & Young",
+    # ESDC
+    "esdc":                                   "ESDC",
+    "esdc - cpp":                             "ESDC",
+    "esdc - oas":                             "ESDC",
+    "esdc - tdri":                            "ESDC",
+    "esdc tdri":                              "ESDC",
+    "esdc tdri ta 95":                        "ESDC",
+    # Fiserv
+    "fiserv":                                 "Fiserv",
+    "fiserv inc":                             "Fiserv",
+    "fiserv inc (p)":                         "Fiserv",
+    "fiserv, inc.":                           "Fiserv",
+    # Ford
+    "ford motor co":                          "Ford",
+    # General Motors
+    "general motors company":                 "General Motors",
+    "general motors llc":                     "General Motors",
+    # Gilead
+    "gilead sciences inc":                    "Gilead",
+    "gilead sciences, inc.":                  "Gilead",
+    # Google
+    "google":                                 "Google",
+    "google inc.":                            "Google",
+    "google llc":                             "Google",
+    # Hakkoda
+    "hakkoda":                                "Hakkoda",
+    "hakkoda acquisition":                    "Hakkoda",
+    # Honda
+    "honda":                                  "Honda",
+    "honda motor co., ltd.":                  "Honda",
+    # Humana
+    "humana inc.":                            "Humana",
+    # IBM (internal)
+    "ibm":                                    "IBM",
+    "ibm corporation":                        "IBM",
+    "ibm consulting":                         "IBM",
+    # IPG / Interpublic
+    "ipg":                                    "IPG",
+    "interpublic group of companies inc":     "IPG",
+    "interpublic group of cos inc (p)":       "IPG",
+    # Johnson & Johnson
+    "johnson & johnson":                      "Johnson & Johnson",
+    "johnson & johnson services inc":         "Johnson & Johnson",
+    # JPMorgan Chase
+    "jpmorgan":                               "JPMorgan Chase",
+    "jp morgan":                              "JPMorgan Chase",
+    "jpmorgan chase":                         "JPMorgan Chase",
+    "jp morgan chase":                        "JPMorgan Chase",
+    "j.p. morgan":                            "JPMorgan Chase",
+    # Juniper Networks
+    "juniper networks inc":                   "Juniper Networks",
+    "juniper networks, inc.":                 "Juniper Networks",
+    # Kaiser
+    "kaiser":                                 "Kaiser",
+    "kaiser foundation health plan, inc.":    "Kaiser",
+    # Kraft Heinz
+    "kraft foods inc.":                       "Kraft Heinz",
+    "kraft heinz foods co":                   "Kraft Heinz",
+    "the kraft heinz":                        "Kraft Heinz",
+    "the kraft heinz company":                "Kraft Heinz",
+    # Kroger
+    "kroger":                                 "Kroger",
+    "kroger co":                              "Kroger",
+    "the kroger co":                          "Kroger",
+    # Lockheed Martin
+    "lockheed martin":                        "Lockheed Martin",
+    "lockheed martin corporation":            "Lockheed Martin",
+    # Marriott
+    "marriott international inc":             "Marriott",
+    "marriott international, inc.":           "Marriott",
+    "marriott ownership resorts inc":         "Marriott",
+    "marriott vacation worldwide":            "Marriott",
+    # Medtronic
+    "medtronic":                              "Medtronic",
+    "medtronic inc":                          "Medtronic",
+    "medtronic, inc":                         "Medtronic",
+    # MetLife
+    "metlife":                                "MetLife",
+    # Micron
+    "micron technology inc":                  "Micron",
+    "micron technology, inc.":                "Micron",
+    # Morgan Stanley
+    "morgan stanley":                         "Morgan Stanley",
+    "morgan stanley services group inc":      "Morgan Stanley",
+    "morgan stanley smith barney llc":        "Morgan Stanley",
+    # National Grid
+    "national grid":                          "National Grid",
+    "national grid plc":                      "National Grid",
+    "national grid usa service company":      "National Grid",
+    # Navistar
+    "navistar inc (p)":                       "Navistar",
+    "navistar international":                 "Navistar",
+    "navistar international corporation":     "Navistar",
+    # Nestle
+    "nestle":                                 "Nestle",
+    "nestle regional globe office north":     "Nestle",
+    # Neudesic
+    "neudesic":                               "Neudesic",
+    "neudesic acquisition":                   "Neudesic",
+    # New York Life
+    "new york life insurance co":             "New York Life",
+    "new york life insurance company":        "New York Life",
+    # NextEra Energy
+    "nextera energy inc":                     "NextEra Energy",
+    "nextera energy, inc.":                   "NextEra Energy",
+    # Nintendo
+    "nintendo of america inc.":               "Nintendo",
+    # Norfolk Southern
+    "norfolk southern corporation":           "Norfolk Southern",
+    # NYPD
+    "nypd":                                   "NYPD",
+    "nypd - cdw":                             "NYPD",
+    "new york city police department":        "NYPD",
+    # Accelalpha
+    "accelalpha":                             "Accelalpha",
+    "accel alpha":                            "Accelalpha",
+    "accelalpha acquisition":                 "Accelalpha",
+    # Omnicom
+    "omnicom":                                "Omnicom",
+    "omnicom group inc":                      "Omnicom",
+    # Oncor
+    "oncor":                                  "Oncor",
+    "oncor electric":                         "Oncor",
+    "oncor electric delivery":                "Oncor",
+    "oncor electric delivery c":              "Oncor",
+    "oncor electric delivery co llc":         "Oncor",
+    # PayPal
+    "paypal":                                 "PayPal",
+    "paypal inc":                             "PayPal",
+    "paypal inc.":                            "PayPal",
+    # PepsiCo
+    "pepsico inc":                            "PepsiCo",
+    "pepsico, inc.":                          "PepsiCo",
+    # Pfizer
+    "pfizer":                                 "Pfizer",
+    "pfizer inc":                             "Pfizer",
+    "pfizer inc.":                            "Pfizer",
+    # PNC
+    "pnc":                                    "PNC",
+    "pnc bank":                               "PNC",
+    "pnc bank canada branch":                 "PNC",
+    "pnc bank national association":          "PNC",
+    "pnc financial services group inc":       "PNC",
+    # PSPC
+    "pspc":                                   "PSPC",
+    "pspc - posr":                            "PSPC",
+    "pspc - sigma":                           "PSPC",
+    "pspc ams":                               "PSPC",
+    "pspc- psdpt (phoenix)":                  "PSPC",
+    "pspc rpa":                               "PSPC",
+    "pspc sigma":                             "PSPC",
+    # Prudential
+    "prudential financial inc":               "Prudential",
+    "prudential financial inc.":              "Prudential",
+    "the prudential insurance company of":    "Prudential",
+    # RBC
+    "rbc - royal bank of canada":             "Royal Bank of Canada",
+    "royal bank of canada":                   "Royal Bank of Canada",
+    # RTX
+    "rtx":                                    "RTX",
+    "rtx corporation":                        "RTX",
+    "rtx- e-hub & rtx - common build":        "RTX",
+    # SSC / Shared Services Canada
+    "shared services canada":                 "SSC",
+    "ssc":                                    "SSC",
+    "ssc fortinet":                           "SSC",
+    # StanCorp / Standard Insurance
+    "stancorp financial group, inc":          "StanCorp",
+    "stancorp financial group, inc.":         "StanCorp",
+    "standard insurance co":                  "StanCorp",
+    # Staples
+    "staples inc":                            "Staples",
+    "staples, inc.":                          "Staples",
+    # State Farm
+    "state farm insurance co":                "State Farm",
+    "state farm mutual automobile":           "State Farm",
+    "state farm mutual automobile (p)":       "State Farm",
+    "state farm mutual automobile insurance company": "State Farm",
+    # Suncor
+    "suncor energy inc":                      "Suncor",
+    "suncor energy services inc":             "Suncor",
+    # SunTrust (historical, now Truist)
+    "suntrust banks, inc.":                   "Truist",
+    # TD Bank
+    "td bank financial group":                "TD Bank",
+    "the toronto-dominion bank":              "TD Bank",
+    "toronto-dominion bank, the":             "TD Bank",
+    # Telus
+    "telus canada":                           "Telus",
+    "telus communications inc":               "Telus",
+    "telus corporation":                      "Telus",
+    # Toyota
+    "toyota motor corporation":               "Toyota",
+    "toyota motor credit corp":               "Toyota",
+    "toyota motor north america inc":         "Toyota",
+    "toyota motor sales usa inc (p)":         "Toyota",
+    "toyota tsusho america inc":              "Toyota",
+    # Truist
+    "truist":                                 "Truist",
+    "truist financial corp":                  "Truist",
+    "truist financial corporation":           "Truist",
+    "truist financial corporation digital marketing": "Truist",
     # UnitedHealth
-    "united health":          "UnitedHealth Group",
-    "unitedhealthcare":       "UnitedHealth Group",
-    "unitedhealth":           "UnitedHealth Group",
-    "uhc":                    "UnitedHealth Group",
-    # IBM
-    "ibm":                "IBM",
-    "ibm corporation":    "IBM",
+    "united healthcare services inc":         "UnitedHealth",
+    "united health":                          "UnitedHealth",
+    "unitedhealthcare":                       "UnitedHealth",
+    "unitedhealth":                           "UnitedHealth",
+    "uhc":                                    "UnitedHealth",
+    # UPS
+    "united parcel service oasis supply corp":"UPS",
+    "united parcel service, inc.":            "UPS",
+    # USAA
+    "usaa":                                   "USAA",
+    "usaa - hogwarts team extension":         "USAA",
+    "usaa - ibm hogwarts ii":                 "USAA",
+    "usaa - ibm hogwarts team":               "USAA",
+    "united services automobile":             "USAA",
+    "united services automobile association": "USAA",
+    "united services automobile usaa emm rtb":"USAA",
+    # Verizon
+    "verizon":                                "Verizon",
+    "verizon communications":                 "Verizon",
+    "verizon sourcing llc":                   "Verizon",
+    # W. L. Gore
+    "w l gore & associates inc":              "W. L. Gore & Associates",
+    "w. l. gore & associates, inc.":          "W. L. Gore & Associates",
+    # Wells Fargo
+    "wells fargo":                            "Wells Fargo",
+    "wells fargo & co":                       "Wells Fargo",
+    "wells fargo & company":                  "Wells Fargo",
+    "wells fargo bank national":              "Wells Fargo",
+    # Xcel Energy
+    "xcel energy":                            "Xcel Energy",
+    "xcel energy inc.":                       "Xcel Energy",
+    "xcel energy services inc":               "Xcel Energy",
+    # Citigroup / Citi
+    "citibank":                               "Citigroup",
+    "citi":                                   "Citigroup",
+    "citigroup":                              "Citigroup",
 }
 
 
