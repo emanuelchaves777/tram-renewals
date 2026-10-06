@@ -271,10 +271,9 @@
       <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#1f2328">Renewals — Next 60 Days</div>
       <div style="display:flex;flex-direction:column;gap:6px" id="rpLegend"></div>
     </div>
-    <div style="flex:2;min-width:260px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px">Timeline position</div>
-      <div id="rpTimeline" style="position:relative;height:36px;background:#f3f4f6;border-radius:6px;overflow:hidden"></div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:3px"><span>Today</span><span>+30d</span><span>+60d</span></div>
+    <div style="flex:2;min-width:260px;max-height:180px;overflow-y:auto">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px">Upcoming expirations</div>
+      <div id="rpTimeline"></div>
     </div>
   </div>
 
@@ -385,13 +384,12 @@
             <th onclick="sortTable(0)" title="Sort">Exp. Date ↕</th>
             <th onclick="sortTable(1)" title="Sort">Days ↕</th>
             <th onclick="sortTable(2)">Contractor ↕</th>
-            <th onclick="sortTable(3)">Serial / CNUM</th>
-            <th onclick="sortTable(4)">Client ↕</th>
-            <th onclick="sortTable(5)">Project Contact</th>
-            <th onclick="sortTable(6)">Vendor</th>
-            <th onclick="sortTable(7)">Band</th>
-            <th onclick="sortTable(8)">JRS (TRAM)</th>
-            <th onclick="sortTable(9)">Old TRAM ID</th>
+            <th onclick="sortTable(3)">Client ↕</th>
+            <th onclick="sortTable(4)">Project Contact</th>
+            <th onclick="sortTable(5)">Vendor</th>
+            <th onclick="sortTable(6)">Band</th>
+            <th onclick="sortTable(7)">JRS (TRAM)</th>
+            <th onclick="sortTable(8)">Old TRAM ID</th>
             <th>PM Status</th>
           </tr>
         </thead>
@@ -1362,14 +1360,112 @@ async function setPmStatus(serial, status) {
     // Re-render the row pill without full table rebuild
     const pill = document.getElementById('pmPill-'+serial);
     if(pill && c) pill.innerHTML = _pmStatusPill(c);
+    // Show/hide inline TRAM ID / PO input in this row
+    _refreshRowInlineInput(serial, status, c);
     // Refresh detail panel status section if open
     const detailSt = document.getElementById('detailPmStatus');
     if(detailSt) detailSt.value = status;
     const detailPill = document.getElementById('detailPmPill');
     if(detailPill && c) detailPill.innerHTML = _pmStatusPill(c);
+    // Re-render the progress ring with fresh data (no full table rebuild needed)
+    const identityScoped = _identityFilter([..._liveRegistry]);
+    _renderRenewalRing(identityScoped);
   } catch(e) {
     alert('Could not save status: ' + e.message);
   }
+}
+
+function _refreshRowInlineInput(serial, status, c) {
+  const wrap = document.getElementById('rowInline-' + serial);
+  if (!wrap) return;
+  wrap.innerHTML = _inlineInputHTML(serial, status, c);
+}
+
+function _inlineInputHTML(serial, status, c) {
+  if (status === 'In Progress') {
+    const saved = (c && c._ledger && c._ledger.tram_id_new) ? c._ledger.tram_id_new : '';
+    return `<div style="margin-top:5px;display:flex;gap:3px">
+      <input id="ri-tram-${serial}" placeholder="New TRAM ID" value="${saved}"
+             style="flex:1;min-width:0;border:1px solid #fcd34d;border-radius:4px;padding:2px 5px;font-size:10px;font-family:monospace"
+             onclick="event.stopPropagation()">
+      <button onclick="event.stopPropagation();_saveNewTramId('${serial}','row')" title="Save TRAM ID"
+              style="border:none;background:#f59e0b;color:#fff;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:10px;font-weight:700">✓</button>
+    </div>`;
+  }
+  if (status === 'Renewed') {
+    const saved = (c && c._ledger && c._ledger.new_po) ? c._ledger.new_po : '';
+    return `<div style="margin-top:5px;display:flex;gap:3px">
+      <input id="ri-po-${serial}" placeholder="New PO #" value="${saved}"
+             style="flex:1;min-width:0;border:1px solid #86efac;border-radius:4px;padding:2px 5px;font-size:10px;font-family:monospace"
+             onclick="event.stopPropagation()">
+      <button onclick="event.stopPropagation();_saveNewPo('${serial}','row')" title="Save PO"
+              style="border:none;background:#16a34a;color:#fff;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:10px;font-weight:700">✓</button>
+    </div>`;
+  }
+  return '';
+}
+
+// ── Client name normalisation ──────────────────────────────────────────────
+// Unifies common client name variants so the dropdown and analytics de-dupe.
+// Rules: lowercase → canonical map; falls back to title-cased trimmed string.
+const _CLIENT_ALIAS = {
+  // T-Mobile variants
+  't-mobile':           'T-Mobile',
+  't-mo':               'T-Mobile',
+  'tmobile':            'T-Mobile',
+  't mobile':           'T-Mobile',
+  't-mobile usa':       'T-Mobile',
+  't-mobile usa inc':   'T-Mobile',
+  't-mobile us inc':    'T-Mobile',
+  't-mobile us':        'T-Mobile',
+  't-mobile inc':       'T-Mobile',
+  // AT&T
+  'at&t':               'AT&T',
+  'at&t inc':           'AT&T',
+  'att':                'AT&T',
+  'at & t':             'AT&T',
+  // Verizon
+  'verizon':            'Verizon',
+  'verizon communications': 'Verizon',
+  'verizon inc':        'Verizon',
+  // Comcast
+  'comcast':            'Comcast',
+  'comcast corporation':'Comcast',
+  'comcast corp':       'Comcast',
+  // JP Morgan / JPMorgan Chase
+  'jpmorgan':           'JPMorgan Chase',
+  'jp morgan':          'JPMorgan Chase',
+  'jpmorgan chase':     'JPMorgan Chase',
+  'jp morgan chase':    'JPMorgan Chase',
+  'j.p. morgan':        'JPMorgan Chase',
+  // Bank of America
+  'bank of america':    'Bank of America',
+  'bofa':               'Bank of America',
+  'boa':                'Bank of America',
+  // Wells Fargo
+  'wells fargo':        'Wells Fargo',
+  'wells fargo & co':   'Wells Fargo',
+  // Citibank / Citi
+  'citibank':           'Citigroup',
+  'citi':               'Citigroup',
+  'citigroup':          'Citigroup',
+  // American Express
+  'amex':               'American Express',
+  'american express':   'American Express',
+  // United Health
+  'united health':      'UnitedHealth Group',
+  'unitedhealthcare':   'UnitedHealth Group',
+  'unitedhealth':       'UnitedHealth Group',
+  'uhc':                'UnitedHealth Group',
+  // IBM (internal projects)
+  'ibm':                'IBM',
+  'ibm corporation':    'IBM',
+};
+
+function _normaliseClient(raw) {
+  if (!raw || raw === '–') return raw || '–';
+  const key = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  return _CLIENT_ALIAS[key] || raw.trim();
 }
 
 function _buildRow(c) {
@@ -1384,22 +1480,25 @@ function _buildRow(c) {
     :'<span style="color:#9ca3af">–</span>';
   const ghostStyle=c._ghost?' style="opacity:0.65;background:#fafafa"':'';
   const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
+  const clientDisplay = _normaliseClient(c.client);
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
     <td class="col-action" onclick="event.stopPropagation()">
-      <button class="btn btn-primary btn-sm" style="margin-bottom:4px;width:100%" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
-      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>Offboard</button>
+      <button class="btn btn-secondary btn-sm" style="margin-bottom:4px;width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+      <button class="btn btn-secondary btn-sm" style="width:100%;opacity:0.45;cursor:not-allowed" disabled title="Onboarding — coming soon">🔜 Onboarding</button>
     </td>
     <td>${expDate}</td>
     <td>${daysCell}</td>
-    <td><b>${c.name}</b>${ghostBadge}</td>
-    <td><code style="font-size:11px">${c.serial}${c.cnum?'<br><span style="color:#9ca3af">'+c.cnum+'</span>':''}</code></td>
-    <td>${c.client||'–'}</td>
+    <td>
+      <b>${c.name}</b>${ghostBadge}
+      <div style="font-size:10px;color:#9ca3af;margin-top:1px"><code>${c.serial}${c.cnum?'·'+c.cnum:''}</code></div>
+    </td>
+    <td>${clientDisplay}</td>
     <td>${c.contact||'–'}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail||''}</span></td>
     <td style="font-size:12px">${c.vendor||'–'}</td>
     <td style="text-align:center">${c.band||'–'}</td>
     <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram||'–'}</span></td>
     <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
-    <td onclick="event.stopPropagation()" style="min-width:110px">
+    <td onclick="event.stopPropagation()" style="min-width:130px">
       <div id="pmPill-${c.serial}">${_pmStatusPill(c)}</div>
       ${c.pmStatus==='Offboarded'
         ? `<div style="font-size:10px;color:#0891b2;margin-top:4px;text-align:center">🔒 Auto-set</div>`
@@ -1407,6 +1506,7 @@ function _buildRow(c) {
             onchange="setPmStatus('${c.serial}',this.value);this.blur()">
             ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
           </select>`}
+      <div id="rowInline-${c.serial}">${_inlineInputHTML(c.serial, c.pmStatus||'Pending', c)}</div>
     </td>
   </tr>`;
 }
@@ -1429,7 +1529,7 @@ function _renderPage(){
   if(remaining > 0){
     const tr = document.createElement('tr');
     tr.id = 'tableLoadMore';
-    tr.innerHTML = `<td colspan="11" style="text-align:center;padding:14px;color:#6b7280;font-size:13px">
+    tr.innerHTML = `<td colspan="10" style="text-align:center;padding:14px;color:#6b7280;font-size:13px">
       <button class="btn btn-secondary btn-sm" onclick="loadMoreRows()">
         Load ${Math.min(remaining, PAGE_SIZE)} more (${remaining} remaining)
       </button>
@@ -1462,7 +1562,7 @@ function getFilteredData(){
   if(active) data=data.filter(c=>c.bucket===active||(active==='dq'&&c.dq));
   if(jrsSt) data=data.filter(c=>c.jrsStatus===jrsSt);
   if(sortCol>=0){
-    const keys=['endDate','days','name','serial','client','contact','vendor','band','jrsTram','tramId'];
+    const keys=['endDate','days','name','client','contact','vendor','band','jrsTram','tramId'];
     const k=keys[sortCol];
     data.sort((a,b)=>{const av=a[k]??'';const bv=b[k]??'';return (av<bv?-1:av>bv?1:0)*sortDir;});
   }
@@ -1548,22 +1648,29 @@ function _renderRenewalRing(data) {
     ].join('');
   }
 
-  // Timeline: one dot per contractor, x = day position, colored by status
+  // Timeline: grouped readable list — Completed → In Progress → Pending, sorted by days
   const tl = document.getElementById('rpTimeline');
-  if (tl && scope.length) {
-    const W = tl.offsetWidth || 300;
-    const dots = scope.map(c => {
-      const x = Math.max(0, Math.min(W - 8, Math.round(((c.days < 0 ? 0 : c.days) / 60) * (W - 8))));
-      const isDone = c.pmStatus==='Renewed'||c.pmStatus==='Offboarded'||c.renewal==='Submitted'||c.offboard==='Submitted';
-      const isIP   = c.pmStatus==='In Progress' && !isDone;
-      const col = isDone ? '#16a34a' : isIP ? '#f59e0b' : (c.days < 0 ? '#dc2626' : '#94a3b8');
-      return `<div title="${c.name} · ${c.days}d · ${c.pmStatus||'Pending'}"
-                   style="position:absolute;left:${x}px;top:50%;transform:translateY(-50%);
-                          width:8px;height:8px;border-radius:50%;background:${col};
-                          cursor:pointer;transition:transform .15s"
-                   onclick="openDetail('${c.serial}')"></div>`;
-    }).join('');
-    tl.innerHTML = dots;
+  if (tl) {
+    if (!scope.length) { tl.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:4px 0">No contractors expiring in next 60 days</div>'; }
+    else {
+      const _isDone = c => c.pmStatus==='Renewed'||c.pmStatus==='Offboarded'||c.renewal==='Submitted'||c.offboard==='Submitted';
+      const _isIP   = c => c.pmStatus==='In Progress' && !_isDone(c);
+      const groups = [
+        { label:'✅ Completed', color:'#16a34a', bg:'#f0fdf4', items: scope.filter(c=>_isDone(c)).sort((a,b)=>a.days-b.days) },
+        { label:'⏳ In Progress', color:'#d97706', bg:'#fffbeb', items: scope.filter(c=>_isIP(c)).sort((a,b)=>a.days-b.days) },
+        { label:'⏰ Pending', color:'#6b7280', bg:'#f9fafb', items: scope.filter(c=>!_isDone(c)&&!_isIP(c)).sort((a,b)=>a.days-b.days) },
+      ];
+      tl.innerHTML = groups.filter(g=>g.items.length).map(g=>`
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:${g.color};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${g.label} (${g.items.length})</div>
+          ${g.items.map(c=>`
+            <div onclick="openDetail('${c.serial}')" style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;background:${g.bg};margin-bottom:2px;cursor:pointer;font-size:11px" title="${c.name} · ${_normaliseClient(c.client)}">
+              <span style="font-weight:600;color:${g.color};min-width:34px;text-align:right">${c.days<0?c.days+'d':c.days+'d'}</span>
+              <span style="color:#1f2328;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${c.name}</b></span>
+              <span style="color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${_normaliseClient(c.client)}</span>
+            </div>`).join('')}
+        </div>`).join('');
+    }
   }
 }
 function applyFilters(){renderTable(getFilteredData());}
@@ -1584,7 +1691,7 @@ function clearFilters(){
 const _COMBO_CFG = {
   contact:    { field: c => [c.contact, c.contactEmail].filter(Boolean) },
   contractor: { field: c => [c.name].filter(Boolean) },
-  client:     { field: c => [c.client].filter(Boolean) },
+  client:     { field: c => [_normaliseClient(c.client)].filter(v => v && v !== '–') },
   serial:     { field: c => [c.serial, c.cnum].filter(Boolean) },
 };
 
@@ -1682,7 +1789,7 @@ function _populateAnalyticsFilters(data) {
   // clients filtered by chosen sector
   const sectorVal = sEl.value;
   const clientData = sectorVal ? data.filter(c=>(c.marketSector||c.sector)===sectorVal) : data;
-  const clients = [...new Set(clientData.map(c=>c.client||'').filter(Boolean))].sort();
+  const clients = [...new Set(clientData.map(c=>_normaliseClient(c.client)||'').filter(Boolean))].sort();
   const cEl = document.getElementById('an-client');
   const curC = cEl.value;
   cEl.innerHTML = '<option value="">All Clients</option>' +
@@ -1694,7 +1801,7 @@ function _getAnalyticsFiltered() {
   const sec = (document.getElementById('an-sector')||{}).value||'';
   const cli = (document.getElementById('an-client')||{}).value||'';
   if(sec) data = data.filter(c=>(c.marketSector||c.sector)===sec);
-  if(cli) data = data.filter(c=>c.client===cli);
+  if(cli) data = data.filter(c=>_normaliseClient(c.client)===cli);
   return data;
 }
 
@@ -1745,7 +1852,11 @@ function _renderTopBar(containerId, data, field, title, color) {
   const el = document.getElementById(containerId);
   if(!el) return;
   const counts = {};
-  data.forEach(c=>{ const v=c[field]||'Unknown'; counts[v]=(counts[v]||0)+1; });
+  data.forEach(c=>{
+    let v = c[field]||'Unknown';
+    if(field==='client') v = _normaliseClient(v);
+    counts[v]=(counts[v]||0)+1;
+  });
   const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
   if(!sorted.length){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }
   const max = sorted[0][1];
@@ -1995,21 +2106,27 @@ function openDetail(serial){
     </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>🔄 Initiate Renewal</button>
-      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>Initiate Offboarding</button>
+      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
+      <button class="btn btn-secondary" style="opacity:0.45;cursor:not-allowed" disabled title="Onboarding — coming soon">🔜 Onboarding (coming soon)</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
 }
 function closeDetail(e){if(e.target===document.getElementById('detailOverlay')) closeDetailPanel();}
 function closeDetailPanel(){document.getElementById('detailOverlay').classList.remove('open');}
 
-// Save New PO for a completed renewal — persisted via ledger endpoint
-async function _saveNewPo(serial) {
-  const inp = document.getElementById('dp-newPo-' + serial);
-  const st  = document.getElementById('dp-newPo-status-' + serial);
+// Save New PO — works from both the table row ('row') and detail panel (default)
+async function _saveNewPo(serial, source) {
+  const inputId = source === 'row' ? 'ri-po-' + serial : 'dp-newPo-' + serial;
+  const statusId = source === 'row' ? null : 'dp-newPo-status-' + serial;
+  const inp = document.getElementById(inputId);
+  const st  = statusId ? document.getElementById(statusId) : null;
   if (!inp) return;
   const val = inp.value.trim();
-  if (!val) { if (st) st.innerHTML = '<span style="color:#dc2626">Enter a PO number first.</span>'; return; }
+  if (!val) {
+    if (st) st.innerHTML = '<span style="color:#dc2626">Enter a PO number first.</span>';
+    else inp.placeholder = 'Enter PO first!';
+    return;
+  }
   if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
   try {
     if (API_BASE) {
@@ -2018,7 +2135,6 @@ async function _saveNewPo(serial) {
         body: JSON.stringify({ status: 'Renewed', new_po: val })
       });
     }
-    // Update in-memory record
     const c = _findContractor(serial);
     if (c) {
       if (!c._ledger) c._ledger = {};
@@ -2026,18 +2142,29 @@ async function _saveNewPo(serial) {
     }
     if (st) st.innerHTML = `<span style="color:#16a34a">✅ PO saved: <b>${val}</b></span>`;
     inp.style.borderColor = '#86efac';
+    // Sync row inline input if saved from detail panel
+    if (source !== 'row') {
+      const ri = document.getElementById('ri-po-' + serial);
+      if (ri) ri.value = val;
+    }
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
   }
 }
 
-// Save New TRAM ID for an in-progress renewal — updates ledger record
-async function _saveNewTramId(serial) {
-  const inp = document.getElementById('dp-newTram-' + serial);
-  const st  = document.getElementById('dp-newTram-status-' + serial);
+// Save New TRAM ID — works from both the table row ('row') and detail panel (default)
+async function _saveNewTramId(serial, source) {
+  const inputId = source === 'row' ? 'ri-tram-' + serial : 'dp-newTram-' + serial;
+  const statusId = source === 'row' ? null : 'dp-newTram-status-' + serial;
+  const inp = document.getElementById(inputId);
+  const st  = statusId ? document.getElementById(statusId) : null;
   if (!inp) return;
   const val = inp.value.trim();
-  if (!val) { if (st) st.innerHTML = '<span style="color:#dc2626">Enter the new TRAM ID first.</span>'; return; }
+  if (!val) {
+    if (st) st.innerHTML = '<span style="color:#dc2626">Enter the new TRAM ID first.</span>';
+    else inp.placeholder = 'Enter TRAM ID first!';
+    return;
+  }
   if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
   try {
     if (API_BASE) {
@@ -2050,10 +2177,18 @@ async function _saveNewTramId(serial) {
     if (c) {
       if (!c._ledger) c._ledger = {};
       c._ledger.tram_id_new = val;
-      c.tramId = val;  // also update displayed TRAM ID immediately
+      c.tramId = val;
+      // Update the TRAM ID cell in the table row immediately
+      const tramCell = document.querySelector(`#mainTable tr[data-serial="${serial}"] .tram-id-cell`);
+      if (tramCell) tramCell.innerHTML = `<code style="font-size:11px">${val}</code>`;
     }
     if (st) st.innerHTML = `<span style="color:#16a34a">✅ TRAM ID saved: <b>${val}</b></span>`;
     inp.style.borderColor = '#86efac';
+    // Sync row inline input if saved from detail panel
+    if (source !== 'row') {
+      const ri = document.getElementById('ri-tram-' + serial);
+      if (ri) ri.value = val;
+    }
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
   }
