@@ -64,13 +64,16 @@
   .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:12px;border-radius:4px 4px 0 0}
   .table-scroll-top-inner{height:1px}
   .table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:0 0 8px 8px;overflow-x:auto;overflow-y:visible}
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:1400px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:1200px}
   /* Sticky header — stays visible while scrolling down */
   thead th{position:sticky;top:0;z-index:2;background:#f9fafb;padding:10px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
   thead th:hover{background:#f3f4f6}
   /* Action column — sticky to left edge */
-  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:130px;white-space:nowrap;border-right:2px solid #e5e7eb}
+  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:110px;max-width:120px;white-space:nowrap;border-right:2px solid #e5e7eb}
   thead th.col-action{z-index:3;background:#f9fafb}
+  /* Date / days columns — fixed width so they never squeeze */
+  th.col-date,td.col-date{min-width:100px;max-width:110px;white-space:nowrap}
+  th.col-days,td.col-days{min-width:64px;max-width:72px;white-space:nowrap;text-align:center}
   td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
   tr:last-child td{border-bottom:none}
   tr:hover td{background:#f9fafb}
@@ -361,6 +364,13 @@
         <option value="renewal-ip">Renewal In Progress</option>
         <option value="offboard-ip">Offboarding In Progress</option>
       </select>
+      <select id="f-pmstatus" onchange="applyFilters()">
+        <option value="">All PM Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Renewed">Renewed</option>
+        <option value="Offboarded">Offboarded</option>
+      </select>
       <select id="f-jrs" onchange="applyFilters()">
         <option value="">All JRS Statuses</option>
         <option value="active">JRS Active</option>
@@ -381,8 +391,8 @@
         <thead>
           <tr>
             <th class="col-action">Action</th>
-            <th onclick="sortTable(0)" title="Sort">Exp. Date ↕</th>
-            <th onclick="sortTable(1)" title="Sort">Days ↕</th>
+            <th class="col-date" onclick="sortTable(0)" title="Sort">Exp. Date ↕</th>
+            <th class="col-days" onclick="sortTable(1)" title="Sort">Days ↕</th>
             <th onclick="sortTable(2)">Contractor ↕</th>
             <th onclick="sortTable(3)">Client ↕</th>
             <th onclick="sortTable(4)">Project Contact</th>
@@ -757,16 +767,24 @@ function _loadIdentity() {
 
 async function _syncIdentityFromServer(id) {
   // Pull identity from server for this email — overwrites localStorage if server has newer data.
-  // Called after login so a different device picks up the same identity automatically.
+  // This is what lets a second device (e.g. an assistant on another machine) pick up the same
+  // session automatically within ~5s of the page loading — no re-login needed.
   if (!API_BASE || !id) return;
   try {
     const resp = await fetch(`${API_BASE}/api/identity?id=${encodeURIComponent(id)}`);
     if (resp.ok) {
       const data = await resp.json();
       if (data && data.intranetId) {
+        const prevClient = (_identity || {}).client || '';
+        const prevId     = (_identity || {}).intranetId || '';
         _identity = data;
         try { localStorage.setItem('tram_identity', JSON.stringify(_identity)); } catch(_) {}
         _updateHeaderBadge();
+        // If server had a different client scope or a different intranet ID, reload the data
+        // so the second-device user immediately sees the correct filtered view.
+        if (data.client !== prevClient || data.intranetId !== prevId) {
+          loadData();
+        }
       }
     }
   } catch(_) {} // silent — server may not support this endpoint yet
@@ -1486,8 +1504,8 @@ function _buildRow(c) {
       <button class="btn btn-secondary btn-sm" style="margin-bottom:4px;width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
       <button class="btn btn-secondary btn-sm" style="width:100%;opacity:0.45;cursor:not-allowed" disabled title="Onboarding — coming soon">🔜 Onboarding</button>
     </td>
-    <td>${expDate}</td>
-    <td>${daysCell}</td>
+    <td class="col-date">${expDate}</td>
+    <td class="col-days">${daysCell}</td>
     <td>
       <b>${c.name}</b>${ghostBadge}
       <div style="font-size:10px;color:#9ca3af;margin-top:1px"><code>${c.serial}${c.cnum?'·'+c.cnum:''}</code></div>
@@ -1554,13 +1572,15 @@ function getFilteredData(){
   const serial=(document.getElementById('f-serial')||{}).value||'';
   const bkt=(document.getElementById('f-bucket')||{}).value||'';
   const jrsSt=(document.getElementById('f-jrs')||{}).value||'';
+  const pmSt=(document.getElementById('f-pmstatus')||{}).value||'';
   const active=activeBucketFilter||bkt;
   if(contact) data=data.filter(c=>(c.contact||'').toLowerCase().includes(contact.toLowerCase())||(c.contactEmail||'').toLowerCase().includes(contact.toLowerCase()));
   if(contractor) data=data.filter(c=>(c.name||'').toLowerCase().includes(contractor.toLowerCase())||(c.email||'').toLowerCase().includes(contractor.toLowerCase()));
-  if(client) data=data.filter(c=>(c.client||'').toLowerCase().includes(client.toLowerCase()));
+  if(client) data=data.filter(c=>_normaliseClient(c.client||'').toLowerCase().includes(client.toLowerCase()));
   if(serial) data=data.filter(c=>(c.serial||'').toLowerCase().includes(serial.toLowerCase())||(c.cnum||'').toLowerCase().includes(serial.toLowerCase()));
   if(active) data=data.filter(c=>c.bucket===active||(active==='dq'&&c.dq));
   if(jrsSt) data=data.filter(c=>c.jrsStatus===jrsSt);
+  if(pmSt) data=data.filter(c=>(c.pmStatus||'Pending')===pmSt);
   if(sortCol>=0){
     const keys=['endDate','days','name','client','contact','vendor','band','jrsTram','tramId'];
     const k=keys[sortCol];
@@ -1675,7 +1695,7 @@ function _renderRenewalRing(data) {
 }
 function applyFilters(){renderTable(getFilteredData());}
 function clearFilters(){
-  ['f-contact','f-contractor','f-client','f-serial','f-bucket','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
+  ['f-contact','f-contractor','f-client','f-serial','f-bucket','f-pmstatus','f-jrs'].forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
   activeBucketFilter='';
   document.querySelectorAll('#bucketCards .card').forEach(c=>c.classList.remove('active-filter'));
   const filtered=_identityFilter([..._liveRegistry]);

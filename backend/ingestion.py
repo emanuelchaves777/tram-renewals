@@ -26,6 +26,74 @@ from config import (
 )
 
 
+# ── Client name normalisation ─────────────────────────────────────────────────
+# Mirror of the _CLIENT_ALIAS map in app.html so the backend stores canonical names.
+_CLIENT_ALIAS: dict = {
+    # T-Mobile
+    "t-mobile":         "T-Mobile",
+    "t-mo":             "T-Mobile",
+    "tmobile":          "T-Mobile",
+    "t mobile":         "T-Mobile",
+    "t-mobile usa":     "T-Mobile",
+    "t-mobile usa inc": "T-Mobile",
+    "t-mobile us inc":  "T-Mobile",
+    "t-mobile us":      "T-Mobile",
+    "t-mobile inc":     "T-Mobile",
+    # AT&T
+    "at&t":             "AT&T",
+    "at&t inc":         "AT&T",
+    "att":              "AT&T",
+    "at & t":           "AT&T",
+    # Verizon
+    "verizon":                   "Verizon",
+    "verizon communications":    "Verizon",
+    "verizon inc":               "Verizon",
+    # Comcast
+    "comcast":            "Comcast",
+    "comcast corporation":"Comcast",
+    "comcast corp":       "Comcast",
+    # JPMorgan
+    "jpmorgan":           "JPMorgan Chase",
+    "jp morgan":          "JPMorgan Chase",
+    "jpmorgan chase":     "JPMorgan Chase",
+    "jp morgan chase":    "JPMorgan Chase",
+    "j.p. morgan":        "JPMorgan Chase",
+    # Bank of America
+    "bank of america":    "Bank of America",
+    "bofa":               "Bank of America",
+    "boa":                "Bank of America",
+    # Wells Fargo
+    "wells fargo":        "Wells Fargo",
+    "wells fargo & co":   "Wells Fargo",
+    # Citi
+    "citibank":           "Citigroup",
+    "citi":               "Citigroup",
+    "citigroup":          "Citigroup",
+    # American Express
+    "amex":               "American Express",
+    "american express":   "American Express",
+    # UnitedHealth
+    "united health":          "UnitedHealth Group",
+    "unitedhealthcare":       "UnitedHealth Group",
+    "unitedhealth":           "UnitedHealth Group",
+    "uhc":                    "UnitedHealth Group",
+    # IBM
+    "ibm":                "IBM",
+    "ibm corporation":    "IBM",
+}
+
+
+def _normalise_client(raw: Any) -> Any:
+    """Return canonical client name, or the original value if no alias matches."""
+    if not raw:
+        return raw
+    key = str(raw).strip().lower()
+    # collapse multiple spaces
+    import re as _re
+    key = _re.sub(r"\s+", " ", key)
+    return _CLIENT_ALIAS.get(key, str(raw).strip())
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def ingest_from_bytes(file_bytes: bytes, filename: str, ext: str) -> dict:
@@ -243,7 +311,7 @@ def _build_contractor_records(
             "country":            row.get("Country"),
             "hrLob":              row.get("HR LOB"),
             "sector":             row.get("Sector"),
-            "client":             row.get("Client Name-PO"),
+            "client":             _normalise_client(row.get("Client Name-PO")),
             "project":            row.get("Project Name-PO"),
             "vendor":             row.get("Vendor"),
             "poNumber":           row.get("PO Number"),
