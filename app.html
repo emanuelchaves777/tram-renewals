@@ -1867,7 +1867,8 @@ function _buildRow(c) {
   const clientDisplay = _normaliseClient(c.client);
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
     <td class="col-action" onclick="event.stopPropagation()">
-      <button class="btn btn-secondary btn-sm" style="margin-bottom:4px;width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:4px;width:100%" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
+      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
     </td>
     <td class="col-date">${expDate}</td>
     <td class="col-days">${daysCell}</td>
@@ -2491,6 +2492,7 @@ function openDetail(serial){
     </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>🔄 Initiate Renewal</button>
       <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
