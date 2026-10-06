@@ -100,6 +100,14 @@
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
   .modal{background:#fff;border-radius:10px;width:760px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.22)}
+  /* Smart combo filter */
+  .combo-wrap{position:relative;display:inline-block}
+  .combo-wrap input{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;color:#374151;background:#fff;outline:none;min-width:150px;width:100%}
+  .combo-wrap input:focus{border-color:#6366f1}
+  .combo-list{position:absolute;top:calc(100% + 2px);left:0;min-width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:9999;display:none}
+  .combo-list.open{display:block}
+  .combo-item{padding:7px 12px;font-size:13px;color:#374151;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .combo-item:hover,.combo-item.hi{background:#eff6ff;color:#1d4ed8}
   /* Renewal stepper */
   .rnw-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px;padding:0 4px}
   .rnw-step{display:flex;align-items:center;gap:8px;flex:1;position:relative}
@@ -246,6 +254,30 @@
 ═══════════════════════════════════════════ -->
 <div id="tab-dashboard">
 
+  <!-- ── 60-Day Renewal Progress Ring ── -->
+  <div id="renewalProgressWidget" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <div style="position:relative;flex-shrink:0">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="#f3f4f6" stroke-width="10"/>
+        <circle id="rpRingDone" cx="50" cy="50" r="42" fill="none" stroke="#16a34a" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="0 264" transform="rotate(-90 50 50)" style="transition:stroke-dasharray .5s ease"/>
+        <circle id="rpRingIP" cx="50" cy="50" r="42" fill="none" stroke="#f59e0b" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="0 264" transform="rotate(-90 50 50)" style="transition:stroke-dasharray .5s ease;display:none"/>
+        <text id="rpPct" x="50" y="46" text-anchor="middle" font-size="18" font-weight="700" fill="#1f2328">0%</text>
+        <text x="50" y="60" text-anchor="middle" font-size="9" fill="#6b7280">complete</text>
+      </svg>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#1f2328">Renewals — Next 60 Days</div>
+      <div style="display:flex;flex-direction:column;gap:6px" id="rpLegend"></div>
+    </div>
+    <div style="flex:2;min-width:260px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px">Timeline position</div>
+      <div id="rpTimeline" style="position:relative;height:36px;background:#f3f4f6;border-radius:6px;overflow:hidden"></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:3px"><span>Today</span><span>+30d</span><span>+60d</span></div>
+    </div>
+  </div>
+
   <div class="freshness-bar" id="freshnessBar">
     <div class="dot dot-warn" id="freshnessDot"></div>
     <div id="freshnessText">
@@ -294,10 +326,27 @@
 
   <div class="filters">
     <div class="filters-row">
-      <input id="f-contact" type="text" placeholder="Project contact name or email" oninput="debouncedFilter()">
-      <input id="f-contractor" type="text" placeholder="Contractor name or email" oninput="debouncedFilter()">
-      <input id="f-client" type="text" placeholder="Client" oninput="debouncedFilter()">
-      <input id="f-serial" type="text" placeholder="Serial / TalentID" oninput="debouncedFilter()">
+      <!-- Smart combo: type to search, dropdown shows matching options from live data -->
+      <div class="combo-wrap" id="cw-contact">
+        <input id="f-contact" type="text" placeholder="Project contact…" autocomplete="off"
+               oninput="_comboInput('contact')" onfocus="_comboOpen('contact')" onblur="_comboBlur('contact')">
+        <div class="combo-list" id="cl-contact"></div>
+      </div>
+      <div class="combo-wrap" id="cw-contractor">
+        <input id="f-contractor" type="text" placeholder="Contractor name…" autocomplete="off"
+               oninput="_comboInput('contractor')" onfocus="_comboOpen('contractor')" onblur="_comboBlur('contractor')">
+        <div class="combo-list" id="cl-contractor"></div>
+      </div>
+      <div class="combo-wrap" id="cw-client">
+        <input id="f-client" type="text" placeholder="Client…" autocomplete="off"
+               oninput="_comboInput('client')" onfocus="_comboOpen('client')" onblur="_comboBlur('client')">
+        <div class="combo-list" id="cl-client"></div>
+      </div>
+      <div class="combo-wrap" id="cw-serial">
+        <input id="f-serial" type="text" placeholder="Serial / TalentID…" autocomplete="off"
+               oninput="_comboInput('serial')" onfocus="_comboOpen('serial')" onblur="_comboBlur('serial')">
+        <div class="combo-list" id="cl-serial"></div>
+      </div>
       <select id="f-bucket" onchange="applyFilters()">
         <option value="">All Buckets</option>
         <option value="past-due">Past Due</option>
@@ -1375,6 +1424,95 @@ function updateBucketCounts(data){
   });
   const map={'past-due':'cnt-past','0-7':'cnt-07','8-14':'cnt-814','15-30':'cnt-1530','31-60':'cnt-3160','60+':'cnt-60p','renewal-ip':'cnt-rip','offboard-ip':'cnt-oip','dq':'cnt-dq'};
   Object.entries(map).forEach(([k,id])=>{const el=document.getElementById(id);if(el) el.textContent=counts[k]||0;});
+  _renderRenewalRing(data);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 60-DAY RENEWAL PROGRESS RING
+// Shows: completed (Renewed/Offboarded), in-progress, pending
+// for all contractors expiring within the next 60 days.
+// ══════════════════════════════════════════════════════════════════════
+function _renderRenewalRing(data) {
+  const CIRC = 2 * Math.PI * 42; // circumference ≈ 263.9
+
+  // Scope to next 60 days (includes past-due)
+  const scope = data.filter(c => c.days !== null && c.days <= 60);
+  const total = scope.length;
+
+  const done = scope.filter(c =>
+    c.pmStatus === 'Renewed' || c.pmStatus === 'Offboarded' ||
+    c.renewal === 'Submitted' || c.offboard === 'Submitted'
+  ).length;
+
+  const inProg = scope.filter(c =>
+    (c.pmStatus === 'In Progress') &&
+    c.pmStatus !== 'Renewed' && c.pmStatus !== 'Offboarded' &&
+    c.renewal !== 'Submitted' && c.offboard !== 'Submitted'
+  ).length;
+
+  const pending = total - done - inProg;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  // Ring — green arc for done, yellow arc for in-progress, rest is grey
+  const doneDash  = total ? (done / total) * CIRC : 0;
+  const ipDash    = total ? (inProg / total) * CIRC : 0;
+  const ipOffset  = doneDash; // starts after the done arc
+
+  const ringDone = document.getElementById('rpRingDone');
+  const ringIP   = document.getElementById('rpRingIP');
+  const pctEl    = document.getElementById('rpPct');
+
+  if (ringDone) {
+    ringDone.setAttribute('stroke-dasharray', `${doneDash.toFixed(1)} ${CIRC.toFixed(1)}`);
+  }
+  if (ringIP) {
+    if (inProg > 0) {
+      // Yellow arc starts where green ends — achieved via stroke-dashoffset trick
+      ringIP.style.display = '';
+      ringIP.setAttribute('stroke-dasharray', `${ipDash.toFixed(1)} ${(CIRC - ipDash).toFixed(1)}`);
+      // rotate to start after the done arc
+      const deg = -90 + (done / (total || 1)) * 360;
+      ringIP.setAttribute('transform', `rotate(${deg} 50 50)`);
+    } else {
+      ringIP.style.display = 'none';
+    }
+  }
+  if (pctEl) pctEl.textContent = pct + '%';
+
+  // Legend
+  const legend = document.getElementById('rpLegend');
+  if (legend) {
+    const row = (color, label, count) =>
+      `<div style="display:flex;align-items:center;gap:8px;font-size:13px">
+         <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
+         <span style="color:#57606a">${label}</span>
+         <span style="font-weight:700;margin-left:auto;color:#1f2328">${count}</span>
+       </div>`;
+    legend.innerHTML = [
+      row('#16a34a', 'Completed', done),
+      row('#f59e0b', 'In Progress', inProg),
+      row('#e5e7eb', 'Pending', pending),
+      row('#1d4ed8', 'Total in 60d window', total),
+    ].join('');
+  }
+
+  // Timeline: one dot per contractor, x = day position, colored by status
+  const tl = document.getElementById('rpTimeline');
+  if (tl && scope.length) {
+    const W = tl.offsetWidth || 300;
+    const dots = scope.map(c => {
+      const x = Math.max(0, Math.min(W - 8, Math.round(((c.days < 0 ? 0 : c.days) / 60) * (W - 8))));
+      const isDone = c.pmStatus==='Renewed'||c.pmStatus==='Offboarded'||c.renewal==='Submitted'||c.offboard==='Submitted';
+      const isIP   = c.pmStatus==='In Progress' && !isDone;
+      const col = isDone ? '#16a34a' : isIP ? '#f59e0b' : (c.days < 0 ? '#dc2626' : '#94a3b8');
+      return `<div title="${c.name} · ${c.days}d · ${c.pmStatus||'Pending'}"
+                   style="position:absolute;left:${x}px;top:50%;transform:translateY(-50%);
+                          width:8px;height:8px;border-radius:50%;background:${col};
+                          cursor:pointer;transition:transform .15s"
+                   onclick="openDetail('${c.serial}')"></div>`;
+    }).join('');
+    tl.innerHTML = dots;
+  }
 }
 function applyFilters(){renderTable(getFilteredData());}
 function clearFilters(){
@@ -1384,6 +1522,75 @@ function clearFilters(){
   const filtered=_identityFilter([..._liveRegistry]);
   renderTable(filtered);
   updateBucketCounts(filtered);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SMART COMBO FILTERS
+// Each text filter shows a dropdown of matching unique values from the
+// live registry scoped to the current identity.
+// ══════════════════════════════════════════════════════════════════════
+const _COMBO_CFG = {
+  contact:    { field: c => [c.contact, c.contactEmail].filter(Boolean) },
+  contractor: { field: c => [c.name].filter(Boolean) },
+  client:     { field: c => [c.client].filter(Boolean) },
+  serial:     { field: c => [c.serial, c.cnum].filter(Boolean) },
+};
+
+function _comboOptions(key, query) {
+  const cfg = _COMBO_CFG[key];
+  if (!cfg) return [];
+  const base = _identityFilter([..._liveRegistry]);
+  const q = (query || '').trim().toLowerCase();
+  const seen = new Set();
+  const results = [];
+  base.forEach(c => {
+    cfg.field(c).forEach(v => {
+      if (!v || v === '–') return;
+      const vl = v.toLowerCase();
+      if (seen.has(v)) return;
+      if (!q || vl.includes(q)) { seen.add(v); results.push(v); }
+    });
+  });
+  return results.sort((a, b) => {
+    // Exact-start matches first
+    const al = a.toLowerCase(), bl = b.toLowerCase();
+    const aq = al.startsWith(q), bq = bl.startsWith(q);
+    if (aq && !bq) return -1;
+    if (!aq && bq) return 1;
+    return a.localeCompare(b);
+  }).slice(0, 40);
+}
+
+function _comboInput(key) {
+  _comboOpen(key);
+  debouncedFilter();
+}
+
+function _comboOpen(key) {
+  const inp = document.getElementById('f-' + key);
+  const list = document.getElementById('cl-' + key);
+  if (!inp || !list) return;
+  const opts = _comboOptions(key, inp.value);
+  if (!opts.length) { list.classList.remove('open'); return; }
+  list.innerHTML = opts.map(v =>
+    `<div class="combo-item" onmousedown="event.preventDefault()" onclick="_comboPick('${key}',${JSON.stringify(v)})">${v}</div>`
+  ).join('');
+  list.classList.add('open');
+}
+
+function _comboPick(key, val) {
+  const inp = document.getElementById('f-' + key);
+  if (inp) inp.value = val;
+  document.getElementById('cl-' + key).classList.remove('open');
+  applyFilters();
+}
+
+let _comboBlurTimers = {};
+function _comboBlur(key) {
+  _comboBlurTimers[key] = setTimeout(() => {
+    const list = document.getElementById('cl-' + key);
+    if (list) list.classList.remove('open');
+  }, 150);
 }
 function filterBucket(b,card){
   if(activeBucketFilter===b){activeBucketFilter='';card.classList.remove('active-filter');}
@@ -1699,6 +1906,37 @@ function openDetail(serial){
       </div>
     </div>
     <hr class="divider">
+
+    ${(c.pmStatus==='Renewed'||c.renewal==='Submitted') ? `
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;color:#15803d;margin-bottom:8px">✅ Renewal Completed — Record New PO</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">New PO Number</label>
+          <input id="dp-newPo-${c.serial}" placeholder="e.g. PO-2025-04812"
+                 value="${c._ledger && c._ledger.new_po ? c._ledger.new_po : ''}"
+                 style="width:100%;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:13px;font-family:monospace">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="_saveNewPo('${c.serial}')">Save PO</button>
+      </div>
+      <div id="dp-newPo-status-${c.serial}" style="font-size:12px;margin-top:6px"></div>
+    </div>` : ''}
+
+    ${(c.pmStatus==='In Progress') && c.renewal!=='Submitted' ? `
+    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px">⏳ Renewal In Progress — Paste New TRAM ID when ready</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">New TRAM ID</label>
+          <input id="dp-newTram-${c.serial}" placeholder="e.g. NA202506293304S"
+                 value="${c._ledger && c._ledger.tram_id_new ? c._ledger.tram_id_new : ''}"
+                 style="width:100%;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px;font-size:13px;font-family:monospace;letter-spacing:.04em">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="_saveNewTramId('${c.serial}')">Save TRAM ID</button>
+      </div>
+      <div id="dp-newTram-status-${c.serial}" style="font-size:12px;margin-top:6px"></div>
+    </div>` : ''}
+
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>Initiate Offboarding</button>
     </div>`;
@@ -1706,6 +1944,62 @@ function openDetail(serial){
 }
 function closeDetail(e){if(e.target===document.getElementById('detailOverlay')) closeDetailPanel();}
 function closeDetailPanel(){document.getElementById('detailOverlay').classList.remove('open');}
+
+// Save New PO for a completed renewal — persisted via ledger endpoint
+async function _saveNewPo(serial) {
+  const inp = document.getElementById('dp-newPo-' + serial);
+  const st  = document.getElementById('dp-newPo-status-' + serial);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { if (st) st.innerHTML = '<span style="color:#dc2626">Enter a PO number first.</span>'; return; }
+  if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
+  try {
+    if (API_BASE) {
+      await apiFetch(`/api/pm-status/${serial}`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'Renewed', new_po: val })
+      });
+    }
+    // Update in-memory record
+    const c = _findContractor(serial);
+    if (c) {
+      if (!c._ledger) c._ledger = {};
+      c._ledger.new_po = val;
+    }
+    if (st) st.innerHTML = `<span style="color:#16a34a">✅ PO saved: <b>${val}</b></span>`;
+    inp.style.borderColor = '#86efac';
+  } catch(e) {
+    if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+  }
+}
+
+// Save New TRAM ID for an in-progress renewal — updates ledger record
+async function _saveNewTramId(serial) {
+  const inp = document.getElementById('dp-newTram-' + serial);
+  const st  = document.getElementById('dp-newTram-status-' + serial);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) { if (st) st.innerHTML = '<span style="color:#dc2626">Enter the new TRAM ID first.</span>'; return; }
+  if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
+  try {
+    if (API_BASE) {
+      await apiFetch(`/api/pm-status/${serial}`, {
+        method: 'POST',
+        body: JSON.stringify({ status: 'In Progress', tram_id_new: val })
+      });
+    }
+    const c = _findContractor(serial);
+    if (c) {
+      if (!c._ledger) c._ledger = {};
+      c._ledger.tram_id_new = val;
+      c.tramId = val;  // also update displayed TRAM ID immediately
+    }
+    if (st) st.innerHTML = `<span style="color:#16a34a">✅ TRAM ID saved: <b>${val}</b></span>`;
+    inp.style.borderColor = '#86efac';
+  } catch(e) {
+    if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+  }
+}
 
 // ── SECTOR → CSP EMAIL ROUTING ─────────────────────────────────────────
 // Confirmed routing rules:

@@ -748,21 +748,27 @@ def get_ledger():
 
 @app.post("/api/pm-status/{serial}")
 def set_pm_status(serial: str, body: dict):
-    """PM sets a workflow status (Pending/In Progress/Renewed/Offboarded) on a contractor."""
+    """PM sets a workflow status (Pending/In Progress/Renewed/Offboarded) on a contractor.
+    Optional body fields new_po and tram_id_new are persisted to the ledger.
+    """
     VALID = {"Pending", "In Progress", "Renewed", "Offboarded"}
     status = (body.get("status") or "").strip()
     if status not in VALID:
         raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {sorted(VALID)}")
-    ledger_module.record_pm_status(serial, status)
+    extra = {k: body.get(k) for k in ("new_po", "tram_id_new") if body.get(k)}
+    ledger_module.record_pm_status(serial, status, extra or None)
     # Patch in-memory record immediately so next /api/contractors call reflects it
+    STATUS_PCT = {"Pending": 0, "In Progress": 50, "Renewed": 100, "Offboarded": 100}
     if _ingestion_result:
         for c in _ingestion_result["contractors"] + _ingestion_result.get("dq_exceptions", []):
             if c.get("serial") == serial:
-                STATUS_PCT = {"Pending": 0, "In Progress": 50, "Renewed": 100, "Offboarded": 100}
                 c["pmStatus"]    = status
                 c["pmStatusPct"] = STATUS_PCT[status]
+                if extra:
+                    if not c.get("_ledger"): c["_ledger"] = {}
+                    c["_ledger"].update(extra)
                 break
-    return {"serial": serial, "pmStatus": status, "pmStatusPct": {"Pending":0,"In Progress":50,"Renewed":100,"Offboarded":100}[status]}
+    return {"serial": serial, "pmStatus": status, "pmStatusPct": STATUS_PCT[status]}
 
 
 @app.delete("/api/ledger/{serial}")

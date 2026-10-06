@@ -82,14 +82,20 @@ def record_renewal(serial: str, renewal_data: dict) -> None:
     _save()
 
 
-def record_pm_status(serial: str, pm_status: str) -> None:
-    """Called when a PM manually sets a workflow status on a contractor."""
+def record_pm_status(serial: str, pm_status: str, extra: dict | None = None) -> None:
+    """Called when a PM manually sets a workflow status on a contractor.
+    Optional `extra` keys (e.g. new_po, tram_id_new) are merged into the entry.
+    """
     STATUS_PCT = {"Pending": 0, "In Progress": 50, "Renewed": 100, "Offboarded": 100}
     entry = _ledger.get(serial, {"serial": serial})
     entry["pm_status"]     = pm_status
     entry["pm_status_pct"] = STATUS_PCT.get(pm_status, 0)
     entry["updated_at"]    = datetime.utcnow().isoformat() + "Z"
     entry["updated_by"]    = "PM_STATUS_SET"
+    if extra:
+        for k, v in extra.items():
+            if v:   # only store non-empty values
+                entry[k] = v
     _ledger[serial] = entry
     _save()
 
