@@ -536,6 +536,9 @@ def _parse_xlsb(file_bytes: bytes, tab_name: str) -> tuple[list[dict], list[str]
                     if not any(v for v in values if v is not None):
                         continue   # skip fully empty rows
 
+                    if not _is_active_status(values):
+                        continue   # only CMO rows with "Active" in column A
+
                     record = {}
                     for col_idx, canonical in enumerate(headers):
                         if canonical and col_idx < len(values):
@@ -577,6 +580,8 @@ def _parse_xlsx(file_bytes: bytes, tab_name: str) -> tuple[list[dict], list[str]
             continue
         if not any(v for v in values if v is not None):
             continue
+        if not _is_active_status(values):
+            continue   # only CMO rows with "Active" in column A
         record = {}
         for col_idx, canonical in enumerate(headers):
             if canonical and col_idx < len(values):
@@ -585,6 +590,11 @@ def _parse_xlsx(file_bytes: bytes, tab_name: str) -> tuple[list[dict], list[str]
 
     wb.close()
     return rows, missing_headers
+
+
+def _is_active_status(values: list) -> bool:
+    """True when column A (the CMO 'Status' column) is 'Active'."""
+    return bool(values) and str(values[0] or "").strip().lower() == "active"
 
 
 def _clean_xlsx_value(v: Any) -> Any:
