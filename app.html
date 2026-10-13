@@ -3245,9 +3245,12 @@ function showRenewalSuccess(resp) {
   const emailOk  = !resp.email_error && (resp.email || resp._prototype);
   const realFail = !emailOk && !graphNotConfigured;
 
-  const queued = !!(resp.email && resp.email.status === 'queued');
-  const emailLine = emailOk
-    ? `<div class="confirm-row">✅ <b>${queued ? 'Email queued — sent from Outlook with the Excel attached within ~1 minute' : 'Email sent automatically'}</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
+  const isDraft = !!(resp.email && resp.email.status === 'draft');
+  if (isDraft) _autoDownloadEml(resp);
+  const emailLine = isDraft
+    ? _emlPanel(resp)
+    : emailOk
+    ? `<div class="confirm-row">✅ <b>Email sent automatically</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
     : graphNotConfigured
       ? `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
            📧 <b>Open in Outlook to send the renewal email.</b><br>
@@ -3570,6 +3573,31 @@ function _offboardConfirmSent(resp){
   _offboardFinalScreen(c, resp, now, false, true);
 }
 
+// ── Email draft (.eml) — works on any laptop/OS: open the file in Outlook, click Send ──
+let _emlResp = null;
+function _emlBlobUrl(resp) {
+  const bin = atob(resp.email.eml_b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: 'message/rfc822' }));
+}
+function _downloadEml() {
+  if (!_emlResp) return;
+  const a = document.createElement('a');
+  a.href = _emlBlobUrl(_emlResp);
+  a.download = _emlResp.email.eml_filename || 'TRAM_email_draft.eml';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function _autoDownloadEml(resp) { _emlResp = resp; setTimeout(_downloadEml, 300); }
+function _emlPanel(resp) {
+  _emlResp = resp;
+  return `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
+    📧 <b>Last step — send the email.</b> A file named <b>TRAM_email_draft.eml</b> was downloaded.<br>
+    Double-click it: Outlook opens the email with the recipient (<b>${resp.email.to}</b>), subject and the Excel already attached. Click <b>Send</b>.
+    <br><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="_downloadEml()">⬇ Download email again</button>
+  </div>`;
+}
+
 function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   c.offboard='Submitted';
   // Auto-set PM status to Offboarded — cannot be changed manually after this
@@ -3581,7 +3609,9 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   const title = autoSent ? 'Offboarding Successfully Submitted'
               : manualSent ? 'Offboarding Successfully Submitted'
               : 'Submission Error';
-  const emailDetail = autoSent ? (resp.email?.status === 'queued' ? `Queued — Outlook sends it with the Excel to ${resp.email?.to} within ~1 minute` : `Sent automatically to ${resp.email?.to}`)
+  const isDraft = autoSent && resp.email?.status === 'draft';
+  if (isDraft) _autoDownloadEml(resp);
+  const emailDetail = autoSent ? (isDraft ? `Email draft with Excel downloaded — open it in Outlook and click Send (to ${resp.email?.to})` : `Sent automatically to ${resp.email?.to}`)
                     : manualSent ? 'Sent via Outlook'
                     : resp.email_error;
   document.getElementById('offboardModalBody').innerHTML=`
@@ -3590,7 +3620,7 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
       <div style="font-size:20px;font-weight:700;color:${color};margin-bottom:4px">${title}</div>
       <div style="font-size:13px;color:#6b7280">${now}</div>
     </div>
-    ${autoSent?`<div class="confirm-row">✅ <b>Email sent automatically</b> to ${resp.email?.to}</div>`:''}
+    ${isDraft ? _emlPanel(resp) : autoSent?`<div class="confirm-row">✅ <b>Email sent automatically</b> to ${resp.email?.to}</div>`:''}
     <ul class="timeline" style="margin-top:16px">
       <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">OFFBOARDING_SUBMITTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
       <li><div class="tl-dot ${autoSent||manualSent?'green':'red'}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${autoSent?'SENT':manualSent?'SENT_OUTLOOK':'FAILED'}</div><div class="tl-detail">${emailDetail}</div></div></li>

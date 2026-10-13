@@ -109,9 +109,31 @@ def graph_configured() -> bool:
 
 
 def is_configured() -> bool:
-    """Sending is always available: Microsoft Graph when configured, otherwise the
-    outbox queue that outlook_mail_bridge.ps1 delivers through local Outlook."""
+    """Sending is always available: Microsoft Graph when configured, otherwise an
+    unsent .eml draft (recipient, subject, body, Excel attached) is returned for the PM
+    to open in their own Outlook and click Send — works on any laptop / OS."""
     return True
+
+
+def _build_eml(to_email, subject, body, body_type, attachment_filename, attachment_bytes) -> bytes:
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg["X-Unsent"] = "1"          # Outlook opens the .eml as an editable, unsent draft
+    if body_type == "HTML":
+        msg.set_content("This message requires an HTML-capable mail client.")
+        msg.add_alternative(body, subtype="html")
+    else:
+        msg.set_content(body)
+    if attachment_filename and attachment_bytes:
+        msg.add_attachment(
+            attachment_bytes,
+            maintype="application",
+            subtype="vnd.ms-excel.sheet.macroEnabled.12",
+            filename=attachment_filename,
+        )
+    return bytes(msg)
 
 
 # ── Core send logic ───────────────────────────────────────────────────────────
@@ -127,9 +149,15 @@ def _send(
     """Send via Microsoft Graph, or queue in the outbox when Graph is not configured."""
 
     if not graph_configured():
-        import outbox
-        return outbox.enqueue(to_email, subject, body, body_type,
-                              attachment_filename, attachment_bytes)
+        eml = _build_eml(to_email, subject, body, body_type,
+                         attachment_filename, attachment_bytes)
+        return {
+            "status":       "draft",
+            "to":           to_email,
+            "subject":      subject,
+            "eml_filename": "TRAM_email_draft.eml",
+            "eml_b64":      base64.b64encode(eml).decode("ascii"),
+        }
 
     token    = _get_access_token()
     payload  = _build_payload(to_email, subject, body, attachment_filename, attachment_bytes, body_type)

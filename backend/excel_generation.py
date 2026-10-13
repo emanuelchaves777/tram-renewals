@@ -112,7 +112,7 @@ def generate_renewal_excel(
 # Offboards tab: headers in row 6, columns D(4)–M(13), data starts row 7
 OFFBOARD_TAB      = "Offboards"
 OFFBOARD_HDR_ROW  = 6
-OFFBOARD_DATA_ROW = 7
+OFFBOARD_DATA_ROW = 10   # rows 6-9 are a merged header block; row 10 is the first data row
 # (col_index 1-based, header name as it appears in the template, data_key)
 OFFBOARD_COLUMN_MAP = [
     (4,  "Sector",                     "sector"),
