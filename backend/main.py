@@ -39,6 +39,7 @@ import jrs_validation
 import excel_generation
 import email_sender
 import ledger as ledger_module
+import outbox as outbox_module
 import tram_jobs as tram_jobs_module
 try:
     import seed_data as _seed
@@ -119,6 +120,7 @@ def _boot_load() -> None:
     # Always initialise ledger + job queue first
     ledger_module.init(DATA_DIR)
     print(f"[boot] Ledger loaded: {len(ledger_module.get_all())} entries")
+    outbox_module.init(DATA_DIR)
     tram_jobs_module.init(DATA_DIR)
     print(f"[boot] TRAM job queue loaded: {len(tram_jobs_module.list_jobs())} jobs")
 
@@ -816,6 +818,39 @@ def submit_offboarding(req: SubmitOffboardingRequest):
         "submitted_at":     datetime.utcnow().isoformat() + "Z",
         "mailto_fallback":  _build_offboard_mailto(contractor, offboard_data),
     }
+
+
+# ── Email outbox (delivered by outlook_mail_bridge.ps1 through local Outlook) ─
+
+@app.get("/api/outbox/next")
+def outbox_next(pin: str = ""):
+    _verify_pin(pin)
+    item = outbox_module.claim_next()
+    if not item:
+        return Response(status_code=204)
+    return item
+
+
+@app.post("/api/outbox/{mail_id}/sent")
+def outbox_sent(mail_id: str, pin: str = ""):
+    _verify_pin(pin)
+    if not outbox_module.mark_sent(mail_id):
+        raise HTTPException(status_code=404, detail="Unknown outbox id.")
+    return {"id": mail_id, "status": "sent"}
+
+
+@app.post("/api/outbox/{mail_id}/fail")
+def outbox_fail(mail_id: str, body: dict, pin: str = ""):
+    _verify_pin(pin)
+    if not outbox_module.mark_failed(mail_id, str(body.get("error", ""))):
+        raise HTTPException(status_code=404, detail="Unknown outbox id.")
+    return {"id": mail_id, "status": "pending"}
+
+
+@app.get("/api/outbox")
+def outbox_list(pin: str = ""):
+    _verify_pin(pin)
+    return {"items": outbox_module.list_items()}
 
 
 # ── Ledger inspection ─────────────────────────────────────────────────────────

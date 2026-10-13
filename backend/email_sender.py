@@ -103,9 +103,15 @@ def send_offboarding_email(
     )
 
 
-def is_configured() -> bool:
+def graph_configured() -> bool:
     """Return True if all Microsoft Graph credentials are set."""
     return all([MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL])
+
+
+def is_configured() -> bool:
+    """Sending is always available: Microsoft Graph when configured, otherwise the
+    outbox queue that outlook_mail_bridge.ps1 delivers through local Outlook."""
+    return True
 
 
 # ── Core send logic ───────────────────────────────────────────────────────────
@@ -118,14 +124,12 @@ def _send(
     attachment_bytes: bytes | None,
     body_type: str = "Text",
 ) -> dict:
-    """Build and send the email via Microsoft Graph."""
+    """Send via Microsoft Graph, or queue in the outbox when Graph is not configured."""
 
-    if not is_configured():
-        raise RuntimeError(
-            "Microsoft Graph credentials not configured. "
-            "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL "
-            "in Railway environment variables."
-        )
+    if not graph_configured():
+        import outbox
+        return outbox.enqueue(to_email, subject, body, body_type,
+                              attachment_filename, attachment_bytes)
 
     token    = _get_access_token()
     payload  = _build_payload(to_email, subject, body, attachment_filename, attachment_bytes, body_type)

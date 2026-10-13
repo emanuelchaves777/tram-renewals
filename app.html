@@ -1356,6 +1356,18 @@ const PM_STATUS_CFG = {
 };
 const PM_STATUS_MANUAL = Object.entries(PM_STATUS_CFG).filter(([,v])=>v.manual).map(([k])=>k);
 
+// Offboarded contractors (CMO "Offboard in Progress"=Yes, or submitted in-app) are final: no actions allowed.
+function _isOffboarded(c) { return c.pmStatus === 'Offboarded' || c.offboard === 'Submitted'; }
+
+// New TRAM ID comes only from the CMO column "Renewal Metro Ticket Number" — never typed by the PM.
+function _newTramBadge(c) {
+  if (!c.tramIdNew) return '';
+  return `<div style="margin-top:6px;padding:4px 6px;border:1px solid #86efac;background:#f0fdf4;border-radius:6px">
+    <div style="font-size:10px;font-weight:700;color:#15803d">✅ NEW TRAM SUBMITTED</div>
+    <code style="font-size:11px;color:#14532d">${c.tramIdNew}</code>
+  </div>`;
+}
+
 function _pmStatusPill(c) {
   const st  = c.pmStatus || 'Pending';
   const cfg = PM_STATUS_CFG[st] || PM_STATUS_CFG['Pending'];
@@ -1406,16 +1418,7 @@ function _refreshRowInlineInput(serial, status, c) {
 }
 
 function _inlineInputHTML(serial, status, c) {
-  if (status === 'In Progress') {
-    const saved = (c && c._ledger && c._ledger.tram_id_new) ? c._ledger.tram_id_new : '';
-    return `<div style="margin-top:5px;display:flex;gap:3px">
-      <input id="ri-tram-${serial}" placeholder="New TRAM ID" value="${saved}"
-             style="flex:1;min-width:0;border:1px solid #fcd34d;border-radius:4px;padding:2px 5px;font-size:10px;font-family:monospace"
-             onclick="event.stopPropagation()">
-      <button onclick="event.stopPropagation();_saveNewTramId('${serial}','row')" title="Save TRAM ID"
-              style="border:none;background:#f59e0b;color:#fff;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:10px;font-weight:700">✓</button>
-    </div>`;
-  }
+  // No New TRAM ID input: the new TRAM ID is read only from the CMO ("Renewal Metro Ticket Number").
   if (status === 'Renewed') {
     const saved = (c && c._ledger && c._ledger.new_po) ? c._ledger.new_po : '';
     return `<div style="margin-top:5px;display:flex;gap:3px">
@@ -1868,8 +1871,8 @@ function _buildRow(c) {
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
     <td class="col-action" onclick="event.stopPropagation()" style="padding:6px 8px">
       <div style="display:flex;flex-direction:column;gap:4px;min-width:110px">
-        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Renewal already submitted')+'"':''}>🔄 Renew</button>
-        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(c.offboard==='Submitted'||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}>🔄 Renew</button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
       </div>
     </td>
     <td class="col-date">${expDate}</td>
@@ -1892,6 +1895,7 @@ function _buildRow(c) {
             onchange="setPmStatus('${c.serial}',this.value);this.blur()">
             ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
           </select>`}
+      ${_newTramBadge(c)}
       <div id="rowInline-${c.serial}">${_inlineInputHTML(c.serial, c.pmStatus||'Pending', c)}</div>
     </td>
   </tr>`;
@@ -2435,6 +2439,9 @@ function openDetail(serial){
     <div class="section-title">TRAM &amp; Purchasing</div>
     <div class="info-grid">
       <div class="info-item"><label>Old TRAM ID</label><span>${c.tramId||'<span class="badge badge-red">Missing</span>'}</span></div>
+      <div class="info-item"><label>New TRAM ID</label><span>${c.tramIdNew
+        ? `<span class="badge badge-green">Submitted</span> <code style="font-size:13px;font-weight:700">${c.tramIdNew}</code>`
+        : '<span class="badge badge-gray">Pending — appears after next CMO update</span>'}</span></div>
       <div class="info-item"><label>TRAM Requester (Submitter)</label><span>${c.tramRequester}</span></div>
       <div class="info-item"><label>Renewal Status</label><span>${renewalBadge(c.renewal)}</span></div>
       <div class="info-item"><label>Offboard Status</label><span>${offboardBadge(c.offboard)}</span></div>
@@ -2480,22 +2487,13 @@ function openDetail(serial){
 
     ${(c.pmStatus==='In Progress') && c.renewal!=='Submitted' ? `
     <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;margin-bottom:12px">
-      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px">⏳ Renewal In Progress — Paste New TRAM ID when ready</div>
-      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-        <div style="flex:1;min-width:220px">
-          <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">New TRAM ID</label>
-          <input id="dp-newTram-${c.serial}" placeholder="e.g. NA202506293304S"
-                 value="${c._ledger && c._ledger.tram_id_new ? c._ledger.tram_id_new : ''}"
-                 style="width:100%;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px;font-size:13px;font-family:monospace;letter-spacing:.04em">
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="_saveNewTramId('${c.serial}')">Save TRAM ID</button>
-      </div>
-      <div id="dp-newTram-status-${c.serial}" style="font-size:12px;margin-top:6px"></div>
+      <div style="font-weight:700;font-size:13px;color:#92400e">⏳ Renewal In Progress</div>
+      <div style="font-size:12px;color:#92400e;margin-top:4px">The new TRAM ID will appear here automatically after the next CMO update.</div>
     </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${c.renewal==='Submitted'?'disabled title="Renewal already submitted"':''}>🔄 Initiate Renewal</button>
-      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${c.offboard==='Submitted'?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c))?'disabled title="'+(_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}>🔄 Initiate Renewal</button>
+      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${_isOffboarded(c)?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
 }
@@ -2592,6 +2590,7 @@ let _rnwStep = 1;  // current step: 1 | 2 | 3
 function openRenewalModal(id) {
   const c = _findContractor(id);
   if (!c) return;
+  if (_isOffboarded(c)) { alert('This contractor is offboarded — renewal is not allowed.'); return; }
   if (c.renewal === 'Submitted') {
     alert('⚠ DUPLICATE DETECTED\n\nA renewal has already been submitted for this contractor.\nCheck the audit trail for details.');
     return;
@@ -3246,8 +3245,9 @@ function showRenewalSuccess(resp) {
   const emailOk  = !resp.email_error && (resp.email || resp._prototype);
   const realFail = !emailOk && !graphNotConfigured;
 
+  const queued = !!(resp.email && resp.email.status === 'queued');
   const emailLine = emailOk
-    ? `<div class="confirm-row">✅ <b>Email sent automatically</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
+    ? `<div class="confirm-row">✅ <b>${queued ? 'Email queued — sent from Outlook with the Excel attached within ~1 minute' : 'Email sent automatically'}</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
     : graphNotConfigured
       ? `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
            📧 <b>Open in Outlook to send the renewal email.</b><br>
@@ -3356,7 +3356,7 @@ function getSectorEmailLabel(sector){
 let offboardData={};
 function openOffboardModal(id){
   const c=_findContractor(id);if(!c) return;
-  if(c.offboard==='Submitted'){
+  if(_isOffboarded(c)){
     alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
@@ -3581,7 +3581,7 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   const title = autoSent ? 'Offboarding Successfully Submitted'
               : manualSent ? 'Offboarding Successfully Submitted'
               : 'Submission Error';
-  const emailDetail = autoSent ? `Sent automatically to ${resp.email?.to}`
+  const emailDetail = autoSent ? (resp.email?.status === 'queued' ? `Queued — Outlook sends it with the Excel to ${resp.email?.to} within ~1 minute` : `Sent automatically to ${resp.email?.to}`)
                     : manualSent ? 'Sent via Outlook'
                     : resp.email_error;
   document.getElementById('offboardModalBody').innerHTML=`
