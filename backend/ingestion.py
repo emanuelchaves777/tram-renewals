@@ -695,6 +695,9 @@ def _build_contractor_records(
             "pmIntranetId":          row.get("PM Intranet ID"),
             # BP Manager Intranet ID (CMO column "CL") — used as the primary PM identity filter
             "bpManagerIntranetId":   row.get("BP Manager Intranet ID"),
+            # CMO workflow flags — drive the PM status (see ledger.apply_to_contractors)
+            "offboardInProgress":  row.get("Offboard In Progress"),
+            "renewalMetroTicket":  row.get("Renewal Metro Ticket Number"),
             # Role
             "band":               row.get("Actual Band"),
             "jrsTram":            row.get("JR/S (TRAM)"),

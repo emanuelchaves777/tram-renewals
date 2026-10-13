@@ -100,13 +100,43 @@ def record_pm_status(serial: str, pm_status: str, extra: dict | None = None) -> 
     _save()
 
 
+_NO_TICKET = {"", "n/a", "na", "none", "-", "–", "tbd", "pending"}
+
+
+def _apply_cmo_status(contractors: list[dict]) -> None:
+    """CMO columns override PM-set status:
+      - 'Offboard in Progress' = Yes       -> Offboarded, 100%, locked
+      - 'Renewal Metro Ticket Number' set  -> Renewed, 100%, new TRAM ID = that ticket
+    Anything else keeps the ledger status (default Pending).
+    """
+    for c in contractors:
+        if c.get("_ghost"):
+            continue
+        if str(c.get("offboardInProgress") or "").strip().lower() == "yes":
+            c["pmStatus"], c["pmStatusPct"] = "Offboarded", 100
+            c["offboard"] = "Submitted"
+            continue
+        ticket = str(c.get("renewalMetroTicket") or "").strip()
+        if ticket.lower() not in _NO_TICKET:
+            c["pmStatus"], c["pmStatusPct"] = "Renewed", 100
+            c["renewal"] = "Submitted"
+            c["tramIdNew"] = ticket
+            c["_ledger"] = {**c.get("_ledger", {}), "tram_id_new": ticket}
+
+
 def apply_to_contractors(contractors: list[dict]) -> list[dict]:
     """
-    Merge ledger state into a freshly parsed contractor list.
-    Ledger wins over CMO for offboard/renewal status fields.
+    Merge ledger state into a freshly parsed contractor list, then apply
+    CMO-driven status (which always wins).
     Contractors in the ledger but NOT in the CMO are re-injected
     as ghost records so they stay visible in the dashboard.
     """
+    contractors = _merge_ledger(contractors)
+    _apply_cmo_status(contractors)
+    return contractors
+
+
+def _merge_ledger(contractors: list[dict]) -> list[dict]:
     if not _ledger:
         return contractors
 

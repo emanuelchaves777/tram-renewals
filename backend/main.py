@@ -835,6 +835,11 @@ def set_pm_status(serial: str, body: dict):
     status = (body.get("status") or "").strip()
     if status not in VALID:
         raise HTTPException(status_code=400, detail=f"Invalid status '{status}'. Must be one of: {sorted(VALID)}")
+    # Offboarded is final (set by the app after the offboarding email, or by CMO 'Offboard in Progress' = Yes)
+    if _ingestion_result and status != "Offboarded":
+        for c in _ingestion_result["contractors"]:
+            if c.get("serial") == serial and c.get("pmStatus") == "Offboarded":
+                raise HTTPException(status_code=409, detail="Contractor is Offboarded — status cannot be changed.")
     extra = {k: body.get(k) for k in ("new_po", "tram_id_new") if body.get(k)}
     ledger_module.record_pm_status(serial, status, extra or None)
     # Patch in-memory record immediately so next /api/contractors call reflects it

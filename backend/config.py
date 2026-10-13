@@ -158,6 +158,7 @@ HEADER_ALIASES = {
     "bp manager intranet address":     "BP Manager Intranet ID",
     "bp mgr intranet id":              "BP Manager Intranet ID",
     # Workflow status columns
+    "renewal metro ticket number":     "Renewal Metro Ticket Number",
     "renewal in progress":             "Renewal In Progress",
     "offboard in progress":            "Offboard In Progress",
     # Other
