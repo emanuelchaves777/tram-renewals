@@ -4,201 +4,159 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TRAM Subcontractor Renewal & Offboarding — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
+  /* IBM Carbon Design System (g10 theme) — IBM Plex, 0-radius, 2px focus ring, 8px grid */
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.5;background:#f3f4f6;color:#1f2937}
-  .banner{background:#1d4ed8;color:#fff;text-align:center;padding:6px 12px;font-size:12px;letter-spacing:.04em}
-  .banner b{color:#fde68a}
-  header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 24px;display:flex;align-items:center;gap:16px}
-  header .logo{font-weight:700;font-size:16px;color:#1d4ed8;letter-spacing:-.5px}
-  header .title{font-size:14px;color:#374151;font-weight:600}
-  header .role-badge{margin-left:auto;background:#dbeafe;color:#1e40af;border-radius:4px;padding:3px 10px;font-size:12px;font-weight:600}
-  nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px;display:flex;gap:0}
-  nav button{padding:10px 18px;border:none;background:none;cursor:pointer;font-size:13px;color:#6b7280;border-bottom:3px solid transparent;font-weight:500;transition:.15s}
-  nav button.active{color:#1d4ed8;border-bottom-color:#1d4ed8;font-weight:700}
-  nav button:hover:not(.active){color:#374151}
-  .main{max-width:100%;margin:0;padding:16px 24px}
-  /* Cards */
-  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:.15s}
-  .card:hover{border-color:#6366f1;box-shadow:0 2px 8px rgba(99,102,241,.15)}
-  .card.active-filter{border-color:#1d4ed8;background:#eff6ff}
-  .card .num{font-size:28px;font-weight:700;line-height:1}
-  .card .lbl{font-size:11px;color:#6b7280;margin-top:4px;text-transform:uppercase;letter-spacing:.04em}
-  .card.red .num{color:#dc2626}
-  .card.orange .num{color:#ea580c}
-  .card.yellow .num{color:#d97706}
-  .card.blue .num{color:#2563eb}
-  .card.green .num{color:#16a34a}
-  .card.purple .num{color:#7c3aed}
-  .card.teal .num{color:#0d9488}
-  .card.gray .num{color:#6b7280}
-  /* Staleness */
-  .freshness-bar{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:13px}
+  body{font-family:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;font-size:14px;line-height:1.43;letter-spacing:.16px;background:#f4f4f4;color:#161616;-webkit-font-smoothing:antialiased}
+  :focus-visible{outline:2px solid #0f62fe;outline-offset:-2px}
+  code,.email-preview{font-family:"IBM Plex Mono",Menlo,Consolas,monospace}
+  .banner{background:#0f62fe;color:#fff;text-align:center;padding:8px 16px;font-size:12px;letter-spacing:.32px}
+  .banner b{color:#fff;font-weight:600}
+  header{background:#161616;color:#fff;height:48px;padding:0 16px;display:flex;align-items:center;gap:16px}
+  header .logo{font-weight:700;font-size:16px;color:#fff;letter-spacing:.08em;padding-right:16px;border-right:1px solid #393939;line-height:48px}
+  header .title{font-size:14px;color:#f4f4f4;font-weight:400}
+  header .role-badge{margin-left:auto;background:#393939;color:#f4f4f4;border-radius:16px;padding:2px 12px;font-size:12px}
+  nav{background:#fff;border-bottom:1px solid #e0e0e0;padding:0 16px;display:flex}
+  nav button{height:48px;padding:0 16px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:14px;color:#525252;border-bottom:3px solid transparent;font-weight:400;transition:background .11s}
+  nav button.active{color:#161616;border-bottom-color:#0f62fe;font-weight:600}
+  nav button:hover:not(.active){background:#e8e8e8;color:#161616}
+  .main{max-width:100%;margin:0;padding:24px 32px}
+  /* Tiles / bucket cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:2px;margin-bottom:24px}
+  .card{background:#fff;border:1px solid transparent;border-radius:0;padding:16px;text-align:left;cursor:pointer;transition:background .11s}
+  .card:hover{background:#e8e8e8}
+  .card.active-filter{outline:2px solid #0f62fe;outline-offset:-2px;background:#edf5ff}
+  .card .num{font-size:32px;font-weight:300;line-height:1.25}
+  .card .lbl{font-size:12px;color:#525252;margin-top:8px;letter-spacing:.32px}
+  .card.red .num{color:#da1e28}.card.orange .num{color:#ba4e00}.card.yellow .num{color:#8e6a00}.card.blue .num{color:#0f62fe}
+  .card.green .num{color:#198038}.card.purple .num{color:#8a3ffc}.card.teal .num{color:#007d79}.card.gray .num{color:#525252}
+  .freshness-bar{background:#fff;border:1px solid #e0e0e0;border-radius:0;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px}
   .freshness-bar .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .dot-ok{background:#16a34a}
-  .dot-warn{background:#d97706}
-  .dot-stale{background:#dc2626}
-  .freshness-bar span{color:#6b7280}
-  .freshness-bar b{color:#1f2937}
-  /* Filters */
-  .filters{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px}
+  .dot-ok{background:#24a148}.dot-warn{background:#f1c21b}.dot-stale{background:#da1e28}
+  .freshness-bar span{color:#525252}.freshness-bar b{color:#161616;font-weight:600}
+  .filters{background:#fff;border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:16px}
   .filters-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .filters-row input,.filters-row select{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;color:#374151;background:#fff;outline:none;min-width:140px}
-  .filters-row input:focus,.filters-row select:focus{border-color:#6366f1}
-  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
-  .btn-primary{background:#1d4ed8;color:#fff}
-  .btn-primary:hover{background:#1e40af}
-  .btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
-  .btn-secondary:hover{background:#e5e7eb}
-  .btn-danger{background:#dc2626;color:#fff}
-  .btn-danger:hover{background:#b91c1c}
-  .btn-warn{background:#d97706;color:#fff}
-  .btn-warn:hover{background:#b45309}
-  .btn-green{background:#16a34a;color:#fff}
-  .btn-green:hover{background:#15803d}
-  .btn-sm{padding:4px 10px;font-size:12px}
-  /* Table */
+  .filters-row input,.filters-row select,.combo-wrap input,.form-group input,.form-group select,.form-group textarea,.id-modal input{background:#f4f4f4;border:none;border-bottom:1px solid #8d8d8d;border-radius:0;font-family:inherit;color:#161616;outline:none}
+  .filters-row input,.filters-row select{min-height:40px;padding:0 16px;font-size:14px;min-width:140px}
+  .filters-row input:focus,.filters-row select:focus,.combo-wrap input:focus,.form-group input:focus,.form-group select:focus,.form-group textarea:focus,.id-modal input:focus{outline:2px solid #0f62fe;outline-offset:-2px}
+  .btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid transparent;border-radius:0;cursor:pointer;font-family:inherit;font-size:14px;font-weight:400;letter-spacing:.16px;transition:background .11s,color .11s}
+  .btn-primary{background:#0f62fe;color:#fff}.btn-primary:hover{background:#0353e9}.btn-primary:active{background:#002d9c}
+  .btn-secondary{background:transparent;color:#0f62fe;border-color:#0f62fe}.btn-secondary:hover{background:#0353e9;color:#fff}.btn-secondary:active{background:#002d9c;color:#fff}
+  .btn-danger{background:#da1e28;color:#fff}.btn-danger:hover{background:#ba1b23}
+  .btn-warn{background:#ff832b;color:#161616}.btn-warn:hover{background:#eb6200}
+  .btn-green{background:#198038;color:#fff}.btn-green:hover{background:#0e6027}
+  .btn-sm{min-height:32px;padding:0 12px;font-size:13px}
+  .btn:disabled,.btn[disabled]{background:#c6c6c6;color:#8d8d8d;border-color:transparent;cursor:not-allowed}
+  /* Data table */
   .table-outer{position:relative}
-  /* Top scrollbar mirror */
-  .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:12px;border-radius:4px 4px 0 0}
+  .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:12px}
   .table-scroll-top-inner{height:1px}
-  .table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:0 0 8px 8px;overflow-x:auto;overflow-y:visible}
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:1200px}
-  /* Sticky header — stays visible while scrolling down */
-  thead th{position:sticky;top:0;z-index:2;background:#f9fafb;padding:10px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:2px solid #e5e7eb;white-space:nowrap;cursor:pointer;user-select:none}
-  thead th:hover{background:#f3f4f6}
-  /* Action column — sticky to left edge */
-  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:120px;max-width:140px;border-right:2px solid #e5e7eb}
-  thead th.col-action{z-index:3;background:#f9fafb}
-  /* Date / days columns — fixed width so they never squeeze */
+  .table-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:0;overflow-x:auto;overflow-y:visible}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:1200px}
+  thead th{position:sticky;top:0;z-index:2;background:#e0e0e0;padding:12px 16px;text-align:left;font-weight:600;color:#161616;border-bottom:1px solid #c6c6c6;white-space:nowrap;cursor:pointer;user-select:none}
+  thead th:hover{background:#cacaca}
+  th.col-action,td.col-action{position:sticky;left:0;z-index:1;background:#fff;min-width:120px;max-width:140px;border-right:1px solid #e0e0e0}
+  thead th.col-action{z-index:3;background:#e0e0e0}
   th.col-date,td.col-date{min-width:100px;max-width:110px;white-space:nowrap}
   th.col-days,td.col-days{min-width:64px;max-width:72px;white-space:nowrap;text-align:center}
-  td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  td{padding:8px 16px;border-bottom:1px solid #e0e0e0;vertical-align:middle}
   tr:last-child td{border-bottom:none}
-  tr:hover td{background:#f9fafb}
-  tr:hover td.col-action{background:#f0f4ff}
-  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
-  .badge-red{background:#fee2e2;color:#b91c1c}
-  .badge-orange{background:#ffedd5;color:#c2410c}
-  .badge-yellow{background:#fef3c7;color:#92400e}
-  .badge-green{background:#dcfce7;color:#15803d}
-  .badge-blue{background:#dbeafe;color:#1e40af}
-  .badge-purple{background:#ede9fe;color:#6d28d9}
-  .badge-gray{background:#f3f4f6;color:#6b7280}
-  .badge-warn{background:#fef9c3;color:#713f12}
-  /* Detail Panel */
-  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:flex-start;justify-content:flex-end}
+  tr:hover td{background:#e8e8e8}
+  tr:hover td.col-action{background:#e8e8e8}
+  /* Tags */
+  .badge{display:inline-block;padding:2px 8px;border-radius:16px;font-size:12px;font-weight:400;line-height:1.33;letter-spacing:.32px}
+  .badge-red{background:#ffd7d9;color:#a2191f}.badge-orange{background:#ffd9be;color:#8a3800}.badge-yellow{background:#fddc69;color:#684e00}
+  .badge-green{background:#a7f0ba;color:#0e6027}.badge-blue{background:#d0e2ff;color:#0043ce}.badge-purple{background:#e8daff;color:#6929c4}
+  .badge-gray{background:#e0e0e0;color:#161616}.badge-warn{background:#fddc69;color:#684e00}
+  /* Side panel + modal */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(22,22,22,.5);z-index:100;align-items:flex-start;justify-content:flex-end}
   .overlay.open{display:flex}
-  .panel{background:#fff;width:680px;max-width:98vw;height:100vh;overflow-y:auto;padding:0;box-shadow:-4px 0 24px rgba(0,0,0,.18);display:flex;flex-direction:column}
-  .panel-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:1}
-  .panel-header h2{font-size:16px;font-weight:700;flex:1}
-  .panel-body{padding:20px;flex:1}
-  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
-  .info-item label{display:block;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-  .info-item span{font-size:13px;color:#1f2937;font-weight:500}
-  .dq-warn{background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:8px}
-  /* Modal */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+  .panel{background:#fff;width:680px;max-width:98vw;height:100vh;overflow-y:auto;padding:0;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;flex-direction:column}
+  .panel-header,.modal-header{padding:16px 24px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:1}
+  .panel-header h2,.modal-header h2{font-size:20px;font-weight:400;flex:1;line-height:1.4}
+  .panel-body{padding:24px;flex:1}
+  .section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.32px;color:#525252;margin:24px 0 8px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px}
+  .info-item label{display:block;font-size:12px;color:#6f6f6f;letter-spacing:.32px;margin-bottom:2px}
+  .info-item span{font-size:14px;color:#161616}
+  .dq-warn{background:#fcf4d6;border-left:3px solid #f1c21b;border-radius:0;padding:12px 16px;font-size:14px;color:#161616;margin-bottom:8px}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(22,22,22,.5);z-index:200;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
-  .modal{background:#fff;border-radius:10px;width:760px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.22)}
-  /* Smart combo filter */
+  .modal{background:#fff;border-radius:0;width:760px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .modal-body{padding:24px}
+  .modal-footer{padding:16px 24px;border-top:1px solid #e0e0e0;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff}
+  /* Combo filter */
   .combo-wrap{position:relative;display:inline-block}
-  .combo-wrap input{border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:13px;color:#374151;background:#fff;outline:none;min-width:150px;width:100%}
-  .combo-wrap input:focus{border-color:#6366f1}
-  .combo-list{position:absolute;top:calc(100% + 2px);left:0;min-width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:9999;display:none}
+  .combo-wrap input{min-height:40px;padding:0 16px;font-size:14px;min-width:150px;width:100%}
+  .combo-list{position:absolute;top:100%;left:0;min-width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #e0e0e0;border-radius:0;box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:9999;display:none}
   .combo-list.open{display:block}
-  .combo-item{padding:7px 12px;font-size:13px;color:#374151;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .combo-item:hover,.combo-item.hi{background:#eff6ff;color:#1d4ed8}
-  /* Renewal stepper */
+  .combo-item{padding:12px 16px;font-size:14px;color:#161616;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .combo-item:hover,.combo-item.hi{background:#e8e8e8}
+  /* Progress indicator (renewal stepper) */
   .rnw-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px;padding:0 4px}
   .rnw-step{display:flex;align-items:center;gap:8px;flex:1;position:relative}
-  .rnw-step:not(:last-child)::after{content:'';position:absolute;right:0;top:50%;width:calc(100% - 124px);height:2px;background:#e5e7eb;transform:translateY(-50%);left:124px}
-  .rnw-step.done::after{background:#16a34a}
-  .rnw-step.active::after{background:#e5e7eb}
-  .rnw-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;border:2px solid #e5e7eb;background:#fff;color:#9ca3af;z-index:1}
-  .rnw-step.active .rnw-circle{border-color:#1d4ed8;background:#1d4ed8;color:#fff}
-  .rnw-step.done .rnw-circle{border-color:#16a34a;background:#16a34a;color:#fff}
-  .rnw-label{font-size:12px;font-weight:600;color:#9ca3af;white-space:nowrap}
-  .rnw-step.active .rnw-label{color:#1d4ed8}
-  .rnw-step.done .rnw-label{color:#16a34a}
-  .modal-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:1}
-  .modal-header h2{font-size:16px;font-weight:700;flex:1}
-  .modal-body{padding:20px}
-  .modal-footer{padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#fff}
-  /* Form */
-  .form-group{margin-bottom:14px}
-  .form-group label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
-  .form-group input,.form-group select,.form-group textarea{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:13px;color:#374151;outline:none}
-  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#6366f1}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .attest-box{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin-bottom:12px;background:#f9fafb}
-  .attest-box label{display:flex;gap:10px;cursor:pointer;font-size:13px;color:#374151;line-height:1.5}
-  .attest-box input[type=checkbox]{width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#1d4ed8}
-  .attest-box.checked{border-color:#16a34a;background:#f0fdf4}
-  /* JRS Validation */
-  .jrs-result{border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px}
-  .jrs-active{background:#dcfce7;border:1px solid #86efac;color:#15803d}
-  .jrs-warn{background:#fef3c7;border:1px solid #fcd34d;color:#92400e}
-  .jrs-error{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c}
-  .jrs-blocked{background:#ede9fe;border:1px solid #c4b5fd;color:#6d28d9}
-  /* TRAM Reconciliation */
-  .recon-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
-  .recon-table th{background:#f9fafb;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;border-bottom:2px solid #e5e7eb}
-  .recon-table td{padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-  .recon-match{color:#16a34a;font-weight:600}
-  .recon-mismatch{color:#dc2626;font-weight:600}
-  /* Timeline */
+  .rnw-step:not(:last-child)::after{content:'';position:absolute;right:0;top:50%;width:calc(100% - 124px);height:1px;background:#8d8d8d;transform:translateY(-50%);left:124px}
+  .rnw-step.done::after{background:#0f62fe}
+  .rnw-circle{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;border:2px solid #8d8d8d;background:#fff;color:#525252;z-index:1}
+  .rnw-step.active .rnw-circle{border-color:#0f62fe;background:#0f62fe;color:#fff}
+  .rnw-step.done .rnw-circle{border-color:#0f62fe;background:#fff;color:#0f62fe}
+  .rnw-label{font-size:14px;color:#525252;white-space:nowrap}
+  .rnw-step.active .rnw-label{color:#161616;font-weight:600}
+  .rnw-step.done .rnw-label{color:#161616}
+  /* Forms */
+  .form-group{margin-bottom:16px}
+  .form-group label,.id-modal label{display:block;font-size:12px;color:#525252;letter-spacing:.32px;margin-bottom:8px}
+  .form-group input,.form-group select,.form-group textarea{width:100%;min-height:40px;padding:0 16px;font-size:14px}
+  .form-group textarea{padding:11px 16px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .attest-box{border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:8px;background:#f4f4f4}
+  .attest-box label{display:flex;gap:12px;cursor:pointer;font-size:14px;color:#161616;line-height:1.43}
+  .attest-box input[type=checkbox]{width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#0f62fe}
+  .attest-box.checked{border-color:#24a148;background:#defbe6}
+  /* Inline notifications */
+  .jrs-result{border-radius:0;padding:12px 16px;margin-bottom:8px;font-size:14px;border-left:3px solid;color:#161616}
+  .jrs-active{background:#defbe6;border-color:#24a148}.jrs-warn{background:#fcf4d6;border-color:#f1c21b}
+  .jrs-error{background:#fff1f1;border-color:#da1e28}.jrs-blocked{background:#f6f2ff;border-color:#8a3ffc}
+  .recon-table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px;min-width:0}
+  .recon-table th{background:#e0e0e0;padding:8px 16px;text-align:left;font-size:12px;font-weight:600;color:#161616;border-bottom:1px solid #c6c6c6}
+  .recon-table td{padding:8px 16px;border-bottom:1px solid #e0e0e0;vertical-align:middle}
+  .recon-match{color:#198038;font-weight:600}.recon-mismatch{color:#da1e28;font-weight:600}
   .timeline{list-style:none}
-  .timeline li{display:flex;gap:12px;margin-bottom:14px}
-  .tl-dot{width:10px;height:10px;border-radius:50%;background:#6366f1;margin-top:5px;flex-shrink:0}
-  .tl-dot.green{background:#16a34a}
-  .tl-dot.orange{background:#ea580c}
-  .tl-dot.red{background:#dc2626}
-  .tl-dot.blue{background:#2563eb}
-  .tl-content .tl-time{font-size:11px;color:#9ca3af}
-  .tl-content .tl-action{font-size:13px;font-weight:600;color:#1f2937}
-  .tl-content .tl-detail{font-size:12px;color:#6b7280}
-  /* Progress Steps */
-  .steps{display:flex;gap:0;margin-bottom:20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
-  .step{flex:1;padding:10px 8px;text-align:center;font-size:12px;font-weight:600;color:#9ca3af;border-right:1px solid #e5e7eb;position:relative}
+  .timeline li{display:flex;gap:12px;margin-bottom:16px}
+  .tl-dot{width:10px;height:10px;border-radius:50%;background:#0f62fe;margin-top:5px;flex-shrink:0}
+  .tl-dot.green{background:#24a148}.tl-dot.orange{background:#ff832b}.tl-dot.red{background:#da1e28}.tl-dot.blue{background:#0f62fe}
+  .tl-content .tl-time{font-size:12px;color:#6f6f6f}.tl-content .tl-action{font-size:14px;font-weight:600;color:#161616}.tl-content .tl-detail{font-size:12px;color:#525252}
+  .steps{display:flex;gap:0;margin-bottom:24px;background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;overflow:hidden}
+  .step{flex:1;padding:12px 8px;text-align:center;font-size:12px;color:#525252;border-right:1px solid #e0e0e0}
   .step:last-child{border-right:none}
-  .step.done{background:#dcfce7;color:#15803d}
-  .step.active{background:#dbeafe;color:#1e40af}
-  .step.blocked{background:#fee2e2;color:#b91c1c}
-  /* DQ Page */
-  .dq-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px}
-  .dq-card h3{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
-  .dq-card p{font-size:13px;color:#6b7280;margin-bottom:8px}
-  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
-  .tag-error{background:#fee2e2;color:#b91c1c}
-  .tag-warn{background:#fef3c7;color:#92400e}
-  .tag-info{background:#dbeafe;color:#1e40af}
-  hr.divider{border:none;border-top:1px solid #e5e7eb;margin:16px 0}
-  .confirm-row{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:8px;font-size:13px}
-  .confirm-row b{color:#15803d}
-  .email-preview{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;font-size:13px;font-family:monospace;white-space:pre-wrap;line-height:1.6}
-  .field-changed{background:#fef9c3}
-  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
-  .sd-green{background:#16a34a}
-  .sd-red{background:#dc2626}
-  .sd-yellow{background:#d97706}
-  .sd-blue{background:#2563eb}
-  /* Identity / Who-are-you modal */
+  .step.done{background:#defbe6;color:#0e6027}.step.active{background:#edf5ff;color:#0043ce}.step.blocked{background:#fff1f1;color:#a2191f}
+  .dq-card{background:#fff;border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:8px}
+  .dq-card h3{font-size:16px;font-weight:400;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .dq-card p{font-size:14px;color:#525252;margin-bottom:8px}
+  .tag{display:inline-block;padding:2px 8px;border-radius:16px;font-size:12px;letter-spacing:.32px;margin-right:4px}
+  .tag-error{background:#ffd7d9;color:#a2191f}.tag-warn{background:#fddc69;color:#684e00}.tag-info{background:#d0e2ff;color:#0043ce}
+  hr.divider{border:none;border-top:1px solid #e0e0e0;margin:16px 0}
+  .confirm-row{background:#defbe6;border-left:3px solid #24a148;border-radius:0;padding:12px 16px;margin-bottom:8px;font-size:14px}
+  .confirm-row b{color:#0e6027;font-weight:600}
+  .email-preview{background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;padding:16px;font-size:13px;white-space:pre-wrap;line-height:1.6}
+  .field-changed{background:#fcf4d6}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+  .sd-green{background:#24a148}.sd-red{background:#da1e28}.sd-yellow{background:#f1c21b}.sd-blue{background:#0f62fe}
+  /* Identity modal */
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;pointer-events:none}
+  .id-modal-overlay{display:none;position:fixed;inset:0;background:rgba(22,22,22,.7);z-index:500;align-items:center;justify-content:center;pointer-events:none}
   .id-modal-overlay.open{display:flex;pointer-events:all}
-  .id-modal{background:#fff;border-radius:12px;width:480px;max-width:96vw;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.28)}
-  .id-modal h2{font-size:18px;font-weight:700;margin-bottom:6px;color:#1f2937}
-  .id-modal p{font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5}
-  .id-modal label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
-  .id-modal input{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:14px;outline:none;margin-bottom:14px}
-  .id-modal input:focus{border-color:#1d4ed8}
-  .id-modal .id-hint{font-size:11px;color:#9ca3af;margin-top:-10px;margin-bottom:14px}
-  .id-modal .id-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
-  .id-active-badge{background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;cursor:pointer;border:none}
-  .id-active-badge:hover{background:#bfdbfe}
+  .id-modal{background:#fff;border-radius:0;width:480px;max-width:96vw;padding:32px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .id-modal h2{font-size:20px;font-weight:400;margin-bottom:8px;color:#161616}
+  .id-modal p{font-size:14px;color:#525252;margin-bottom:24px;line-height:1.43}
+  .id-modal input{width:100%;min-height:40px;padding:0 16px;font-size:14px;margin-bottom:16px}
+  .id-modal .id-hint{font-size:12px;color:#6f6f6f;margin-top:-8px;margin-bottom:16px}
+  .id-modal .id-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+  .id-active-badge{background:transparent;color:#78a9ff;border:none;padding:0 4px;font-size:12px;margin-left:8px;cursor:pointer;font-family:inherit;text-decoration:underline}
+  .id-active-badge:hover{color:#a6c8ff}
+  .cds-ic{width:1em;height:1em;vertical-align:-.125em;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -208,23 +166,23 @@
 ═══════════════════════════════════════════ -->
 <div class="id-modal-overlay" id="identityModal">
   <div class="id-modal">
-    <h2>👤 Who are you?</h2>
+    <h2><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 4a5 5 0 11-5 5 5 5 0 015-5m0-2a7 7 0 107 7A7 7 0 0016 2zM26 30H24V25a5 5 0 00-5-5H13a5 5 0 00-5 5v5H6V25a7 7 0 017-7h6a7 7 0 017 7z"/></svg> Who are you?</h2>
     <p>Enter your IBM Intranet ID to filter the dashboard to <b>your contractors only</b>. You can also filter by account/client name.<br><br>Your identity is saved in this browser and never sent to any server.</p>
     <label>Your IBM Intranet ID (BP Manager Intranet ID)</label>
     <input id="id-intranetId" type="email" placeholder="jsmith@us.ibm.com" autocomplete="email"
            oninput="clearIdentityError()" onkeydown="if(event.key==='Enter') saveIdentity()">
-    <div id="id-intranetId-error" style="display:none;color:#dc2626;font-size:12px;font-weight:600;margin-top:-10px;margin-bottom:10px"></div>
+    <div id="id-intranetId-error" style="display:none;color:#da1e28;font-size:12px;font-weight:600;margin-top:-10px;margin-bottom:10px"></div>
     <div class="id-hint">This must match the <em>BP Manager Intranet ID</em> field (column CL) in the CMO report.</div>
     <label>Account / Client (optional)</label>
     <input id="id-client" type="text" placeholder="e.g. AT&T INC">
     <div class="id-hint">Leave blank to see all accounts you are the PM for.</div>
     <!-- Admin PIN gate — hidden until "View All" is clicked -->
-    <div id="adminPinSection" style="display:none;margin-top:12px;padding:12px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px">
-      <label style="font-size:13px;font-weight:600;color:#374151">Admin PIN</label>
+    <div id="adminPinSection" style="display:none;margin-top:12px;padding:12px;background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0">
+      <label style="font-size:13px;font-weight:600;color:#161616">Admin PIN</label>
       <input id="adminPinInput" type="password" placeholder="Enter admin PIN"
-             style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:14px;margin-top:4px;box-sizing:border-box"
+             style="width:100%;padding:8px 10px;border:1px solid #c6c6c6;border-radius:0;font-size:14px;margin-top:4px;box-sizing:border-box"
              onkeydown="if(event.key==='Enter') confirmAdminPin()">
-      <div id="adminPinError" style="color:#dc2626;font-size:12px;margin-top:4px;display:none">Incorrect PIN. Try again.</div>
+      <div id="adminPinError" style="color:#da1e28;font-size:12px;margin-top:4px;display:none">Incorrect PIN. Try again.</div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-secondary" style="flex:1" onclick="hideAdminPin()">Cancel</button>
         <button class="btn btn-primary" style="flex:1" onclick="confirmAdminPin()">Confirm</button>
@@ -237,17 +195,17 @@
   </div>
 </div>
 
-<div class="banner" id="appBanner">⚠ <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.</div>
+<div class="banner" id="appBanner"><svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> <b>PROTOTYPE — SYNTHETIC DATA ONLY.</b> No real contractor information. No IBM systems connected. For demonstration purposes only.</div>
 
 <header>
   <div class="logo">IBM</div>
   <div class="title">Subcontractor Renewal &amp; Offboarding</div>
-  <div class="role-badge" id="headerBadge">👤 —</div>
+  <div class="role-badge" id="headerBadge"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 4a5 5 0 11-5 5 5 5 0 015-5m0-2a7 7 0 107 7A7 7 0 0016 2zM26 30H24V25a5 5 0 00-5-5H13a5 5 0 00-5 5v5H6V25a7 7 0 017-7h6a7 7 0 017 7z"/></svg> —</div>
 </header>
 
 <nav>
   <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
-  <button onclick="showTab('analytics',this)">📊 Analytics</button>
+  <button onclick="showTab('analytics',this)"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M4,2H2V28a2,2,0,0,0,2,2H30V28H4V25H26V17H4V13H18V5H4ZM24,19v4H4V19ZM16,7v4H4V7Z"/></svg> Analytics</button>
 </nav>
 
 <div class="main">
@@ -258,24 +216,24 @@
 <div id="tab-dashboard">
 
   <!-- ── 60-Day Renewal Progress Ring ── -->
-  <div id="renewalProgressWidget" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+  <div id="renewalProgressWidget" style="background:#fff;border:1px solid #e0e0e0;border-radius:0;padding:16px 20px;margin-bottom:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
     <div style="position:relative;flex-shrink:0">
       <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="42" fill="none" stroke="#f3f4f6" stroke-width="10"/>
-        <circle id="rpRingDone" cx="50" cy="50" r="42" fill="none" stroke="#16a34a" stroke-width="10"
+        <circle cx="50" cy="50" r="42" fill="none" stroke="#f4f4f4" stroke-width="10"/>
+        <circle id="rpRingDone" cx="50" cy="50" r="42" fill="none" stroke="#198038" stroke-width="10"
                 stroke-linecap="round" stroke-dasharray="0 264" transform="rotate(-90 50 50)" style="transition:stroke-dasharray .5s ease"/>
-        <circle id="rpRingIP" cx="50" cy="50" r="42" fill="none" stroke="#f59e0b" stroke-width="10"
+        <circle id="rpRingIP" cx="50" cy="50" r="42" fill="none" stroke="#f1c21b" stroke-width="10"
                 stroke-linecap="round" stroke-dasharray="0 264" transform="rotate(-90 50 50)" style="transition:stroke-dasharray .5s ease;display:none"/>
-        <text id="rpPct" x="50" y="46" text-anchor="middle" font-size="18" font-weight="700" fill="#1f2328">0%</text>
-        <text x="50" y="60" text-anchor="middle" font-size="9" fill="#6b7280">complete</text>
+        <text id="rpPct" x="50" y="46" text-anchor="middle" font-size="18" font-weight="700" fill="#161616">0%</text>
+        <text x="50" y="60" text-anchor="middle" font-size="9" fill="#525252">complete</text>
       </svg>
     </div>
     <div style="flex:1;min-width:200px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#1f2328">Renewals — Next 60 Days</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#161616">Renewals — Next 60 Days</div>
       <div style="display:flex;flex-direction:column;gap:6px" id="rpLegend"></div>
     </div>
     <div style="flex:2;min-width:260px;max-height:180px;overflow-y:auto">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:8px">Upcoming expirations</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:8px">Upcoming expirations</div>
       <div id="rpTimeline"></div>
     </div>
   </div>
@@ -286,9 +244,9 @@
       <b id="freshnessFile">No report loaded</b>
       <span id="freshnessDate" style="margin-left:12px"></span>
       <span id="freshnessIngested" style="margin-left:12px"></span>
-      <span id="freshnessStale" style="margin-left:12px;color:#d97706;font-weight:600"></span>
+      <span id="freshnessStale" style="margin-left:12px;color:#b28600;font-weight:600"></span>
     </div>
-    <button class="btn btn-secondary btn-sm" style="margin-left:auto" id="setupBtn" onclick="openSetupPanel()">⚙ Setup</button>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto" id="setupBtn" onclick="openSetupPanel()"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg> Setup</button>
   </div>
 
   <div class="cards" id="bucketCards">
@@ -381,7 +339,7 @@
     </div>
   </div>
 
-  <div style="font-size:12px;color:#6b7280;text-align:right;padding:4px 8px" id="tableRowCount"></div>
+  <div style="font-size:12px;color:#525252;text-align:right;padding:4px 8px" id="tableRowCount"></div>
   <div class="table-outer">
     <div class="table-scroll-top" id="tableScrollTop">
       <div class="table-scroll-top-inner" id="tableScrollTopInner"></div>
@@ -421,18 +379,18 @@
     <!-- Filters -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px">
       <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Market / Sector (col GM)</label>
-        <select id="an-sector" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:160px">
+        <label style="font-size:12px;color:#525252;display:block;margin-bottom:4px">Market / Sector (col GM)</label>
+        <select id="an-sector" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #c6c6c6;border-radius:0;font-size:13px;min-width:160px">
           <option value="">All Sectors</option>
         </select>
       </div>
       <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Client</label>
-        <select id="an-client" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;min-width:200px">
+        <label style="font-size:12px;color:#525252;display:block;margin-bottom:4px">Client</label>
+        <select id="an-client" onchange="renderAnalytics()" style="padding:6px 10px;border:1px solid #c6c6c6;border-radius:0;font-size:13px;min-width:200px">
           <option value="">All Clients</option>
         </select>
       </div>
-      <div style="margin-left:auto;font-size:12px;color:#6b7280" id="an-scope"></div>
+      <div style="margin-left:auto;font-size:12px;color:#525252" id="an-scope"></div>
     </div>
 
     <!-- Summary cards row -->
@@ -441,33 +399,33 @@
     <!-- Charts grid -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
       <!-- Expiry bucket bar chart -->
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Contractors by Expiry Bucket</div>
+      <div style="background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#161616">Contractors by Expiry Bucket</div>
         <div id="an-chart-bucket"></div>
       </div>
       <!-- Sector donut -->
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Distribution by Sector</div>
+      <div style="background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#161616">Distribution by Sector</div>
         <div id="an-chart-sector"></div>
       </div>
     </div>
 
     <!-- Top clients bar + Top vendors bar -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Top 10 Clients</div>
+      <div style="background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#161616">Top 10 Clients</div>
         <div id="an-chart-clients"></div>
       </div>
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#1f2328">Top 10 Vendors</div>
+      <div style="background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:20px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:16px;color:#161616">Top 10 Vendors</div>
         <div id="an-chart-vendors"></div>
       </div>
     </div>
 
     <!-- Expiry timeline -->
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:24px">
-      <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:#1f2328">Expiry Timeline — Contractors expiring per month</div>
-      <div style="font-size:12px;color:#6b7280;margin-bottom:16px">Each bar = number of contractors whose contract ends in that month</div>
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:20px;margin-bottom:24px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:#161616">Expiry Timeline — Contractors expiring per month</div>
+      <div style="font-size:12px;color:#525252;margin-bottom:16px">Each bar = number of contractors whose contract ends in that month</div>
       <div id="an-chart-timeline"></div>
     </div>
 
@@ -483,37 +441,37 @@
 <div class="overlay" id="setupOverlay" onclick="closeSetupPanel(event)">
   <div class="panel" id="setupPanel">
     <div class="panel-header">
-      <h2 id="setupPanelTitle">⚙ Setup</h2>
+      <h2 id="setupPanelTitle"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg> Setup</h2>
       <button class="btn btn-secondary btn-sm" onclick="closeSetupPanel()">✕ Close</button>
     </div>
     <div class="panel-body">
 
       <!-- Status-only view for non-admins -->
       <div id="setupStatusOnly">
-        <p style="font-size:13px;color:#6b7280;margin-bottom:16px">
+        <p style="font-size:13px;color:#525252;margin-bottom:16px">
           Files are loaded and managed by the app admin. Data is shared across all users — no action needed.
         </p>
         <div id="statusReport" style="font-size:13px;margin-bottom:8px"></div>
         <div id="statusTaxonomy" style="font-size:13px;margin-bottom:8px"></div>
         <div id="statusTemplate" style="font-size:13px;margin-bottom:8px"></div>
         <div id="setupSummary" style="margin-top:12px"></div>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
-        <button id="setupAdminBtn" class="btn btn-secondary btn-sm" onclick="setupEnterAdminMode()">🔒 Admin: Upload / Replace Files</button>
+        <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0">
+        <button id="setupAdminBtn" class="btn btn-secondary btn-sm" onclick="setupEnterAdminMode()"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M24,14H22V8A6,6,0,0,0,10,8v6H8a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V16A2,2,0,0,0,24,14ZM12,8a4,4,0,0,1,8,0v6H12ZM24,28H8V16H24Z"/></svg> Admin: Upload / Replace Files</button>
       </div>
 
       <!-- Admin upload controls — hidden until PIN verified -->
       <div id="setupAdminControls" style="display:none">
 
-        <p style="font-size:13px;color:#6b7280;margin-bottom:20px">
+        <p style="font-size:13px;color:#525252;margin-bottom:20px">
           Upload your three files once. They are <b>saved to disk on the server</b> and auto-reload on every restart — no re-upload needed.
         </p>
 
         <input type="hidden" id="uploadPin">
 
         <!-- Report -->
-        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-          <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#dc2626">*</span></div>
-          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+        <div style="border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:14px;background:#f4f4f4">
+          <div style="font-weight:700;margin-bottom:4px">1. Contractor Report <span style="color:#da1e28">*</span></div>
+          <div style="font-size:12px;color:#525252;margin-bottom:10px">
             The <code>.xlsb</code> or <code>.xlsx</code> CMO report.<br>
             Filename: <code>Contractor Management Outlook report IBM Consulting NA 09.07.xlsb</code>
           </div>
@@ -525,9 +483,9 @@
         </div>
 
         <!-- Taxonomy -->
-        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-          <div style="font-weight:700;margin-bottom:4px">2. JRS Taxonomy <span style="color:#dc2626">*</span></div>
-          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+        <div style="border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:14px;background:#f4f4f4">
+          <div style="font-weight:700;margin-bottom:4px">2. JRS Taxonomy <span style="color:#da1e28">*</span></div>
+          <div style="font-size:12px;color:#525252;margin-bottom:10px">
             The M389 taxonomy <code>.xlsx</code> file (IBM Consulting Taxonomy Shortlist).
           </div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -538,9 +496,9 @@
         </div>
 
         <!-- Template -->
-        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;background:#fafafa">
-          <div style="font-weight:700;margin-bottom:4px">3. Excel Renewal Template <span style="color:#dc2626">*</span></div>
-          <div style="font-size:12px;color:#6b7280;margin-bottom:10px">
+        <div style="border:1px solid #e0e0e0;border-radius:0;padding:16px;margin-bottom:14px;background:#f4f4f4">
+          <div style="font-weight:700;margin-bottom:4px">3. Excel Renewal Template <span style="color:#da1e28">*</span></div>
+          <div style="font-size:12px;color:#525252;margin-bottom:10px">
             The <code>Request Form Template_Contractor Team.xlsm</code> file.
           </div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -634,9 +592,9 @@ async function openSetupPanel() {
       const rEl = document.getElementById('statusReport');
       const tEl = document.getElementById('statusTaxonomy');
       const tmEl= document.getElementById('statusTemplate');
-      if (rEl)  rEl.innerHTML  = st.report   ? `<span style="color:#16a34a">✅ CMO loaded: <b>${st.report.filename}</b> — ${st.report.accepted} contractors · ${st.report.report_date}${st.report.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ CMO report: not loaded</span>`;
-      if (tEl)  tEl.innerHTML  = st.taxonomy ? `<span style="color:#16a34a">✅ JRS Taxonomy loaded${st.taxonomy.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ JRS Taxonomy: not loaded</span>`;
-      if (tmEl) tmEl.innerHTML = st.template ? `<span style="color:#16a34a">✅ Template loaded: <b>${st.template.filename||'template'}</b> · ${(st.template.size/1024).toFixed(0)} KB${st.template.persisted?' · 💾 persisted':''}</span>` : `<span style="color:#6b7280">⚪ Renewal template: not loaded</span>`;
+      if (rEl)  rEl.innerHTML  = st.report   ? `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> CMO loaded: <b>${st.report.filename}</b> — ${st.report.accepted} contractors · ${st.report.report_date}${st.report.persisted?' ·  persisted':''}</span>` : `<span style="color:#525252"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M7.7 4.7a14.7 14.7 0 00-3 3.1L6.3 9A13.26 13.26 0 018.9 6.3zM4.6 12.3l-1.9-.6A12.51 12.51 0 002 16H4A11.48 11.48 0 014.6 12.3zM2.7 20.4a14.4 14.4 0 002 3.9l1.6-1.2a12.89 12.89 0 01-1.7-3.3zM7.8 27.3a14.4 14.4 0 003.9 2l.6-1.9A12.89 12.89 0 019 25.7zM11.7 2.7l.6 1.9A11.48 11.48 0 0116 4V2A12.51 12.51 0 0011.7 2.7zM24.2 27.3a15.18 15.18 0 003.1-3.1L25.7 23A11.53 11.53 0 0123 25.7zM27.4 19.7l1.9.6A15.47 15.47 0 0030 16H28A11.48 11.48 0 0127.4 19.7zM29.2 11.6a14.4 14.4 0 00-2-3.9L25.6 8.9a12.89 12.89 0 011.7 3.3zM24.1 4.6a14.4 14.4 0 00-3.9-2l-.6 1.9a12.89 12.89 0 013.3 1.7zM20.3 29.3l-.6-1.9A11.48 11.48 0 0116 28v2A21.42 21.42 0 0020.3 29.3z"/></svg> CMO report: not loaded</span>`;
+      if (tEl)  tEl.innerHTML  = st.taxonomy ? `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> JRS Taxonomy loaded${st.taxonomy.persisted?' ·  persisted':''}</span>` : `<span style="color:#525252"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M7.7 4.7a14.7 14.7 0 00-3 3.1L6.3 9A13.26 13.26 0 018.9 6.3zM4.6 12.3l-1.9-.6A12.51 12.51 0 002 16H4A11.48 11.48 0 014.6 12.3zM2.7 20.4a14.4 14.4 0 002 3.9l1.6-1.2a12.89 12.89 0 01-1.7-3.3zM7.8 27.3a14.4 14.4 0 003.9 2l.6-1.9A12.89 12.89 0 019 25.7zM11.7 2.7l.6 1.9A11.48 11.48 0 0116 4V2A12.51 12.51 0 0011.7 2.7zM24.2 27.3a15.18 15.18 0 003.1-3.1L25.7 23A11.53 11.53 0 0123 25.7zM27.4 19.7l1.9.6A15.47 15.47 0 0030 16H28A11.48 11.48 0 0127.4 19.7zM29.2 11.6a14.4 14.4 0 00-2-3.9L25.6 8.9a12.89 12.89 0 011.7 3.3zM24.1 4.6a14.4 14.4 0 00-3.9-2l-.6 1.9a12.89 12.89 0 013.3 1.7zM20.3 29.3l-.6-1.9A11.48 11.48 0 0116 28v2A21.42 21.42 0 0020.3 29.3z"/></svg> JRS Taxonomy: not loaded</span>`;
+      if (tmEl) tmEl.innerHTML = st.template ? `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> Template loaded: <b>${st.template.filename||'template'}</b> · ${(st.template.size/1024).toFixed(0)} KB${st.template.persisted?' ·  persisted':''}</span>` : `<span style="color:#525252"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M7.7 4.7a14.7 14.7 0 00-3 3.1L6.3 9A13.26 13.26 0 018.9 6.3zM4.6 12.3l-1.9-.6A12.51 12.51 0 002 16H4A11.48 11.48 0 014.6 12.3zM2.7 20.4a14.4 14.4 0 002 3.9l1.6-1.2a12.89 12.89 0 01-1.7-3.3zM7.8 27.3a14.4 14.4 0 003.9 2l.6-1.9A12.89 12.89 0 019 25.7zM11.7 2.7l.6 1.9A11.48 11.48 0 0116 4V2A12.51 12.51 0 0011.7 2.7zM24.2 27.3a15.18 15.18 0 003.1-3.1L25.7 23A11.53 11.53 0 0123 25.7zM27.4 19.7l1.9.6A15.47 15.47 0 0030 16H28A11.48 11.48 0 0127.4 19.7zM29.2 11.6a14.4 14.4 0 00-2-3.9L25.6 8.9a12.89 12.89 0 011.7 3.3zM24.1 4.6a14.4 14.4 0 00-3.9-2l-.6 1.9a12.89 12.89 0 013.3 1.7zM20.3 29.3l-.6-1.9A11.48 11.48 0 0116 28v2A21.42 21.42 0 0020.3 29.3z"/></svg> Renewal template: not loaded</span>`;
     } catch(_) {}
   }
 
@@ -647,7 +605,7 @@ async function openSetupPanel() {
 function _showSetupMode(isAdmin) {
   document.getElementById('setupStatusOnly').style.display     = isAdmin ? 'none' : 'block';
   document.getElementById('setupAdminControls').style.display  = isAdmin ? 'block' : 'none';
-  document.getElementById('setupPanelTitle').textContent       = isAdmin ? '⚙ Setup — Upload Files (Admin)' : '⚙ Setup — Status';
+  document.getElementById('setupPanelTitle').textContent       = isAdmin ? 'Setup — Upload Files (Admin)' : 'Setup — Status';
   // Show/hide the "Admin Upload" button in the status-only view
   const adminBtn = document.getElementById('setupAdminBtn');
   if (adminBtn) adminBtn.style.display = isAdmin ? 'none' : 'inline-block';
@@ -683,12 +641,12 @@ async function uploadFile(type) {
   const statusEl  = document.getElementById('status' + capType + 'Admin')
                  || document.getElementById('status' + capType);
   if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">Please select a file first.</span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color:#da1e28">Please select a file first.</span>`;
     return;
   }
   const file = fileInput.files[0];
   const pin  = (document.getElementById('uploadPin') || {}).value || '';
-  if (statusEl) statusEl.innerHTML = `<span style="color:#6b7280">⏳ Uploading ${file.name}…</span>`;
+  if (statusEl) statusEl.innerHTML = `<span style="color:#525252"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Uploading ${file.name}…</span>`;
 
   try {
     const form = new FormData();
@@ -701,16 +659,16 @@ async function uploadFile(type) {
     }
     const data = await res.json();
     if (type === 'report') {
-      const ledgerNote = data.ledger_applied ? ` · 📋 ${data.ledger_applied} ledger overrides applied` : '';
-      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ${ledgerNote}</span>`;
+      const ledgerNote = data.ledger_applied ? ` · <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> ${data.ledger_applied} ledger overrides applied` : '';
+      if (statusEl) statusEl.innerHTML = `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> ${data.filename} — ${data.accepted} contractors, ${data.dq} DQ${ledgerNote}</span>`;
       await loadData();
     } else if (type === 'taxonomy') {
-      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ Taxonomy loaded successfully</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> Taxonomy loaded successfully</span>`;
     } else {
-      if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✅ ${data.filename} — template ready (${(data.size/1024).toFixed(0)} KB)</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> ${data.filename} — template ready (${(data.size/1024).toFixed(0)} KB)</span>`;
     }
   } catch(e) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color:#da1e28"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> ${e.message}</span>`;
   }
 }
 
@@ -810,12 +768,12 @@ function _updateHeaderBadge() {
   const badge = document.getElementById('headerBadge');
   if (!badge) return;
   if (!_identity || _identity.viewAll) {
-    badge.innerHTML = '👤 Admin (all contractors) <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>';
+    badge.innerHTML = '<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 4a5 5 0 11-5 5 5 5 0 015-5m0-2a7 7 0 107 7A7 7 0 0016 2zM26 30H24V25a5 5 0 00-5-5H13a5 5 0 00-5 5v5H6V25a7 7 0 017-7h6a7 7 0 017 7z"/></svg> Admin (all contractors) <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>';
   } else {
     const label = _identity.client
       ? `${_identity.intranetId} · ${_identity.client}`
       : _identity.intranetId;
-    badge.innerHTML = `👤 ${label} <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>`;
+    badge.innerHTML = `<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 4a5 5 0 11-5 5 5 5 0 015-5m0-2a7 7 0 107 7A7 7 0 0016 2zM26 30H24V25a5 5 0 00-5-5H13a5 5 0 00-5 5v5H6V25a7 7 0 017-7h6a7 7 0 017 7z"/></svg> ${label} <button class="id-active-badge" onclick="openIdentityModal()" title="Change identity">✎ Change</button>`;
   }
 }
 
@@ -885,7 +843,7 @@ function clearIdentityError() {
 function _showIdentityError(msg) {
   const inp = document.getElementById('id-intranetId');
   const err = document.getElementById('id-intranetId-error');
-  inp.style.borderColor = '#dc2626';
+  inp.style.borderColor = '#da1e28';
   err.textContent = msg;
   err.style.display = 'block';
   inp.focus();
@@ -926,7 +884,7 @@ function _applyIdentityToView() {
     const filterMsg = (_identity && !_identity.viewAll && _identity.intranetId)
       ? `✓ Live data loaded from backend · showing ${shown} of ${total} for ${_identity.intranetId}`
       : `✓ Live data loaded from backend · ${total} contractors`;
-    b.style.background = '#15803d';
+    b.style.background = '#0e6027';
     b.innerHTML = filterMsg;
   }
 }
@@ -992,7 +950,7 @@ async function loadData() {
   renderTable([]);
   updateBucketCounts([]);
   if (!API_BASE) {
-    showLoadingBanner('No API configured — running in prototype mode. Upload a report via ⚙ Setup.');
+    showLoadingBanner('No API configured — running in prototype mode. Upload a report via <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg> Setup.');
     return;
   }
   try {
@@ -1006,7 +964,7 @@ async function loadData() {
     const resp = await fetch(url);
     if (resp.status === 503) {
       // Backend up but no CMO uploaded yet — this is expected on first visit
-      showLoadingBanner('No data loaded — click ⚙ Setup / Upload Files to get started.');
+      showLoadingBanner('No data loaded — click <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg> Setup / Upload Files to get started.');
       return;
     }
     if (!resp.ok) {
@@ -1056,15 +1014,15 @@ async function postAudit(action, contractor, detail, outcome='success') {
 
 function showLoadingBanner(msg) {
   const b = document.getElementById('appBanner');
-  if (b) { b.style.background = '#1d4ed8'; b.innerHTML = `⏳ ${msg}`; }
+  if (b) { b.style.background = '#0f62fe'; b.innerHTML = `<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> ${msg}`; }
 }
 function showErrorBanner(msg) {
   const b = document.getElementById('appBanner');
-  if (b) { b.style.background = '#b91c1c'; b.innerHTML = `⚠ ${msg}`; }
+  if (b) { b.style.background = '#a2191f'; b.innerHTML = `<svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> ${msg}`; }
 }
 function hideBanner() {
   const b = document.getElementById('appBanner');
-  if (b) { b.style.background = '#15803d'; b.innerHTML = '✓ Live data loaded from backend.'; }
+  if (b) { b.style.background = '#0e6027'; b.innerHTML = '✓ Live data loaded from backend.'; }
 }
 
 function updateFreshnessBar(meta) {
@@ -1077,9 +1035,9 @@ function updateFreshnessBar(meta) {
   if (spans[2]) spans[2].textContent = 'Ingested: ' + meta.ingested_at.replace('T',' ').replace('Z',' UTC');
   if (spans[3]) {
     spans[3].textContent = meta.is_stale
-      ? `⚠ Dataset is ${meta.staleness_days} days old — review before submitting`
+      ? `<svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Dataset is ${meta.staleness_days} days old — review before submitting`
       : `✓ Dataset is current`;
-    spans[3].style.color = meta.is_stale ? '#d97706' : '#16a34a';
+    spans[3].style.color = meta.is_stale ? '#b28600' : '#198038';
   }
 }
 
@@ -1108,7 +1066,7 @@ function bucketBadge(b){
   const m=map[b]||['badge-gray',b];
   return `<span class="badge ${m[0]}">${m[1]}</span>`;
 }
-function jrsBadge(s){const map={active:['badge-green','✓ Active'],warn:['badge-yellow','⚠ Warning'],invalid:['badge-red','✗ Invalid']};const m=map[s]||['badge-gray','–'];return `<span class="badge ${m[0]}">${m[1]}</span>`;}
+function jrsBadge(s){const map={active:['badge-green','✓ Active'],warn:['badge-yellow','<svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Warning'],invalid:['badge-red','✗ Invalid']};const m=map[s]||['badge-gray','–'];return `<span class="badge ${m[0]}">${m[1]}</span>`;}
 function renewalBadge(s){if(!s||s==='–') return '<span class="badge badge-gray">–</span>';if(s==='In Progress') return '<span class="badge badge-blue">In Progress</span>';if(s==='Submitted') return '<span class="badge badge-green">Submitted</span>';return `<span class="badge badge-gray">${s}</span>`;}
 function offboardBadge(s){if(!s||s==='–') return '<span class="badge badge-gray">–</span>';if(s==='In Progress') return '<span class="badge badge-orange">In Progress</span>';return `<span class="badge badge-gray">${s}</span>`;}
 
@@ -1349,10 +1307,10 @@ let _lastFilteredData = [];
 // PM Status helpers
 // "Offboarded" is read-only — set automatically when offboard is submitted, never manually
 const PM_STATUS_CFG = {
-  'Pending':     { color:'#6b7280', bg:'#f3f4f6', pct:0,   manual:true  },
-  'In Progress': { color:'#d97706', bg:'#fef3c7', pct:50,  manual:true  },
-  'Renewed':     { color:'#16a34a', bg:'#dcfce7', pct:100, manual:true  },
-  'Offboarded':  { color:'#0891b2', bg:'#e0f2fe', pct:100, manual:false },
+  'Pending':     { color:'#525252', bg:'#f4f4f4', pct:0,   manual:true  },
+  'In Progress': { color:'#b28600', bg:'#fcf4d6', pct:50,  manual:true  },
+  'Renewed':     { color:'#198038', bg:'#defbe6', pct:100, manual:true  },
+  'Offboarded':  { color:'#0072c3', bg:'#e5f6ff', pct:100, manual:false },
 };
 const PM_STATUS_MANUAL = Object.entries(PM_STATUS_CFG).filter(([,v])=>v.manual).map(([k])=>k);
 
@@ -1362,9 +1320,9 @@ function _isOffboarded(c) { return c.pmStatus === 'Offboarded' || c.offboard ===
 // New TRAM ID comes only from the CMO column "Renewal Metro Ticket Number" — never typed by the PM.
 function _newTramBadge(c) {
   if (!c.tramIdNew) return '';
-  return `<div style="margin-top:6px;padding:4px 6px;border:1px solid #86efac;background:#f0fdf4;border-radius:6px">
-    <div style="font-size:10px;font-weight:700;color:#15803d">✅ NEW TRAM SUBMITTED</div>
-    <code style="font-size:11px;color:#14532d">${c.tramIdNew}</code>
+  return `<div style="margin-top:6px;padding:4px 6px;border:1px solid #6fdc8c;background:#defbe6;border-radius:0">
+    <div style="font-size:10px;font-weight:700;color:#0e6027"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> NEW TRAM SUBMITTED</div>
+    <code style="font-size:11px;color:#0e6027">${c.tramIdNew}</code>
   </div>`;
 }
 
@@ -1373,11 +1331,11 @@ function _pmStatusPill(c) {
   const cfg = PM_STATUS_CFG[st] || PM_STATUS_CFG['Pending'];
   const pct = cfg.pct;
   return `<div style="min-width:100px">
-    <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${cfg.bg};color:${cfg.color}">${st}</span>
-    <div style="margin-top:4px;background:#e5e7eb;border-radius:4px;height:5px;overflow:hidden">
-      <div style="width:${pct}%;background:${cfg.color};height:100%;border-radius:4px;transition:width .3s"></div>
+    <span style="display:inline-block;padding:2px 8px;border-radius:16px;font-size:11px;font-weight:600;background:${cfg.bg};color:${cfg.color}">${st}</span>
+    <div style="margin-top:4px;background:#e0e0e0;border-radius:0;height:5px;overflow:hidden">
+      <div style="width:${pct}%;background:${cfg.color};height:100%;border-radius:0;transition:width .3s"></div>
     </div>
-    <div style="font-size:10px;color:#9ca3af;margin-top:1px;text-align:right">${pct}%</div>
+    <div style="font-size:10px;color:#6f6f6f;margin-top:1px;text-align:right">${pct}%</div>
   </div>`;
 }
 
@@ -1423,10 +1381,10 @@ function _inlineInputHTML(serial, status, c) {
     const saved = (c && c._ledger && c._ledger.new_po) ? c._ledger.new_po : '';
     return `<div style="margin-top:5px;display:flex;gap:3px">
       <input id="ri-po-${serial}" placeholder="New PO #" value="${saved}"
-             style="flex:1;min-width:0;border:1px solid #86efac;border-radius:4px;padding:2px 5px;font-size:10px;font-family:monospace"
+             style="flex:1;min-width:0;border:1px solid #6fdc8c;border-radius:0;padding:2px 5px;font-size:10px;font-family:IBM Plex Mono,monospace"
              onclick="event.stopPropagation()">
       <button onclick="event.stopPropagation();_saveNewPo('${serial}','row')" title="Save PO"
-              style="border:none;background:#16a34a;color:#fff;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:10px;font-weight:700">✓</button>
+              style="border:none;background:#198038;color:#fff;border-radius:0;padding:2px 5px;cursor:pointer;font-size:10px;font-weight:700">✓</button>
     </div>`;
   }
   return '';
@@ -1857,41 +1815,41 @@ function _normaliseClient(raw) {
 
 function _buildRow(c) {
   let daysCell;
-  if(c.days===null) daysCell='<span style="color:#9ca3af">?</span>';
-  else if(c.days<0) daysCell=`<span style="color:#dc2626;font-weight:700;background:#fee2e2;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-  else if(c.days<=7) daysCell=`<span style="color:#c2410c;font-weight:700;background:#ffedd5;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-  else if(c.days<=14) daysCell=`<span style="color:#92400e;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px">${c.days}d</span>`;
-  else daysCell=`<span style="color:#374151">${c.days}d</span>`;
+  if(c.days===null) daysCell='<span style="color:#6f6f6f">?</span>';
+  else if(c.days<0) daysCell=`<span style="color:#da1e28;font-weight:700;background:#ffd7d9;padding:2px 6px;border-radius:0">${c.days}d</span>`;
+  else if(c.days<=7) daysCell=`<span style="color:#8a3800;font-weight:700;background:#ffd9be;padding:2px 6px;border-radius:0">${c.days}d</span>`;
+  else if(c.days<=14) daysCell=`<span style="color:#684e00;font-weight:700;background:#fcf4d6;padding:2px 6px;border-radius:0">${c.days}d</span>`;
+  else daysCell=`<span style="color:#161616">${c.days}d</span>`;
   const expDate=c.endDate
-    ?(c.days!==null&&c.days<0?`<b style="color:#dc2626">${c.endDate}</b>`:`<b>${c.endDate}</b>`)
-    :'<span style="color:#9ca3af">–</span>';
-  const ghostStyle=c._ghost?' style="opacity:0.65;background:#fafafa"':'';
-  const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO">📋 ledger</span>':'';
+    ?(c.days!==null&&c.days<0?`<b style="color:#da1e28">${c.endDate}</b>`:`<b>${c.endDate}</b>`)
+    :'<span style="color:#6f6f6f">–</span>';
+  const ghostStyle=c._ghost?' style="opacity:0.65;background:#f4f4f4"':'';
+  const ghostBadge=c._ghost?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px" title="Not in latest CMO"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> ledger</span>':'';
   const clientDisplay = _normaliseClient(c.client);
   return `<tr${ghostStyle} style="cursor:pointer" onclick="openDetail('${c.serial}')">
     <td class="col-action" onclick="event.stopPropagation()" style="padding:6px 8px">
       <div style="display:flex;flex-direction:column;gap:4px;min-width:110px">
-        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}>🔄 Renew</button>
-        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}>📤 Offboard</button>
+        <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M12 10H6.78A11 11 0 0127 16h2A13 13 0 006 7.68V4H4v8h8zM20 22h5.22A11 11 0 015 16H3a13 13 0 0023 8.32V28h2V20H20z"/></svg> Renew</button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="openOffboardModal('${c.serial}')" ${(_isOffboarded(c)||c._ghost)?'disabled title="'+(c._ghost?'Ghost record':'Offboarding already submitted')+'"':''}><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M26 24v4H6V24H4v4l.0076-.0049A1.9977 1.9977 0 006 30H26a2 2 0 002-2h0V24zM6 12L7.411 13.405 15 5.825 15 24 17 24 17 5.825 24.591 13.405 26 12 16 2 6 12z"/></svg> Offboard</button>
       </div>
     </td>
     <td class="col-date">${expDate}</td>
     <td class="col-days">${daysCell}</td>
     <td>
       <b>${c.name}</b>${ghostBadge}
-      <div style="font-size:10px;color:#9ca3af;margin-top:1px"><code>${c.serial}${c.cnum?'·'+c.cnum:''}</code></div>
+      <div style="font-size:10px;color:#6f6f6f;margin-top:1px"><code>${c.serial}${c.cnum?'·'+c.cnum:''}</code></div>
     </td>
     <td>${clientDisplay}</td>
-    <td>${c.contact||'–'}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail||''}</span></td>
+    <td>${c.contact||'–'}<br><span style="font-size:11px;color:#6f6f6f">${c.contactEmail||''}</span></td>
     <td style="font-size:12px">${c.vendor||'–'}</td>
     <td style="text-align:center">${c.band||'–'}</td>
     <td>${jrsBadge(c.jrsStatus)} <span style="font-size:12px">${c.jrsTram||'–'}</span></td>
-    <td><code style="font-size:11px">${c.tramId||'<span style="color:#dc2626">Missing</span>'}</code></td>
+    <td><code style="font-size:11px">${c.tramId||'<span style="color:#da1e28">Missing</span>'}</code></td>
     <td onclick="event.stopPropagation()" style="min-width:130px">
       <div id="pmPill-${c.serial}">${_pmStatusPill(c)}</div>
       ${c.pmStatus==='Offboarded'
-        ? `<div style="font-size:10px;color:#0891b2;margin-top:4px;text-align:center">🔒 Auto-set</div>`
-        : `<select style="margin-top:4px;font-size:11px;border:1px solid #e5e7eb;border-radius:4px;padding:2px 4px;width:100%;background:#fff"
+        ? `<div style="font-size:10px;color:#0072c3;margin-top:4px;text-align:center"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M24,14H22V8A6,6,0,0,0,10,8v6H8a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V16A2,2,0,0,0,24,14ZM12,8a4,4,0,0,1,8,0v6H12ZM24,28H8V16H24Z"/></svg> Auto-set</div>`
+        : `<select style="margin-top:4px;font-size:11px;border:1px solid #e0e0e0;border-radius:0;padding:2px 4px;width:100%;background:#fff"
             onchange="setPmStatus('${c.serial}',this.value);this.blur()">
             ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
           </select>`}
@@ -1919,7 +1877,7 @@ function _renderPage(){
   if(remaining > 0){
     const tr = document.createElement('tr');
     tr.id = 'tableLoadMore';
-    tr.innerHTML = `<td colspan="10" style="text-align:center;padding:14px;color:#6b7280;font-size:13px">
+    tr.innerHTML = `<td colspan="10" style="text-align:center;padding:14px;color:#525252;font-size:13px">
       <button class="btn btn-secondary btn-sm" onclick="loadMoreRows()">
         Load ${Math.min(remaining, PAGE_SIZE)} more (${remaining} remaining)
       </button>
@@ -2029,37 +1987,37 @@ function _renderRenewalRing(data) {
     const row = (color, label, count) =>
       `<div style="display:flex;align-items:center;gap:8px;font-size:13px">
          <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
-         <span style="color:#57606a">${label}</span>
-         <span style="font-weight:700;margin-left:auto;color:#1f2328">${count}</span>
+         <span style="color:#525252">${label}</span>
+         <span style="font-weight:700;margin-left:auto;color:#161616">${count}</span>
        </div>`;
     legend.innerHTML = [
-      row('#16a34a', 'Completed', done),
-      row('#f59e0b', 'In Progress', inProg),
-      row('#e5e7eb', 'Pending', pending),
-      row('#1d4ed8', 'Total in 60d window', total),
+      row('#198038', 'Completed', done),
+      row('#f1c21b', 'In Progress', inProg),
+      row('#e0e0e0', 'Pending', pending),
+      row('#0f62fe', 'Total in 60d window', total),
     ].join('');
   }
 
   // Timeline: grouped readable list — Completed → In Progress → Pending, sorted by days
   const tl = document.getElementById('rpTimeline');
   if (tl) {
-    if (!scope.length) { tl.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:4px 0">No contractors expiring in next 60 days</div>'; }
+    if (!scope.length) { tl.innerHTML = '<div style="font-size:12px;color:#6f6f6f;padding:4px 0">No contractors expiring in next 60 days</div>'; }
     else {
       const _isDone = c => c.pmStatus==='Renewed'||c.pmStatus==='Offboarded'||c.renewal==='Submitted'||c.offboard==='Submitted';
       const _isIP   = c => c.pmStatus==='In Progress' && !_isDone(c);
       const groups = [
-        { label:'✅ Completed', color:'#16a34a', bg:'#f0fdf4', items: scope.filter(c=>_isDone(c)).sort((a,b)=>a.days-b.days) },
-        { label:'⏳ In Progress', color:'#d97706', bg:'#fffbeb', items: scope.filter(c=>_isIP(c)).sort((a,b)=>a.days-b.days) },
-        { label:'⏰ Pending', color:'#6b7280', bg:'#f9fafb', items: scope.filter(c=>!_isDone(c)&&!_isIP(c)).sort((a,b)=>a.days-b.days) },
+        { label:'<svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> Completed', color:'#198038', bg:'#defbe6', items: scope.filter(c=>_isDone(c)).sort((a,b)=>a.days-b.days) },
+        { label:'<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> In Progress', color:'#b28600', bg:'#fcf4d6', items: scope.filter(c=>_isIP(c)).sort((a,b)=>a.days-b.days) },
+        { label:'<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Pending', color:'#525252', bg:'#f4f4f4', items: scope.filter(c=>!_isDone(c)&&!_isIP(c)).sort((a,b)=>a.days-b.days) },
       ];
       tl.innerHTML = groups.filter(g=>g.items.length).map(g=>`
         <div style="margin-bottom:8px">
           <div style="font-size:10px;font-weight:700;color:${g.color};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${g.label} (${g.items.length})</div>
           ${g.items.map(c=>`
-            <div onclick="openDetail('${c.serial}')" style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;background:${g.bg};margin-bottom:2px;cursor:pointer;font-size:11px" title="${c.name} · ${_normaliseClient(c.client)}">
+            <div onclick="openDetail('${c.serial}')" style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:0;background:${g.bg};margin-bottom:2px;cursor:pointer;font-size:11px" title="${c.name} · ${_normaliseClient(c.client)}">
               <span style="font-weight:600;color:${g.color};min-width:34px;text-align:right">${c.days<0?c.days+'d':c.days+'d'}</span>
-              <span style="color:#1f2328;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${c.name}</b></span>
-              <span style="color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${_normaliseClient(c.client)}</span>
+              <span style="color:#161616;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${c.name}</b></span>
+              <span style="color:#525252;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${_normaliseClient(c.client)}</span>
             </div>`).join('')}
         </div>`).join('');
     }
@@ -2209,8 +2167,8 @@ function renderAnalytics() {
   _renderAnCards(data);
   _renderBucketChart(data);
   _renderSectorChart(data);
-  _renderTopBar('an-chart-clients', data, 'client', 'Top 10 Clients', '#3b82f6');
-  _renderTopBar('an-chart-vendors', data, 'vendor', 'Top 10 Vendors', '#8b5cf6');
+  _renderTopBar('an-chart-clients', data, 'client', 'Top 10 Clients', '#4589ff');
+  _renderTopBar('an-chart-vendors', data, 'vendor', 'Top 10 Vendors', '#a56eff');
   _renderTimeline(data);
 }
 
@@ -2225,17 +2183,17 @@ function _renderAnCards(data) {
   const offboardIP = data.filter(c=>c.bucket==='offboard-ip').length;
   const dqCount    = data.filter(c=>c.dq).length;
   const cards = [
-    {label:'Total',       val:total,      color:'#1f2328'},
-    {label:'Past Due',    val:pastDue,    color:'#dc2626'},
-    {label:'Next 30 Days',val:next30,     color:'#d97706'},
-    {label:'Renewal IP',  val:renewalIP,  color:'#7c3aed'},
-    {label:'Offboard IP', val:offboardIP, color:'#0891b2'},
-    {label:'DQ Issues',   val:dqCount,    color:'#6b7280'},
+    {label:'Total',       val:total,      color:'#161616'},
+    {label:'Past Due',    val:pastDue,    color:'#da1e28'},
+    {label:'Next 30 Days',val:next30,     color:'#b28600'},
+    {label:'Renewal IP',  val:renewalIP,  color:'#8a3ffc'},
+    {label:'Offboard IP', val:offboardIP, color:'#0072c3'},
+    {label:'DQ Issues',   val:dqCount,    color:'#525252'},
   ];
   el.innerHTML = cards.map(c=>`
-    <div style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;text-align:center">
+    <div style="background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;padding:14px 16px;text-align:center">
       <div style="font-size:26px;font-weight:700;color:${c.color}">${c.val}</div>
-      <div style="font-size:11px;color:#6b7280;margin-top:2px;text-transform:uppercase;letter-spacing:.5px">${c.label}</div>
+      <div style="font-size:11px;color:#525252;margin-top:2px;text-transform:uppercase;letter-spacing:.5px">${c.label}</div>
     </div>`).join('');
 }
 
@@ -2250,7 +2208,7 @@ function _renderTopBar(containerId, data, field, title, color) {
     counts[v]=(counts[v]||0)+1;
   });
   const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  if(!sorted.length){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }
+  if(!sorted.length){ el.innerHTML='<p style="color:#6f6f6f;font-size:13px">No data</p>'; return; }
   const max = sorted[0][1];
   const rowH = 28, gap = 4, labelW = 160, barAreaW = 220, numW = 36;
   const svgH = sorted.length * (rowH + gap);
@@ -2259,9 +2217,9 @@ function _renderTopBar(containerId, data, field, title, color) {
     const y = i*(rowH+gap);
     const label = name.length>22 ? name.slice(0,21)+'…' : name;
     return `
-      <text x="${labelW-6}" y="${y+rowH/2+4}" text-anchor="end" font-size="11" fill="#374151">${label}</text>
+      <text x="${labelW-6}" y="${y+rowH/2+4}" text-anchor="end" font-size="11" fill="#161616">${label}</text>
       <rect x="${labelW}" y="${y+4}" width="${barW}" height="${rowH-8}" rx="3" fill="${color}" opacity="0.85"/>
-      <text x="${labelW+barW+5}" y="${y+rowH/2+4}" font-size="11" fill="#6b7280">${count}</text>`;
+      <text x="${labelW+barW+5}" y="${y+rowH/2+4}" font-size="11" fill="#525252">${count}</text>`;
   }).join('');
   el.innerHTML = `<svg width="100%" viewBox="0 0 ${labelW+barAreaW+numW} ${svgH}" style="overflow:visible">${rows}</svg>`;
 }
@@ -2271,14 +2229,14 @@ function _renderBucketChart(data) {
   const el = document.getElementById('an-chart-bucket');
   if(!el) return;
   const buckets = [
-    {key:'past-due', label:'Past Due',      color:'#dc2626'},
-    {key:'0-7',      label:'Next 7d',       color:'#f97316'},
-    {key:'8-14',     label:'8–14d',         color:'#f59e0b'},
-    {key:'15-30',    label:'15–30d',        color:'#3b82f6'},
-    {key:'31-60',    label:'31–60d',        color:'#10b981'},
-    {key:'60+',      label:'60+ d',         color:'#8b5cf6'},
-    {key:'renewal-ip',  label:'Renewal IP', color:'#7c3aed'},
-    {key:'offboard-ip', label:'Offboard IP',color:'#0891b2'},
+    {key:'past-due', label:'Past Due',      color:'#da1e28'},
+    {key:'0-7',      label:'Next 7d',       color:'#ff832b'},
+    {key:'8-14',     label:'8–14d',         color:'#f1c21b'},
+    {key:'15-30',    label:'15–30d',        color:'#4589ff'},
+    {key:'31-60',    label:'31–60d',        color:'#24a148'},
+    {key:'60+',      label:'60+ d',         color:'#a56eff'},
+    {key:'renewal-ip',  label:'Renewal IP', color:'#8a3ffc'},
+    {key:'offboard-ip', label:'Offboard IP',color:'#0072c3'},
   ];
   const counts = buckets.map(b=>({...b, count:data.filter(c=>c.bucket===b.key).length}));
   const max = Math.max(...counts.map(c=>c.count), 1);
@@ -2290,10 +2248,10 @@ function _renderBucketChart(data) {
     const y = chartH-bh;
     const lx = x+barW/2;
     const labelLines = b.label.split(' ');
-    const labelSvg = labelLines.map((l,li)=>`<text x="${lx}" y="${chartH+14+(li*13)}" text-anchor="middle" font-size="10" fill="#6b7280">${l}</text>`).join('');
+    const labelSvg = labelLines.map((l,li)=>`<text x="${lx}" y="${chartH+14+(li*13)}" text-anchor="middle" font-size="10" fill="#525252">${l}</text>`).join('');
     return `
       <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${b.color}" opacity="0.85"/>
-      <text x="${lx}" y="${y-4}" text-anchor="middle" font-size="11" fill="#374151" font-weight="600">${b.count}</text>
+      <text x="${lx}" y="${y-4}" text-anchor="middle" font-size="11" fill="#161616" font-weight="600">${b.count}</text>
       ${labelSvg}`;
   }).join('');
   el.innerHTML = `<svg width="100%" viewBox="0 0 ${svgW} ${chartH+labelH}" style="overflow:visible">${bars}</svg>`;
@@ -2308,8 +2266,8 @@ function _renderSectorChart(data) {
   data.forEach(c=>{ const s=c.marketSector||c.sector||'Unknown'; counts[s]=(counts[s]||0)+1; });
   const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const total = entries.reduce((s,[,v])=>s+v,0);
-  if(!total){ el.innerHTML='<p style="color:#9ca3af;font-size:13px">No data</p>'; return; }
-  const colors=['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#0891b2','#f97316','#6b7280'];
+  if(!total){ el.innerHTML='<p style="color:#6f6f6f;font-size:13px">No data</p>'; return; }
+  const colors=['#4589ff','#24a148','#f1c21b','#a56eff','#d02670','#0072c3','#ff832b','#525252'];
   const cx=110, cy=100, R=80, r=44;
   let angle = -Math.PI/2;
   const slices = entries.map(([name,count],i)=>{
@@ -2326,15 +2284,15 @@ function _renderSectorChart(data) {
   const legend = entries.map(([name,count],i)=>{
     const pct = Math.round(count/total*100);
     const label = name.length>20?name.slice(0,19)+'…':name;
-    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#374151;margin-bottom:3px">
-      <div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
-      <span>${label}</span><span style="color:#9ca3af;margin-left:auto">${pct}%</span></div>`;
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#161616;margin-bottom:3px">
+      <div style="width:10px;height:10px;border-radius:0;background:${colors[i%colors.length]};flex-shrink:0"></div>
+      <span>${label}</span><span style="color:#6f6f6f;margin-left:auto">${pct}%</span></div>`;
   }).join('');
   el.innerHTML = `
     <div style="display:flex;gap:16px;align-items:flex-start">
       <svg viewBox="0 0 220 200" style="width:180px;flex-shrink:0">
         ${slices}
-        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13" fill="#374151" font-weight="600">${total}</text>
+        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13" fill="#161616" font-weight="600">${total}</text>
       </svg>
       <div style="flex:1;padding-top:8px">${legend}</div>
     </div>`;
@@ -2369,14 +2327,14 @@ function _renderTimeline(data) {
     const x = i*(barW+gap);
     const y = chartH-bh;
     const isToday = e.m===todayKey;
-    const col = isToday?'#f97316':e.count===0?'#e5e7eb':'#3b82f6';
+    const col = isToday?'#ff832b':e.count===0?'#e0e0e0':'#4589ff';
     const label = e.m.slice(5)+'\n'+e.m.slice(0,4);
     const [mm,yyyy] = [e.m.slice(5), e.m.slice(0,4)];
     return `
       <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(bh,2)}" rx="2" fill="${col}" opacity="0.85"/>
-      ${e.count>0?`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="#374151">${e.count}</text>`:''}
-      <text x="${x+barW/2}" y="${chartH+12}" text-anchor="middle" font-size="9" fill="${isToday?'#f97316':'#9ca3af'}">${mm}</text>
-      <text x="${x+barW/2}" y="${chartH+23}" text-anchor="middle" font-size="8" fill="#d1d5db">${yyyy.slice(2)}</text>`;
+      ${e.count>0?`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="#161616">${e.count}</text>`:''}
+      <text x="${x+barW/2}" y="${chartH+12}" text-anchor="middle" font-size="9" fill="${isToday?'#ff832b':'#6f6f6f'}">${mm}</text>
+      <text x="${x+barW/2}" y="${chartH+23}" text-anchor="middle" font-size="8" fill="#c6c6c6">${yyyy.slice(2)}</text>`;
   }).join('');
   el.innerHTML = `<svg width="100%" viewBox="0 0 ${svgW} ${chartH+labelH}" style="overflow:visible">${bars}</svg>`;
 }
@@ -2385,20 +2343,20 @@ function _renderTimeline(data) {
 function openDetail(serial){
   const c=_findContractor(serial);if(!c) return;
   document.getElementById('detailTitle').textContent=c.name+' — Record Detail';
-  const daysLabel=c.days===null?'Unknown (date missing)':c.days<0?`<b style="color:#dc2626">${Math.abs(c.days)} days past due</b>`:`${c.days} days`;
+  const daysLabel=c.days===null?'Unknown (date missing)':c.days<0?`<b style="color:#da1e28">${Math.abs(c.days)} days past due</b>`:`${c.days} days`;
   document.getElementById('detailBody').innerHTML=`
-    ${c.dq?`<div class="dq-warn">⚠ This record has data-quality warnings. Review before actioning.</div>`:''}
+    ${c.dq?`<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> This record has data-quality warnings. Review before actioning.</div>`:''}
 
     <div class="section-title">Expiration</div>
     <div class="info-grid">
-      <div class="info-item"><label>Expected End Date</label><span style="font-size:15px;font-weight:700;color:${c.days!==null&&c.days<0?'#dc2626':c.days<=7?'#c2410c':'#1f2937'}">${c.endDate||'–'}</span></div>
+      <div class="info-item"><label>Expected End Date</label><span style="font-size:15px;font-weight:700;color:${c.days!==null&&c.days<0?'#da1e28':c.days<=7?'#8a3800':'#161616'}">${c.endDate||'–'}</span></div>
       <div class="info-item"><label>Days Remaining</label><span>${daysLabel}</span></div>
     </div>
 
     <div class="section-title">Contractor Identity</div>
     <div class="info-grid">
       <div class="info-item"><label>Full Name</label><span>${c.name}</span></div>
-      <div class="info-item"><label>Email (Intranet Address)</label><span>${c.email}</span></div>
+      <div class="info-item"><label>Email (Intranet Address)</label><span>${c.email||'—'}</span></div>
       <div class="info-item"><label>TalentID / Serial</label><span><code>${c.serial}</code></span></div>
       <div class="info-item"><label>TalentID / CNUM</label><span><code>${c.cnum||'–'}</code></span></div>
       <div class="info-item"><label>Actual Band</label><span>${c.band}</span></div>
@@ -2421,7 +2379,7 @@ function openDetail(serial){
 
     <div class="section-title">People</div>
     <div class="info-grid">
-      <div class="info-item"><label>Project Contact (TRAM)</label><span>${c.contact}<br><span style="font-size:11px;color:#9ca3af">${c.contactEmail}</span></span></div>
+      <div class="info-item"><label>Project Contact (TRAM)</label><span>${c.contact}<br><span style="font-size:11px;color:#6f6f6f">${c.contactEmail}</span></span></div>
       <div class="info-item"><label>Contractor Assignee</label><span>${c.contractorAssignee}</span></div>
       <div class="info-item"><label>PM Notes ID</label><span>${c.pmNotesId}</span></div>
       <div class="info-item"><label>BP Manager Intranet ID</label><span>${c.bpManagerIntranetId || c.pmIntranetId || '–'}</span></div>
@@ -2432,7 +2390,7 @@ function openDetail(serial){
       <div class="info-item"><label>JR/S (TRAM)</label><span>${c.jrsTram}</span></div>
       <div class="info-item"><label>JRS Taxonomy Status</label><span>${jrsBadge(c.jrsStatus)}</span></div>
     </div>
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 12px;margin-top:6px;font-size:13px;color:#374151">
+    <div style="background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;padding:10px 12px;margin-top:6px;font-size:13px;color:#161616">
       <b>Skill Description:</b><br>${c.skillDescription}
     </div>
 
@@ -2459,10 +2417,10 @@ function openDetail(serial){
       <div id="detailPmPill">${_pmStatusPill(c)}</div>
       <div>
         ${c.pmStatus==='Offboarded'
-          ? `<div style="font-size:12px;color:#0891b2;padding:6px 0">🔒 Offboarded — set automatically when offboarding was submitted</div>`
-          : `<label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Change status</label>
+          ? `<div style="font-size:12px;color:#0072c3;padding:6px 0"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M24,14H22V8A6,6,0,0,0,10,8v6H8a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V16A2,2,0,0,0,24,14ZM12,8a4,4,0,0,1,8,0v6H12ZM24,28H8V16H24Z"/></svg> Offboarded — set automatically when offboarding was submitted</div>`
+          : `<label style="font-size:12px;color:#525252;display:block;margin-bottom:4px">Change status</label>
              <select id="detailPmStatus"
-               style="padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"
+               style="padding:6px 12px;border:1px solid #c6c6c6;border-radius:0;font-size:13px"
                onchange="setPmStatus('${c.serial}',this.value)">
                ${PM_STATUS_MANUAL.map(s=>`<option value="${s}" ${(c.pmStatus||'Pending')===s?'selected':''}>${s}</option>`).join('')}
              </select>`}
@@ -2471,14 +2429,14 @@ function openDetail(serial){
     <hr class="divider">
 
     ${(c.pmStatus==='Renewed'||c.renewal==='Submitted') ? `
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:12px">
-      <div style="font-weight:700;font-size:13px;color:#15803d;margin-bottom:8px">✅ Renewal Completed — Record New PO</div>
+    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;color:#0e6027;margin-bottom:8px"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> Renewal Completed — Record New PO</div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <div style="flex:1;min-width:180px">
-          <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">New PO Number</label>
+          <label style="font-size:12px;color:#525252;display:block;margin-bottom:4px">New PO Number</label>
           <input id="dp-newPo-${c.serial}" placeholder="e.g. PO-2025-04812"
                  value="${c._ledger && c._ledger.new_po ? c._ledger.new_po : ''}"
-                 style="width:100%;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:13px;font-family:monospace">
+                 style="width:100%;border:1px solid #6fdc8c;border-radius:0;padding:6px 10px;font-size:13px;font-family:IBM Plex Mono,monospace">
         </div>
         <button class="btn btn-primary btn-sm" onclick="_saveNewPo('${c.serial}')">Save PO</button>
       </div>
@@ -2486,14 +2444,14 @@ function openDetail(serial){
     </div>` : ''}
 
     ${(c.pmStatus==='In Progress') && c.renewal!=='Submitted' ? `
-    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;margin-bottom:12px">
-      <div style="font-weight:700;font-size:13px;color:#92400e">⏳ Renewal In Progress</div>
-      <div style="font-size:12px;color:#92400e;margin-top:4px">The new TRAM ID will appear here automatically after the next CMO update.</div>
+    <div style="background:#fcf4d6;border:1px solid #f1c21b;border-radius:0;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;color:#684e00"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Renewal In Progress</div>
+      <div style="font-size:12px;color:#684e00;margin-top:4px">The new TRAM ID will appear here automatically after the next CMO update.</div>
     </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:8px">
-      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c))?'disabled title="'+(_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}>🔄 Initiate Renewal</button>
-      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${_isOffboarded(c)?'disabled title="Offboarding already submitted"':''}>📤 Initiate Offboarding</button>
+      <button class="btn btn-primary" onclick="closeDetailPanel();openRenewalModal('${c.serial}')" ${(c.renewal==='Submitted'||_isOffboarded(c))?'disabled title="'+(_isOffboarded(c)?'Contractor is offboarded':'Renewal already submitted')+'"':''}><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M12 10H6.78A11 11 0 0127 16h2A13 13 0 006 7.68V4H4v8h8zM20 22h5.22A11 11 0 015 16H3a13 13 0 0023 8.32V28h2V20H20z"/></svg> Initiate Renewal</button>
+      <button class="btn btn-secondary" onclick="closeDetailPanel();openOffboardModal('${c.serial}')" ${_isOffboarded(c)?'disabled title="Offboarding already submitted"':''}><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M26 24v4H6V24H4v4l.0076-.0049A1.9977 1.9977 0 006 30H26a2 2 0 002-2h0V24zM6 12L7.411 13.405 15 5.825 15 24 17 24 17 5.825 24.591 13.405 26 12 16 2 6 12z"/></svg> Initiate Offboarding</button>
     </div>`;
   document.getElementById('detailOverlay').classList.add('open');
 }
@@ -2509,11 +2467,11 @@ async function _saveNewPo(serial, source) {
   if (!inp) return;
   const val = inp.value.trim();
   if (!val) {
-    if (st) st.innerHTML = '<span style="color:#dc2626">Enter a PO number first.</span>';
+    if (st) st.innerHTML = '<span style="color:#da1e28">Enter a PO number first.</span>';
     else inp.placeholder = 'Enter PO first!';
     return;
   }
-  if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
+  if (st) st.innerHTML = '<span style="color:#525252">Saving…</span>';
   try {
     if (API_BASE) {
       await apiFetch(`/api/pm-status/${serial}`, {
@@ -2526,15 +2484,15 @@ async function _saveNewPo(serial, source) {
       if (!c._ledger) c._ledger = {};
       c._ledger.new_po = val;
     }
-    if (st) st.innerHTML = `<span style="color:#16a34a">✅ PO saved: <b>${val}</b></span>`;
-    inp.style.borderColor = '#86efac';
+    if (st) st.innerHTML = `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> PO saved: <b>${val}</b></span>`;
+    inp.style.borderColor = '#6fdc8c';
     // Sync row inline input if saved from detail panel
     if (source !== 'row') {
       const ri = document.getElementById('ri-po-' + serial);
       if (ri) ri.value = val;
     }
   } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+    if (st) st.innerHTML = `<span style="color:#da1e28"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> ${e.message}</span>`;
   }
 }
 
@@ -2547,11 +2505,11 @@ async function _saveNewTramId(serial, source) {
   if (!inp) return;
   const val = inp.value.trim();
   if (!val) {
-    if (st) st.innerHTML = '<span style="color:#dc2626">Enter the new TRAM ID first.</span>';
+    if (st) st.innerHTML = '<span style="color:#da1e28">Enter the new TRAM ID first.</span>';
     else inp.placeholder = 'Enter TRAM ID first!';
     return;
   }
-  if (st) st.innerHTML = '<span style="color:#6b7280">Saving…</span>';
+  if (st) st.innerHTML = '<span style="color:#525252">Saving…</span>';
   try {
     if (API_BASE) {
       await apiFetch(`/api/pm-status/${serial}`, {
@@ -2568,15 +2526,15 @@ async function _saveNewTramId(serial, source) {
       const tramCell = document.querySelector(`#mainTable tr[data-serial="${serial}"] .tram-id-cell`);
       if (tramCell) tramCell.innerHTML = `<code style="font-size:11px">${val}</code>`;
     }
-    if (st) st.innerHTML = `<span style="color:#16a34a">✅ TRAM ID saved: <b>${val}</b></span>`;
-    inp.style.borderColor = '#86efac';
+    if (st) st.innerHTML = `<span style="color:#198038"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> TRAM ID saved: <b>${val}</b></span>`;
+    inp.style.borderColor = '#6fdc8c';
     // Sync row inline input if saved from detail panel
     if (source !== 'row') {
       const ri = document.getElementById('ri-tram-' + serial);
       if (ri) ri.value = val;
     }
   } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#dc2626">❌ ${e.message}</span>`;
+    if (st) st.innerHTML = `<span style="color:#da1e28"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> ${e.message}</span>`;
   }
 }
 
@@ -2592,7 +2550,7 @@ function openRenewalModal(id) {
   if (!c) return;
   if (_isOffboarded(c)) { alert('This contractor is offboarded — renewal is not allowed.'); return; }
   if (c.renewal === 'Submitted') {
-    alert('⚠ DUPLICATE DETECTED\n\nA renewal has already been submitted for this contractor.\nCheck the audit trail for details.');
+    alert('DUPLICATE DETECTED\n\nA renewal has already been submitted for this contractor.\nCheck the audit trail for details.');
     return;
   }
   renewalData = { c };
@@ -2624,15 +2582,15 @@ function _rnwStepperHTML(current) {
 // ── Contractor summary bar (shown on all steps) ─────────────────────────────
 function _rnwContractorBar() {
   const c = renewalData.c;
-  return `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#1e40af;display:flex;flex-wrap:wrap;gap:8px 20px">
+  return `<div style="background:#edf5ff;border:1px solid #a6c8ff;border-radius:0;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#0043ce;display:flex;flex-wrap:wrap;gap:8px 20px">
     <span><b>${c.name}</b></span>
-    <span style="color:#6b7280">|</span>
+    <span style="color:#525252">|</span>
     <span>${c.client||'–'}</span>
-    <span style="color:#6b7280">|</span>
+    <span style="color:#525252">|</span>
     <span>Serial: <code>${c.serial}</code></span>
-    <span style="color:#6b7280">|</span>
+    <span style="color:#525252">|</span>
     <span>Current end: <b>${c.endDate||'–'}</b></span>
-    ${c.tramId ? `<span style="color:#6b7280">|</span><span>Old TRAM: <code>${c.tramId}</code></span>` : ''}
+    ${c.tramId ? `<span style="color:#525252">|</span><span>Old TRAM: <code>${c.tramId}</code></span>` : ''}
   </div>`;
 }
 
@@ -2651,14 +2609,14 @@ function _rnwRenderStep1() {
   const c = renewalData.c;
   // Show current CMO value as a reference chip
   const val = (v) => v && v !== '–'
-    ? `<code style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;font-size:12px;color:#1e40af">${v}</code>`
-    : `<span style="color:#9ca3af;font-size:12px;font-style:italic">not on record</span>`;
+    ? `<code style="background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;padding:1px 6px;font-size:12px;color:#0043ce">${v}</code>`
+    : `<span style="color:#6f6f6f;font-size:12px;font-style:italic">not on record</span>`;
 
   // Checkbox row helper
   const chk = (label, note='') => `
-    <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:13px">
-      <input type="checkbox" style="width:15px;height:15px;margin-top:1px;flex-shrink:0;accent-color:#1d4ed8" onchange="_rnwChecklistChanged()">
-      <span><b>${label}</b>${note?`<span style="color:#6b7280;font-weight:400;font-size:12px"> — ${note}</span>`:''}</span>
+    <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f4f4f4;cursor:pointer;font-size:13px">
+      <input type="checkbox" style="width:15px;height:15px;margin-top:1px;flex-shrink:0;accent-color:#0f62fe" onchange="_rnwChecklistChanged()">
+      <span><b>${label}</b>${note?`<span style="color:#525252;font-weight:400;font-size:12px"> — ${note}</span>`:''}</span>
     </label>`;
 
   document.getElementById('renewalModalBody').innerHTML = `
@@ -2666,33 +2624,33 @@ function _rnwRenderStep1() {
     ${_rnwContractorBar()}
 
     <!-- Nav path -->
-    <div style="font-size:12px;color:#6b7280;margin-bottom:12px;padding:7px 12px;background:#f7f8fa;border-radius:6px;border:1px solid #e5e7eb">
+    <div style="font-size:12px;color:#525252;margin-bottom:12px;padding:7px 12px;background:#f4f4f4;border-radius:0;border:1px solid #e0e0e0">
       TRAM path: <b>My Requests</b> → <b>Create New Requests</b> → <b>Spend</b> →
       set <b>"Import from Existing TRAM request?"</b> to <b>Yes</b> → paste <code style="font-size:12px">${c.tramId||'prior TRAM ID'}</code>
-      &nbsp;&nbsp;<a href="https://tram.ibm.com" target="_blank" style="color:#1d4ed8;font-weight:600;text-decoration:none">Open TRAM ↗</a>
+      &nbsp;&nbsp;<a href="https://tram.ibm.com" target="_blank" style="color:#0f62fe;font-weight:600;text-decoration:none">Open TRAM ↗</a>
     </div>
 
     <!-- Auto-imported section -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:12px">
-      <div style="background:#f0fdf4;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#15803d;display:flex;align-items:center;gap:6px">
+    <div style="border:1px solid #e0e0e0;border-radius:0;overflow:hidden;margin-bottom:12px">
+      <div style="background:#defbe6;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#0e6027;display:flex;align-items:center;gap:6px">
         ✓ These fields auto-import from the prior request — just confirm they look right
       </div>
       <div style="padding:2px 14px 6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px">
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Contractor:</span> ${val(c.name)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Client / Project:</span> ${val(c.client)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Vendor:</span> ${val(c.vendor)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">JR/S:</span> ${val(c.jrsTram)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Band Equivalent:</span> ${val(c.band)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Location:</span> ${val(c.workLocation)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Sector / Geography / Market:</span> ${val(c.sector||c.marketSector)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#6b7280">Staffing / Contract Type:</span> <span style="color:#9ca3af;font-size:12px;font-style:italic">from prior request</span></div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Contractor:</span> ${val(c.name)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Client / Project:</span> ${val(c.client)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Vendor:</span> ${val(c.vendor)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">JR/S:</span> ${val(c.jrsTram)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Band Equivalent:</span> ${val(c.band)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Location:</span> ${val(c.workLocation)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Sector / Geography / Market:</span> ${val(c.sector||c.marketSector)}</div>
+        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Staffing / Contract Type:</span> <span style="color:#6f6f6f;font-size:12px;font-style:italic">from prior request</span></div>
       </div>
     </div>
 
     <!-- Must-update section (checklist) -->
-    <div style="border:1px solid #fca5a5;border-radius:8px;overflow:hidden;margin-bottom:14px">
-      <div style="background:#fee2e2;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#b91c1c">
-        ⚠ You must update these fields in TRAM — check each one off as you complete it
+    <div style="border:1px solid #ff8389;border-radius:0;overflow:hidden;margin-bottom:14px">
+      <div style="background:#ffd7d9;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a2191f">
+        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> You must update these fields in TRAM — check each one off as you complete it
       </div>
       <div style="padding:2px 14px 6px" id="tramChecklist">
         ${chk('Expected Start Date', `set to the new contract start date`)}
@@ -2701,24 +2659,24 @@ function _rnwRenderStep1() {
         ${chk('Contractor Cost Rate &amp; Contractor Bill Rate', 'update if rates have changed')}
         ${chk('Resource GP% &amp; Project GP%', 'recalculate based on new rates')}
         ${chk('JR/S', `only if the role has changed from <code style="font-size:12px">${c.jrsTram||'?'}</code>`)}
-        ${chk('Internal Search Performed → <span style="color:#dc2626">Yes</span>', 'TRAM requires this — confirm bench review was done')}
-        ${chk('Resources available meeting all requirements → <span style="color:#dc2626">No</span>', 'must select No to justify using a subcontractor')}
+        ${chk('Internal Search Performed → <span style="color:#da1e28">Yes</span>', 'TRAM requires this — confirm bench review was done')}
+        ${chk('Resources available meeting all requirements → <span style="color:#da1e28">No</span>', 'must select No to justify using a subcontractor')}
         ${chk('Business Justification', 'enter justification text in the TRAM Comments field')}
       </div>
     </div>
-    <div id="tramChecklistWarning" style="display:none;color:#92400e;font-size:12px;margin-bottom:8px;padding:6px 10px;background:#fef3c7;border-radius:4px">
-      ⚠ Check off all required TRAM fields above before continuing — or continue if you've already submitted TRAM.
+    <div id="tramChecklistWarning" style="display:none;color:#684e00;font-size:12px;margin-bottom:8px;padding:6px 10px;background:#fcf4d6;border-radius:0">
+      <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Check off all required TRAM fields above before continuing — or continue if you've already submitted TRAM.
     </div>
 
     <!-- New TRAM ID input -->
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px 16px;margin-bottom:4px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#15803d">✓ Submitted in TRAM? Paste the new TRAM ID here</div>
+    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:14px 16px;margin-bottom:4px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#0e6027">✓ Submitted in TRAM? Paste the new TRAM ID here</div>
       <input id="r_tramId" placeholder="e.g. NA202510048216S" autocomplete="off"
-             style="font-family:monospace;font-size:18px;letter-spacing:.06em;padding:10px 14px;width:100%;border:2px solid #86efac;border-radius:6px;outline:none"
-             oninput="this.style.borderColor=this.value.trim()?'#16a34a':'#86efac';_rnwChecklistChanged()">
-      <div style="font-size:11px;color:#6b7280;margin-top:6px">Copy the new TRAM ID exactly as it appears after submitting. The app will embed it in the Excel file and the email subject.</div>
+             style="font-family:IBM Plex Mono,monospace;font-size:18px;letter-spacing:.06em;padding:10px 14px;width:100%;border:2px solid #6fdc8c;border-radius:0;outline:none"
+             oninput="this.style.borderColor=this.value.trim()?'#198038':'#6fdc8c';_rnwChecklistChanged()">
+      <div style="font-size:11px;color:#525252;margin-top:6px">Copy the new TRAM ID exactly as it appears after submitting. The app will embed it in the Excel file and the email subject.</div>
     </div>
-    <div id="rnwStep1Error" style="display:none;color:#dc2626;font-size:12px;margin-top:6px;margin-bottom:4px;padding:6px 10px;background:#fee2e2;border-radius:4px"></div>`;
+    <div id="rnwStep1Error" style="display:none;color:#da1e28;font-size:12px;margin-top:6px;margin-bottom:4px;padding:6px 10px;background:#ffd7d9;border-radius:0"></div>`;
 
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
@@ -2759,26 +2717,26 @@ function _rnwRenderStep2() {
   let jrsBlocked = false;
 
   if (jrsOutcome === 'active') {
-    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#f9fafb">
+    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#f4f4f4">
       <div style="margin-top:4px"><span class="badge badge-green">✓ JRS Active — no change needed</span></div>`;
   } else if (jrsOutcome === 'one_replacement') {
     const prop = (jrsResult.replacements||[])[0] || '';
-    jrsBlock = `<input id="r_jrs" value="${prop}" style="border-color:#f59e0b">
-      <div style="margin-top:6px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e">
-        ⚠ <b>Replacement proposed:</b> <code>${origJrs}</code> → <code>${prop}</code><br>Review and edit if needed.</div>`;
+    jrsBlock = `<input id="r_jrs" value="${prop}" style="border-color:#f1c21b">
+      <div style="margin-top:6px;padding:8px 10px;background:#fcf4d6;border:1px solid #f1c21b;border-radius:0;font-size:12px;color:#684e00">
+        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> <b>Replacement proposed:</b> <code>${origJrs}</code> → <code>${prop}</code><br>Review and edit if needed.</div>`;
   } else if (jrsOutcome === 'multi_replacement') {
     const opts = (jrsResult.replacements||[]).map(r=>`<option value="${r}">${r}</option>`).join('');
-    jrsBlock = `<select id="r_jrs" style="border-color:#f59e0b">
+    jrsBlock = `<select id="r_jrs" style="border-color:#f1c21b">
       <option value="">— Select the correct replacement —</option>${opts}</select>
-      <div style="margin-top:6px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e">
-        ⚠ <b>Multiple replacements found</b> for <code>${origJrs}</code> — select the correct one above.</div>`;
+      <div style="margin-top:6px;padding:8px 10px;background:#fcf4d6;border:1px solid #f1c21b;border-radius:0;font-size:12px;color:#684e00">
+        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> <b>Multiple replacements found</b> for <code>${origJrs}</code> — select the correct one above.</div>`;
   } else {
     jrsBlocked = true;
     const escEmail = getSectorEmail(c.sector);
-    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#fef2f2;border-color:#fca5a5">
-      <div style="margin-top:6px;padding:8px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#b91c1c">
+    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#fff1f1;border-color:#ff8389">
+      <div style="margin-top:6px;padding:8px 10px;background:#ffd7d9;border:1px solid #ff8389;border-radius:0;font-size:12px;color:#a2191f">
         ✗ <b>JRS cannot be resolved</b> (outcome: ${jrsOutcome}).<br>
-        Escalate to CSP: <a href="mailto:${escEmail}" style="color:#b91c1c">${escEmail}</a> before proceeding. Submission is blocked.</div>`;
+        Escalate to CSP: <a href="mailto:${escEmail}" style="color:#a2191f">${escEmail}</a> before proceeding. Submission is blocked.</div>`;
   }
 
   const defaultEnd  = (()=>{try{const d=new Date(c.endDate);d.setMonth(d.getMonth()+3);return d.toISOString().slice(0,10);}catch{return '';}})();
@@ -2789,89 +2747,89 @@ function _rnwRenderStep2() {
     ${_rnwContractorBar()}
 
     <!-- ── Dates & Location ── -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:12px">Contract Period &amp; Location</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Contract Period &amp; Location</div>
       <div class="form-grid">
         <div class="form-group">
-          <label>New Start Date <span style="color:#dc2626">*</span></label>
+          <label>New Start Date <span style="color:#da1e28">*</span></label>
           <input id="r_newStart" type="date" value="${defaultStart}">
         </div>
         <div class="form-group">
-          <label>New End Date <span style="color:#dc2626">*</span></label>
+          <label>New End Date <span style="color:#da1e28">*</span></label>
           <input id="r_newEnd" type="date" value="${defaultEnd}">
         </div>
         <div class="form-group">
-          <label>Work Location <span style="color:#dc2626">*</span></label>
+          <label>Work Location <span style="color:#da1e28">*</span></label>
           <input id="r_location" value="${c.workLocation||''}" placeholder="e.g. Remote – US">
         </div>
         <div class="form-group">
-          <label>Contractor Phone <span style="color:#dc2626">*</span></label>
+          <label>Contractor Phone <span style="color:#da1e28">*</span></label>
           <input id="r_phone" type="tel" placeholder="e.g. +1 555 123 4567">
         </div>
         <div class="form-group" style="grid-column:span 2">
-          <label>Hiring Manager Email (U.S. Manager) <span style="color:#dc2626">*</span></label>
+          <label>Hiring Manager Email (U.S. Manager) <span style="color:#da1e28">*</span></label>
           <input id="r_mgrEmail" type="email" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="manager@us.ibm.com">
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">Excel col 1 — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
+          <div style="font-size:11px;color:#525252;margin-top:3px">Excel col 1 — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
         </div>
         <div class="form-group">
-          <label>Hiring/Bluepages Manager (TRAM) <span style="color:#dc2626">*</span></label>
+          <label>Hiring/Bluepages Manager (TRAM) <span style="color:#da1e28">*</span></label>
           <input id="r_hiringMgr" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="intranet ID, e.g. echaves">
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">TRAM field — Hiring/Bluepages Manager. Leave unchanged to keep the imported value.</div>
+          <div style="font-size:11px;color:#525252;margin-top:3px">TRAM field — Hiring/Bluepages Manager. Leave unchanged to keep the imported value.</div>
         </div>
         <div class="form-group">
           <label>Batch Review Date</label>
           <input id="r_batchReview" type="date" value="${(()=>{const d=new Date();const diff=(5-d.getDay()+7)%7;d.setDate(d.getDate()+diff);return d.toISOString().slice(0,10);})()}">
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">Closest Friday from today — auto-calculated. Override only if needed.</div>
+          <div style="font-size:11px;color:#525252;margin-top:3px">Closest Friday from today — auto-calculated. Override only if needed.</div>
         </div>
         <div class="form-group" style="grid-column:span 2">
-          <label>Supplier's Contact <span style="color:#dc2626">*</span></label>
+          <label>Supplier's Contact <span style="color:#da1e28">*</span></label>
           <input id="r_supplierContact" type="text" placeholder="e.g. John Smith — vendor account manager name or email">
-          <div style="font-size:11px;color:#6b7280;margin-top:3px">Excel col 8 — your vendor / supplier point of contact for this contractor.</div>
+          <div style="font-size:11px;color:#525252;margin-top:3px">Excel col 8 — your vendor / supplier point of contact for this contractor.</div>
         </div>
       </div>
     </div>
 
     <!-- ── JRS & Role ── -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:12px">JR/S &amp; Role</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">JR/S &amp; Role</div>
       <div class="form-grid">
         <div class="form-group" style="grid-column:span 2">
-          <label>JR/S (Job Role &amp; Specialty) <span style="color:#dc2626">*</span></label>
+          <label>JR/S (Job Role &amp; Specialty) <span style="color:#da1e28">*</span></label>
           ${jrsBlock}
         </div>
         <div class="form-group">
-          <label>Band <span style="color:#dc2626">*</span></label>
+          <label>Band <span style="color:#da1e28">*</span></label>
           <input id="r_band" value="${c.band||''}" placeholder="e.g. 7">
         </div>
         <div class="form-group">
-          <label>Niche Skills (3–5 keywords) <span style="color:#dc2626">*</span></label>
+          <label>Niche Skills (3–5 keywords) <span style="color:#da1e28">*</span></label>
           <input id="r_skills" value="${(c.skillDescription||'').slice(0,120)}" placeholder="e.g. SAP HANA, OT/IT convergence">
         </div>
         <div class="form-group" style="grid-column:span 2">
-          <label>Brief Scope of Work <span style="color:#dc2626">*</span></label>
+          <label>Brief Scope of Work <span style="color:#da1e28">*</span></label>
           <textarea id="r_scope" rows="2" placeholder="Describe the work this contractor performs on the engagement.">${c.skillDescription||''}</textarea>
         </div>
       </div>
     </div>
 
     <!-- ── Financials ── -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:12px">Financials</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Financials</div>
       <div class="form-grid">
         <div class="form-group">
-          <label>Rate Cap ($/hr) <span style="color:#dc2626">*</span></label>
+          <label>Rate Cap ($/hr) <span style="color:#da1e28">*</span></label>
           <input id="r_rateCap" type="number" min="0" step="0.01" placeholder="e.g. 125.00">
         </div>
         <div class="form-group">
-          <label>Bill Rate to Client ($/hr) <span style="color:#dc2626">*</span></label>
+          <label>Bill Rate to Client ($/hr) <span style="color:#da1e28">*</span></label>
           <input id="r_billRate" type="number" min="0" step="0.01" placeholder="e.g. 150.00">
         </div>
         <div class="form-group">
-          <label>Project GP% <span style="color:#dc2626">*</span></label>
+          <label>Project GP% <span style="color:#da1e28">*</span></label>
           <input id="r_gp" type="number" min="0" max="100" step="0.1" placeholder="e.g. 28.5">
         </div>
         <div class="form-group">
-          <label>Contract Type <span style="color:#dc2626">*</span></label>
+          <label>Contract Type <span style="color:#da1e28">*</span></label>
           <select id="r_contractType">
             <option value="">— Select —</option>
             <option>T&amp;M (Time &amp; Materials)</option>
@@ -2884,11 +2842,11 @@ function _rnwRenderStep2() {
     </div>
 
     <!-- ── Compliance ── -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:12px">Compliance &amp; Equipment</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Compliance &amp; Equipment</div>
       <div class="form-grid">
         <div class="form-group">
-          <label>US Citizenship? <span style="color:#dc2626">*</span></label>
+          <label>US Citizenship? <span style="color:#da1e28">*</span></label>
           <select id="r_usCitizen">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -2896,7 +2854,7 @@ function _rnwRenderStep2() {
           </select>
         </div>
         <div class="form-group">
-          <label>Security Technologies Access? <span style="color:#dc2626">*</span></label>
+          <label>Security Technologies Access? <span style="color:#da1e28">*</span></label>
           <select id="r_secAccess">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -2904,7 +2862,7 @@ function _rnwRenderStep2() {
           </select>
         </div>
         <div class="form-group">
-          <label>Penetration Testing? <span style="color:#dc2626">*</span></label>
+          <label>Penetration Testing? <span style="color:#da1e28">*</span></label>
           <select id="r_penTest">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -2912,7 +2870,7 @@ function _rnwRenderStep2() {
           </select>
         </div>
         <div class="form-group">
-          <label>Requires Laptop? <span style="color:#dc2626">*</span></label>
+          <label>Requires Laptop? <span style="color:#da1e28">*</span></label>
           <select id="r_laptop" onchange="_rnwToggleLaptop(this.value)">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -2935,30 +2893,30 @@ function _rnwRenderStep2() {
     </div>
 
     <!-- ── Business Justification ── -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;background:#fafafa">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:12px">Business Justification</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Business Justification</div>
       <div class="form-group">
-        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">1</span>
-          No Domestic / GD resources available <span style="color:#dc2626">*</span></label>
+        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">1</span>
+          No Domestic / GD resources available <span style="color:#da1e28">*</span></label>
         <textarea id="r_bj1" rows="2" placeholder="Internal bench review completed on [date]. No IBMers available with required skills."></textarea>
       </div>
       <div class="form-group">
-        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">2</span>
-          GP% explanation if below 25% <span style="color:#6b7280;font-size:11px">(required if GP &lt; 25%)</span></label>
+        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">2</span>
+          GP% explanation if below 25% <span style="color:#525252;font-size:11px">(required if GP &lt; 25%)</span></label>
         <textarea id="r_bj2" rows="2" placeholder="e.g. Fixed-price contract. Client rate card limits margin."></textarea>
       </div>
       <div class="form-group">
-        <label><span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">3</span>
-          Justification for continuation <span style="color:#6b7280;font-size:11px">(if multi-year)</span></label>
+        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">3</span>
+          Justification for continuation <span style="color:#525252;font-size:11px">(if multi-year)</span></label>
         <textarea id="r_bj3" rows="2" placeholder="e.g. Niche specialist needed only for project duration."></textarea>
       </div>
       <div class="form-group" style="margin-bottom:0">
-        <label><span style="background:#f3f4f6;color:#6b7280;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">4</span>
-          Additional context <span style="color:#6b7280;font-size:11px">(optional)</span></label>
+        <label><span style="background:#f4f4f4;color:#525252;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">4</span>
+          Additional context <span style="color:#525252;font-size:11px">(optional)</span></label>
         <textarea id="r_bj4" rows="2" placeholder="e.g. Client requested contractor by name."></textarea>
       </div>
     </div>
-    <div id="rnwStep2Error" style="display:none;color:#dc2626;font-size:12px;margin-bottom:8px;padding:8px 12px;background:#fee2e2;border-radius:6px"></div>`;
+    <div id="rnwStep2Error" style="display:none;color:#da1e28;font-size:12px;margin-bottom:8px;padding:8px 12px;background:#ffd7d9;border-radius:0"></div>`;
 
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" onclick="_rnwBack(2)">← Back</button>
@@ -2988,7 +2946,7 @@ function _rnwStep2Next() {
   const missing = required.filter(([id]) => !get(id));
   if (missing.length) {
     const errEl = document.getElementById('rnwStep2Error');
-    errEl.innerHTML = '⚠ Please complete: <b>' + missing.map(([,l])=>l).join(', ') + '</b>';
+    errEl.innerHTML = '<svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Please complete: <b>' + missing.map(([,l])=>l).join(', ') + '</b>';
     errEl.style.display = 'block';
     errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
@@ -3025,16 +2983,16 @@ function _rnwRenderStep3() {
   const sectorEmail = getSectorEmailLabel(c.sector);
 
   const row = (label, val) => val
-    ? `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:13px">
-        <span style="color:#6b7280;min-width:180px;flex-shrink:0">${label}</span>
-        <span style="font-weight:500;color:#1f2937">${val}</span>
+    ? `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f4f4f4;font-size:13px">
+        <span style="color:#525252;min-width:180px;flex-shrink:0">${label}</span>
+        <span style="font-weight:500;color:#161616">${val}</span>
        </div>` : '';
 
   document.getElementById('renewalModalBody').innerHTML = `
     ${_rnwStepperHTML(3)}
     ${_rnwContractorBar()}
 
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#15803d">
+    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#0e6027">
       <b>✓ Ready to submit.</b> Click <b>Submit Renewal</b> below — the app will:<br>
       <span style="display:inline-block;margin-top:4px">
         1. Send all data to Power Automate → PAD submits TRAM automatically &nbsp;·&nbsp;
@@ -3044,10 +3002,10 @@ function _rnwRenderStep3() {
     </div>
 
     <!-- Summary table -->
-    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px">
-      <div style="background:#f7f8fa;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Review Summary</div>
+    <div style="border:1px solid #e0e0e0;border-radius:0;overflow:hidden;margin-bottom:16px">
+      <div style="background:#f4f4f4;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252">Review Summary</div>
       <div style="padding:4px 14px 8px">
-        ${row('New TRAM ID', `<code style="font-family:monospace;font-size:14px;letter-spacing:.04em">${tramIdNew}</code>`)}
+        ${row('New TRAM ID', `<code style="font-family:IBM Plex Mono,monospace;font-size:14px;letter-spacing:.04em">${tramIdNew}</code>`)}
         ${row('Old TRAM ID', c.tramId ? `<code>${c.tramId}</code>` : '')}
         ${row('Contract Period', `${f.newStart} → ${f.newEnd}`)}
         ${row('Batch Review Date', f.batchReview)}
@@ -3077,7 +3035,7 @@ function _rnwRenderStep3() {
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" id="btnRnwBack3" onclick="_rnwBack(3)">← Back</button>
     <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()">
-      🤖 Submit — Power Automate will handle TRAM →
+       Submit — Power Automate will handle TRAM →
     </button>`;
 }
 
@@ -3099,7 +3057,7 @@ async function submitRenewal() {
   const statusEl = document.getElementById('renewalSubmitStatus');
   btn.disabled = true;
   if (backBtn) backBtn.disabled = true;
-  btn.textContent = '⏳ Sending to Power Automate…';
+  btn.textContent = 'Sending to Power Automate…';
 
   // Prototype mode (no API_BASE)
   if (!API_BASE) {
@@ -3156,8 +3114,8 @@ async function submitRenewal() {
   } catch (e) {
     btn.disabled = false;
     if (backBtn) backBtn.disabled = false;
-    btn.textContent = '🤖 Submit — Power Automate will handle TRAM →';
-    statusEl.innerHTML = `<div class="dq-warn">❌ Failed to queue job: ${e.message}</div>`;
+    btn.textContent = 'Submit — Power Automate will handle TRAM →';
+    statusEl.innerHTML = `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> Failed to queue job: ${e.message}</div>`;
   }
 }
 
@@ -3167,25 +3125,25 @@ function _rnwShowPolling(jobId) {
     ${_rnwStepperHTML(3)}
     ${_rnwContractorBar()}
     <div style="text-align:center;padding:32px 0 16px">
-      <div style="font-size:48px;margin-bottom:16px;animation:spin 2s linear infinite;display:inline-block">⚙️</div>
-      <div style="font-size:18px;font-weight:700;color:#1d4ed8;margin-bottom:8px">Power Automate is filling TRAM…</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:24px">
+      <div style="font-size:48px;margin-bottom:16px;animation:spin 2s linear infinite;display:inline-block"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg></div>
+      <div style="font-size:18px;font-weight:700;color:#0f62fe;margin-bottom:8px">Power Automate is filling TRAM…</div>
+      <div style="font-size:13px;color:#525252;margin-bottom:24px">
         The desktop flow is navigating TRAM, filling all fields, and submitting.<br>
         This usually takes <b>1–2 minutes</b>. Do not close this window.
       </div>
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:13px;color:#1e40af;max-width:420px;margin:0 auto;text-align:left">
+      <div style="background:#edf5ff;border:1px solid #a6c8ff;border-radius:0;padding:14px;font-size:13px;color:#0043ce;max-width:420px;margin:0 auto;text-align:left">
         <div style="font-weight:700;margin-bottom:8px">What's happening right now:</div>
-        <div id="padStep1" style="padding:3px 0">⏳ Opening TRAM in Chrome…</div>
-        <div id="padStep2" style="padding:3px 0;color:#9ca3af">◦ Importing from prior request ${renewalData.c.tramId||''}</div>
-        <div id="padStep3" style="padding:3px 0;color:#9ca3af">◦ Filling dates, rates, JRS, justification</div>
-        <div id="padStep4" style="padding:3px 0;color:#9ca3af">◦ Submitting &amp; reading new TRAM ID</div>
-        <div id="padStep5" style="padding:3px 0;color:#9ca3af">◦ Generating Excel + sending email</div>
+        <div id="padStep1" style="padding:3px 0"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Opening TRAM in Chrome…</div>
+        <div id="padStep2" style="padding:3px 0;color:#6f6f6f">◦ Importing from prior request ${renewalData.c.tramId||''}</div>
+        <div id="padStep3" style="padding:3px 0;color:#6f6f6f">◦ Filling dates, rates, JRS, justification</div>
+        <div id="padStep4" style="padding:3px 0;color:#6f6f6f">◦ Submitting &amp; reading new TRAM ID</div>
+        <div id="padStep5" style="padding:3px 0;color:#6f6f6f">◦ Generating Excel + sending email</div>
       </div>
-      <div style="margin-top:20px;font-size:12px;color:#9ca3af">Job ID: <code>${jobId}</code></div>
+      <div style="margin-top:20px;font-size:12px;color:#6f6f6f">Job ID: <code>${jobId}</code></div>
     </div>`;
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" disabled>← Back</button>
-    <button class="btn btn-primary" disabled>⏳ Waiting for Power Automate…</button>`;
+    <button class="btn btn-primary" disabled><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Waiting for Power Automate…</button>`;
 }
 
 // Animate the step indicators while polling
@@ -3196,8 +3154,8 @@ function _rnwAnimatePadSteps() {
   steps.forEach((id, i) => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (i < _padAnimStep) el.style.color = '#1d4ed8';
-    else el.style.color = '#9ca3af';
+    if (i < _padAnimStep) el.style.color = '#0f62fe';
+    else el.style.color = '#6f6f6f';
   });
 }
 
@@ -3205,7 +3163,7 @@ function _rnwAnimatePadSteps() {
 async function _rnwPoll(jobId, attempt = 0) {
   if (attempt > 75) {  // 5 minute timeout
     document.getElementById('renewalModalBody').innerHTML += `
-      <div class="dq-warn" style="margin-top:16px">⏱ Timed out waiting for Power Automate.
+      <div class="dq-warn" style="margin-top:16px"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Timed out waiting for Power Automate.
       Check that the desktop flow is running, then try again.</div>`;
     return;
   }
@@ -3219,7 +3177,7 @@ async function _rnwPoll(jobId, attempt = 0) {
     if (job.status === 'failed') {
       document.getElementById('renewalModalBody').innerHTML += `
         <div class="dq-warn" style="margin-top:16px">
-          ❌ <b>Power Automate reported an error:</b><br>${job.error||'Unknown error'}<br><br>
+          <svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> <b>Power Automate reported an error:</b><br>${job.error||'Unknown error'}<br><br>
           You can <a href="https://tram.ibm.com" target="_blank">open TRAM manually</a>, submit,
           and then paste the new TRAM ID to complete this renewal manually.
         </div>`;
@@ -3250,14 +3208,14 @@ function showRenewalSuccess(resp) {
   const emailLine = isDraft
     ? _emlPanel(resp)
     : emailOk
-    ? `<div class="confirm-row">✅ <b>Email sent automatically</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
+    ? `<div class="confirm-row"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> <b>Email sent automatically</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
     : graphNotConfigured
-      ? `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
-           📧 <b>Open in Outlook to send the renewal email.</b><br>
+      ? `<div style="background:#edf5ff;border:1px solid #78a9ff;border-radius:0;padding:12px 14px;font-size:13px;color:#0043ce;margin-bottom:8px">
+           <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> <b>Open in Outlook to send the renewal email.</b><br>
            Attach the Excel file and click Send — subject &amp; recipient are pre-filled.
-           ${resp.mailto_fallback ? `<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:10px;display:inline-flex">📧 Open in Outlook</a>` : ''}
+           ${resp.mailto_fallback ? `<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:10px;display:inline-flex"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> Open in Outlook</a>` : ''}
          </div>`
-      : `<div class="dq-warn">❌ <b>Email failed:</b> ${resp.email_error||'Unknown error'}</div>`;
+      : `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> <b>Email failed:</b> ${resp.email_error||'Unknown error'}</div>`;
 
   const dotEmail = emailOk ? 'green' : realFail ? 'red' : 'blue';
   const txtEmail = emailOk
@@ -3266,18 +3224,18 @@ function showRenewalSuccess(resp) {
 
   document.getElementById('renewalModalBody').innerHTML = `
     <div style="text-align:center;padding:20px 0 12px">
-      <div style="font-size:48px;margin-bottom:8px">${emailOk ? '✅' : realFail ? '❌' : '📧'}</div>
-      <div style="font-size:22px;font-weight:700;color:${emailOk?'#15803d':realFail?'#b91c1c':'#1e40af'};margin-bottom:4px">
+      <div style="font-size:48px;margin-bottom:8px">${emailOk ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg>' : realFail ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg>' : '<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg>'}</div>
+      <div style="font-size:22px;font-weight:700;color:${emailOk?'#0e6027':realFail?'#a2191f':'#0043ce'};margin-bottom:4px">
         ${emailOk ? 'Renewal Successfully Submitted' : realFail ? 'Submission Error' : 'Renewal Submitted'}
       </div>
-      <div style="font-size:13px;color:#6b7280">${now}</div>
+      <div style="font-size:13px;color:#525252">${now}</div>
     </div>
     <div class="confirm-row" style="margin-bottom:10px">
-      📋 <b>New TRAM ID:</b> <code style="font-size:16px;font-family:monospace;letter-spacing:.04em">${resp.tram_id_used || renewalData.tramIdNew || '–'}</code>
+      <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> <b>New TRAM ID:</b> <code style="font-size:16px;font-family:IBM Plex Mono,monospace;letter-spacing:.04em">${resp.tram_id_used || renewalData.tramIdNew || '–'}</code>
     </div>
     <div class="confirm-row" style="margin-bottom:10px">
-      📄 <b>Excel generated:</b> <b>${resp.excel_filename||'–'}</b>
-      ${resp.excel_sha256 ? `<br><span style="font-size:11px;color:#6b7280">SHA-256: ${resp.excel_sha256.slice(0,8)}…${resp.excel_sha256.slice(-4)}</span>` : ''}
+      <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> <b>Excel generated:</b> <b>${resp.excel_filename||'–'}</b>
+      ${resp.excel_sha256 ? `<br><span style="font-size:11px;color:#525252">SHA-256: ${resp.excel_sha256.slice(0,8)}…${resp.excel_sha256.slice(-4)}</span>` : ''}
     </div>
     ${emailLine}
     <div class="section-title" style="margin-top:16px">Audit Trail</div>
@@ -3360,7 +3318,7 @@ let offboardData={};
 function openOffboardModal(id){
   const c=_findContractor(id);if(!c) return;
   if(_isOffboarded(c)){
-    alert('⚠ DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
+    alert('DUPLICATE DETECTED\n\nAn active offboarding request already exists for this contractor.\nThis event has been recorded in the audit log.');
     return;
   }
   offboardData={c};
@@ -3375,11 +3333,11 @@ function renderOffboardForm(){
   const sectorEmail=getSectorEmail(c.sector);
 
   document.getElementById('offboardModalBody').innerHTML=`
-    <div style="background:#fff1f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#b91c1c">
+    <div style="background:#fff1f1;border:1px solid #ffb3b8;border-radius:0;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#a2191f">
       <b>${c.name}</b> &nbsp;·&nbsp; ${c.client} &nbsp;·&nbsp; ${c.project}
       &nbsp;·&nbsp; Serial: <code>${c.serial}</code> &nbsp;·&nbsp; TRAM: <code>${c.tramId||'Missing'}</code>
     </div>
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803d">
+    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#0e6027">
       <b>What happens when you click Submit:</b> The application will automatically
       send the offboarding email to ${getSectorEmailLabel(c.sector)} · record the audit trail.
     </div>
@@ -3387,34 +3345,34 @@ function renderOffboardForm(){
     <div class="form-grid">
       <div class="form-group">
         <label>Contractor Name</label>
-        <input value="${c.name}" readonly style="background:#f9fafb">
+        <input value="${c.name}" readonly style="background:#f4f4f4">
       </div>
       <div class="form-group">
         <label>Serial Number</label>
-        <input value="${c.serial}" readonly style="background:#f9fafb">
+        <input value="${c.serial}" readonly style="background:#f4f4f4">
       </div>
       <div class="form-group">
         <label>Sector</label>
-        <input value="${c.sector}" readonly style="background:#f9fafb">
+        <input value="${c.sector}" readonly style="background:#f4f4f4">
       </div>
       <div class="form-group">
-        <label>Manager Email (PM) <span style="color:#dc2626">*</span></label>
+        <label>Manager Email (PM) <span style="color:#da1e28">*</span></label>
         <input id="ob_mgr" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="PM email">
       </div>
       <div class="form-group">
         <label>PO Number</label>
-        <input value="${c.poNumber||'–'}" readonly style="background:#f9fafb">
+        <input value="${c.poNumber||'–'}" readonly style="background:#f4f4f4">
       </div>
       <div class="form-group">
         <label>Old TRAM ID</label>
-        <input value="${c.tramId||''}" readonly style="background:#f9fafb" ${!c.tramId?'style="border-color:#dc2626"':''}>
+        <input value="${c.tramId||''}" readonly style="background:#f4f4f4" ${!c.tramId?'style="border-color:#da1e28"':''}>
       </div>
       <div class="form-group">
-        <label>Last Day <span style="color:#dc2626">*</span></label>
+        <label>Last Day <span style="color:#da1e28">*</span></label>
         <input id="ob_lastDay" type="date">
       </div>
       <div class="form-group">
-        <label>Reason For Termination <span style="color:#dc2626">*</span></label>
+        <label>Reason For Termination <span style="color:#da1e28">*</span></label>
         <select id="ob_reason">
           <option value="">— Select —</option>
           <option>Assignment Completed</option>
@@ -3425,7 +3383,7 @@ function renderOffboardForm(){
         </select>
       </div>
       <div class="form-group">
-        <label>Laptop <span style="color:#dc2626">*</span></label>
+        <label>Laptop <span style="color:#da1e28">*</span></label>
         <select id="ob_laptop">
           <option value="">— Select —</option>
           <option value="Yes">Yes</option>
@@ -3448,7 +3406,7 @@ function renderOffboardForm(){
     </div>
 
     <div class="section-title" style="margin-top:4px">Email Preview</div>
-    <div style="font-size:12px;color:#6b7280;margin-bottom:6px">To: <b>${sectorEmail}</b> &nbsp;·&nbsp; Subject: <b>${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING</b></div>
+    <div style="font-size:12px;color:#525252;margin-bottom:6px">To: <b>${sectorEmail}</b> &nbsp;·&nbsp; Subject: <b>${c.tramId||'–'} ${c.serial} ${c.poNumber||'–'} ${c.name} ${c.client} OFFBOARDING</b></div>
     <div style="overflow-x:auto;margin-bottom:4px">
       <table style="border-collapse:collapse;width:100%;font-size:12px">
         <thead>
@@ -3472,10 +3430,10 @@ function renderOffboardForm(){
             <td style="border:1px solid #000;padding:8px">${c.name||'–'}</td>
             <td style="border:1px solid #000;padding:8px">${c.poNumber||'–'}</td>
             <td style="border:1px solid #000;padding:8px">${c.serial||'–'}</td>
-            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
-            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
-            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
-            <td style="border:1px solid #000;padding:8px;color:#9ca3af;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#6f6f6f;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#6f6f6f;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#6f6f6f;font-style:italic">filled on submit</td>
+            <td style="border:1px solid #000;padding:8px;color:#6f6f6f;font-style:italic">filled on submit</td>
             <td style="border:1px solid #000;padding:8px">–</td>
           </tr>
         </tbody>
@@ -3500,8 +3458,8 @@ async function submitOffboarding(){
 
   const btn=document.getElementById('btnSubmitOffboard');
   const statusEl=document.getElementById('offboardSubmitStatus');
-  btn.disabled=true; btn.textContent='⏳ Submitting…';
-  statusEl.innerHTML=`<div class="confirm-row" style="background:#eff6ff;border-color:#93c5fd">⏳ <b>Processing…</b> Sending offboarding email…</div>`;
+  btn.disabled=true; btn.textContent='Submitting…';
+  statusEl.innerHTML=`<div class="confirm-row" style="background:#edf5ff;border-color:#78a9ff"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> <b>Processing…</b> Sending offboarding email…</div>`;
 
   if(!API_BASE){
     await new Promise(r=>setTimeout(r,900));
@@ -3529,7 +3487,7 @@ async function submitOffboarding(){
     showOffboardSuccess(resp);
   }catch(e){
     btn.disabled=false; btn.textContent='Submit Offboarding — Email sent automatically';
-    statusEl.innerHTML=`<div class="dq-warn">❌ Submission failed: ${e.message}</div>`;
+    statusEl.innerHTML=`<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> Submission failed: ${e.message}</div>`;
   }
 }
 
@@ -3552,14 +3510,14 @@ function showOffboardSuccess(resp){
   // Graph not configured — show Outlook step first, then let PM confirm they sent it
   document.getElementById('offboardModalBody').innerHTML=`
     <div style="text-align:center;padding:16px 0 8px">
-      <div style="font-size:40px;margin-bottom:8px">📧</div>
-      <div style="font-size:18px;font-weight:700;color:#1e40af;margin-bottom:4px">Send the Offboarding Email</div>
-      <div style="font-size:13px;color:#6b7280">Offboarding details are ready. Open Outlook, verify, and click Send.</div>
+      <div style="font-size:40px;margin-bottom:8px"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg></div>
+      <div style="font-size:18px;font-weight:700;color:#0043ce;margin-bottom:4px">Send the Offboarding Email</div>
+      <div style="font-size:13px;color:#525252">Offboarding details are ready. Open Outlook, verify, and click Send.</div>
     </div>
-    <div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:14px;font-size:13px;color:#1e40af;margin:14px 0">
+    <div style="background:#edf5ff;border:1px solid #78a9ff;border-radius:0;padding:14px;font-size:13px;color:#0043ce;margin:14px 0">
       The email is pre-filled with all required fields (recipient, subject, and all 10 offboarding fields).<br>
       <a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary" style="text-decoration:none;margin-top:12px;display:inline-flex">
-        📧 Open in Outlook
+        <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> Open in Outlook
       </a>
     </div>`;
   document.getElementById('offboardModalFooter').innerHTML=`
@@ -3591,10 +3549,10 @@ function _downloadEml() {
 function _autoDownloadEml(resp) { _emlResp = resp; setTimeout(_downloadEml, 300); }
 function _emlPanel(resp) {
   _emlResp = resp;
-  return `<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e40af;margin-bottom:8px">
-    📧 <b>Last step — send the email.</b> A file named <b>TRAM_email_draft.eml</b> was downloaded.<br>
+  return `<div style="background:#edf5ff;border:1px solid #78a9ff;border-radius:0;padding:12px 14px;font-size:13px;color:#0043ce;margin-bottom:8px">
+    <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> <b>Last step — send the email.</b> A file named <b>TRAM_email_draft.eml</b> was downloaded.<br>
     Double-click it: Outlook opens the email with the recipient (<b>${resp.email.to}</b>), subject and the Excel already attached. Click <b>Send</b>.
-    <br><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="_downloadEml()">⬇ Download email again</button>
+    <br><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="_downloadEml()"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M26 24v4H6V24H4v4H4a2 2 0 002 2H26a2 2 0 002-2h0V24zM26 14L24.59 12.59 17 20.17 17 2 15 2 15 20.17 7.41 12.59 6 14 16 24 26 14z"/></svg> Download email again</button>
   </div>`;
 }
 
@@ -3604,8 +3562,8 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
   c.pmStatus = 'Offboarded';
   c.pmStatusPct = 100;
   setPmStatus(c.serial, 'Offboarded');
-  const icon  = autoSent ? '✅' : manualSent ? '✅' : '❌';
-  const color = (autoSent||manualSent) ? '#15803d' : '#b91c1c';
+  const icon  = autoSent ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg>' : manualSent ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg>' : '<svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg>';
+  const color = (autoSent||manualSent) ? '#0e6027' : '#a2191f';
   const title = autoSent ? 'Offboarding Successfully Submitted'
               : manualSent ? 'Offboarding Successfully Submitted'
               : 'Submission Error';
@@ -3618,9 +3576,9 @@ function _offboardFinalScreen(c, resp, now, autoSent, manualSent=false){
     <div style="text-align:center;padding:20px 0 10px">
       <div style="font-size:44px;margin-bottom:8px">${icon}</div>
       <div style="font-size:20px;font-weight:700;color:${color};margin-bottom:4px">${title}</div>
-      <div style="font-size:13px;color:#6b7280">${now}</div>
+      <div style="font-size:13px;color:#525252">${now}</div>
     </div>
-    ${isDraft ? _emlPanel(resp) : autoSent?`<div class="confirm-row">✅ <b>Email sent automatically</b> to ${resp.email?.to}</div>`:''}
+    ${isDraft ? _emlPanel(resp) : autoSent?`<div class="confirm-row"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> <b>Email sent automatically</b> to ${resp.email?.to}</div>`:''}
     <ul class="timeline" style="margin-top:16px">
       <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">OFFBOARDING_SUBMITTED</div><div class="tl-detail">${c.name} · ${c.client}</div></div></li>
       <li><div class="tl-dot ${autoSent||manualSent?'green':'red'}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${autoSent?'SENT':manualSent?'SENT_OUTLOOK':'FAILED'}</div><div class="tl-detail">${emailDetail}</div></div></li>

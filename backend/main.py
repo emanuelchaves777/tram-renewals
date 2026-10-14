@@ -185,8 +185,7 @@ def _boot_load() -> None:
             print(f"[boot] Failed to load template from seed: {exc}")
 
 
-# Run at module load time (FastAPI startup)
-_boot_load()
+# _boot_load() is invoked at the end of this module (needs _run_jrs_batch defined)
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
@@ -1303,3 +1302,7 @@ def list_tram_jobs(pin: str = ""):
     """Admin: list recent TRAM jobs. PIN-protected."""
     _verify_pin(pin)
     return {"jobs": tram_jobs_module.list_jobs(50)}
+
+
+# Run at module load time (FastAPI startup) - after all functions are defined
+_boot_load()
