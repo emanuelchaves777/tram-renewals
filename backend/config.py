@@ -159,6 +159,12 @@ HEADER_ALIASES = {
     "bp mgr intranet id":              "BP Manager Intranet ID",
     # Workflow status columns
     "renewal metro ticket number":     "Renewal Metro Ticket Number",
+    # Rates / margins (prefill the renewal short form)
+    "candidate straight time rate with local currency - csa": "Candidate ST Rate - CSA",
+    "contr pay rate (usd) - metro":    "Contr Pay Rate (USD) - Metro",
+    "bill rate (usd) - metro":         "Bill Rate (USD) - Metro",
+    "contr gp% - metro":               "Contr GP% - Metro",
+    "project gp% - metro":             "Project GP% - Metro",
     "renewal in progress":             "Renewal In Progress",
     "offboard in progress":            "Offboard In Progress",
     # Other

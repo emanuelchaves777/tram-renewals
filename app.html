@@ -2538,12 +2538,26 @@ async function _saveNewTramId(serial, source) {
   }
 }
 
-// ── RENEWAL MODAL — 3-step guided workflow ─────────────────────────────────────
-// Step 1: Open TRAM, paste new TRAM ID
-// Step 2: Fill out the IBM Excel renewal form fields
-// Step 3: Review & Submit (generates Excel + sends email automatically)
+// ── RENEWAL MODAL — short form (TRAM connection not enabled yet) ────────────────
+// The PM reviews/edits the few fields that change, attests authority, and clicks
+// "Send to TRAM". For now nothing is sent: the TRAM integration comes later and
+// will import the OLD TRAM ID, then replace its data with what the PM enters here.
 let renewalData = {};
-let _rnwStep = 1;  // current step: 1 | 2 | 3
+
+function _rnwEsc(v) {
+  return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+// 'YYYY-MM-DD' + 1 year (string math, no timezone drift)
+function _rnwPlusOneYear(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  if (!m) return '';
+  const d = (m[2] === '02' && m[3] === '29') ? '28' : m[3];
+  return `${+m[1] + 1}-${m[2]}-${d}`;
+}
+function _rnwNum(v) {
+  if (v == null || v === '' || isNaN(Number(v))) return '';
+  return String(Math.round(Number(v) * 100) / 100);
+}
 
 function openRenewalModal(id) {
   const c = _findContractor(id);
@@ -2554,707 +2568,128 @@ function openRenewalModal(id) {
     return;
   }
   renewalData = { c };
-  _rnwStep = 1;
   document.getElementById('renewalModal').classList.add('open');
-  _rnwRender();
+  document.getElementById('renewalModalTitle').textContent = `Renewal — ${c.name} (${c.serial})`;
+  _rnwRenderForm();
 }
 function closeRenewalModal() {
   document.getElementById('renewalModal').classList.remove('open');
 }
 
-// ── Stepper header HTML ─────────────────────────────────────────────────────
-function _rnwStepperHTML(current) {
-  const steps = [
-    { n: 1, label: 'TRAM Update' },
-    { n: 2, label: 'Renewal Form' },
-    { n: 3, label: 'Submit' },
-  ];
-  return `<div class="rnw-stepper">${steps.map(s => {
-    const cls = s.n < current ? 'done' : s.n === current ? 'active' : '';
-    const icon = s.n < current ? '✓' : s.n;
-    return `<div class="rnw-step ${cls}">
-      <div class="rnw-circle">${icon}</div>
-      <div class="rnw-label">${s.label}</div>
-    </div>`;
-  }).join('')}</div>`;
-}
-
-// ── Contractor summary bar (shown on all steps) ─────────────────────────────
-function _rnwContractorBar() {
+function _rnwRenderForm() {
   const c = renewalData.c;
-  return `<div style="background:#edf5ff;border:1px solid #a6c8ff;border-radius:0;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#0043ce;display:flex;flex-wrap:wrap;gap:8px 20px">
-    <span><b>${c.name}</b></span>
-    <span style="color:#525252">|</span>
-    <span>${c.client||'–'}</span>
-    <span style="color:#525252">|</span>
-    <span>Serial: <code>${c.serial}</code></span>
-    <span style="color:#525252">|</span>
-    <span>Current end: <b>${c.endDate||'–'}</b></span>
-    ${c.tramId ? `<span style="color:#525252">|</span><span>Old TRAM: <code>${c.tramId}</code></span>` : ''}
-  </div>`;
-}
-
-// ── Master render dispatcher ────────────────────────────────────────────────
-function _rnwRender() {
-  document.getElementById('renewalModalTitle').textContent = `Renewal — ${renewalData.c.name} (${renewalData.c.serial})`;
-  if (_rnwStep === 1) _rnwRenderStep1();
-  else if (_rnwStep === 2) _rnwRenderStep2();
-  else if (_rnwStep === 3) _rnwRenderStep3();
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 1 — Open TRAM, paste new TRAM ID
-// ══════════════════════════════════════════════════════════════════════════════
-function _rnwRenderStep1() {
-  const c = renewalData.c;
-  // Show current CMO value as a reference chip
-  const val = (v) => v && v !== '–'
-    ? `<code style="background:#f4f4f4;border:1px solid #e0e0e0;border-radius:0;padding:1px 6px;font-size:12px;color:#0043ce">${v}</code>`
-    : `<span style="color:#6f6f6f;font-size:12px;font-style:italic">not on record</span>`;
-
-  // Checkbox row helper
-  const chk = (label, note='') => `
-    <label style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f4f4f4;cursor:pointer;font-size:13px">
-      <input type="checkbox" style="width:15px;height:15px;margin-top:1px;flex-shrink:0;accent-color:#0f62fe" onchange="_rnwChecklistChanged()">
-      <span><b>${label}</b>${note?`<span style="color:#525252;font-weight:400;font-size:12px"> — ${note}</span>`:''}</span>
-    </label>`;
+  const start = c.endDate || '';
+  const bands = Array.from(new Set(['6','6A','6B','6G','7','7A','7B','8','9','10', c.band].filter(Boolean)));
+  const req = '<span style="color:#da1e28">*</span>';
+  const field = (label, inner, note) => `<div class="form-group"><label>${label} ${req}</label>${inner}${note?`<div style="font-size:11px;color:#6f6f6f;margin-top:4px">${note}</div>`:''}</div>`;
+  const num = (id, v, ph) => `<input id="${id}" type="number" min="0" step="0.01" value="${_rnwEsc(_rnwNum(v))}" placeholder="${ph}" oninput="_rnwValidate()">`;
+  const fixed = (id, v) => `<select id="${id}" disabled><option>${v}</option></select>`;
 
   document.getElementById('renewalModalBody').innerHTML = `
-    ${_rnwStepperHTML(1)}
-    ${_rnwContractorBar()}
-
-    <!-- Nav path -->
-    <div style="font-size:12px;color:#525252;margin-bottom:12px;padding:7px 12px;background:#f4f4f4;border-radius:0;border:1px solid #e0e0e0">
-      TRAM path: <b>My Requests</b> → <b>Create New Requests</b> → <b>Spend</b> →
-      set <b>"Import from Existing TRAM request?"</b> to <b>Yes</b> → paste <code style="font-size:12px">${c.tramId||'prior TRAM ID'}</code>
-      &nbsp;&nbsp;<a href="https://tram.ibm.com" target="_blank" style="color:#0f62fe;font-weight:600;text-decoration:none">Open TRAM ↗</a>
+    <div style="background:#edf5ff;border:1px solid #a6c8ff;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#0043ce;display:flex;flex-wrap:wrap;gap:8px 20px">
+      <span><b>${_rnwEsc(c.name)}</b></span><span style="color:#525252">|</span>
+      <span>${_rnwEsc(c.client||'–')}</span><span style="color:#525252">|</span>
+      <span>Serial: <code>${_rnwEsc(c.serial)}</code></span><span style="color:#525252">|</span>
+      <span>Current TRAM (will be imported): <b><code>${_rnwEsc(c.tramId||'not on record')}</code></b></span>
     </div>
 
-    <!-- Auto-imported section -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;overflow:hidden;margin-bottom:12px">
-      <div style="background:#defbe6;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#0e6027;display:flex;align-items:center;gap:6px">
-        ✓ These fields auto-import from the prior request — just confirm they look right
-      </div>
-      <div style="padding:2px 14px 6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px">
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Contractor:</span> ${val(c.name)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Client / Project:</span> ${val(c.client)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Vendor:</span> ${val(c.vendor)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">JR/S:</span> ${val(c.jrsTram)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Band Equivalent:</span> ${val(c.band)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Location:</span> ${val(c.workLocation)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Sector / Geography / Market:</span> ${val(c.sector||c.marketSector)}</div>
-        <div style="padding:5px 0;font-size:13px"><span style="color:#525252">Staffing / Contract Type:</span> <span style="color:#6f6f6f;font-size:12px;font-style:italic">from prior request</span></div>
-      </div>
+    <div style="font-size:12px;color:#525252;margin-bottom:16px">
+      TRAM will import the current request above and <b>replace its data with what you enter here</b>.
+      Review every field — all are mandatory.
     </div>
 
-    <!-- Must-update section (checklist) -->
-    <div style="border:1px solid #ff8389;border-radius:0;overflow:hidden;margin-bottom:14px">
-      <div style="background:#ffd7d9;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a2191f">
-        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> You must update these fields in TRAM — check each one off as you complete it
-      </div>
-      <div style="padding:2px 14px 6px" id="tramChecklist">
-        ${chk('Expected Start Date', `set to the new contract start date`)}
-        ${chk('Planned End Date', `set to the new contract end date &nbsp;·&nbsp; current end: <b>${c.endDate||'unknown'}</b>`)}
-        ${chk('Cost Rate &amp; Bill Rate', 'update if rates have changed')}
-        ${chk('Contractor Cost Rate &amp; Contractor Bill Rate', 'update if rates have changed')}
-        ${chk('Resource GP% &amp; Project GP%', 'recalculate based on new rates')}
-        ${chk('JR/S', `only if the role has changed from <code style="font-size:12px">${c.jrsTram||'?'}</code>`)}
-        ${chk('Internal Search Performed → <span style="color:#da1e28">Yes</span>', 'TRAM requires this — confirm bench review was done')}
-        ${chk('Resources available meeting all requirements → <span style="color:#da1e28">No</span>', 'must select No to justify using a subcontractor')}
-        ${chk('Business Justification', 'enter justification text in the TRAM Comments field')}
-      </div>
-    </div>
-    <div id="tramChecklistWarning" style="display:none;color:#684e00;font-size:12px;margin-bottom:8px;padding:6px 10px;background:#fcf4d6;border-radius:0">
-      <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Check off all required TRAM fields above before continuing — or continue if you've already submitted TRAM.
+    <div class="form-grid">
+      ${field('Expected Start Date', `<input id="rf_start" type="date" value="${_rnwEsc(start)}" onchange="document.getElementById('rf_end').value=_rnwPlusOneYear(this.value);_rnwValidate()">`, 'Pre-filled with the current end date')}
+      ${field('Planned End Date', `<input id="rf_end" type="date" value="${_rnwEsc(_rnwPlusOneYear(start))}" onchange="_rnwValidate()">`, 'Pre-filled: start date + 1 year')}
+      ${field('Cost Rate (USD/hr)', num('rf_cost', c.costRate, 'Enter cost rate'))}
+      ${field('Bill Rate (USD/hr)', num('rf_bill', c.billRate, 'Enter bill rate'))}
+      ${field('Resource (Account) GP%', num('rf_gp', c.contrGp, 'Enter resource GP%'))}
+      ${field('Project GP%', num('rf_pgp', c.projectGp, 'Enter project GP%'))}
+      ${field('JR/S', `<input id="rf_jrs" value="${_rnwEsc(c.jrsTram||'')}" oninput="_rnwValidate()">`)}
+      ${field('Band', `<select id="rf_band" onchange="_rnwValidate()"><option value="">— Select —</option>${bands.map(b=>`<option${String(b)===String(c.band)?' selected':''}>${_rnwEsc(b)}</option>`).join('')}</select>`)}
+      ${field('Internal Search Performed', fixed('rf_search','Yes'))}
+      ${field('Resources available meeting all requirements', fixed('rf_avail','No'))}
     </div>
 
-    <!-- New TRAM ID input -->
-    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:14px 16px;margin-bottom:4px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#0e6027">✓ Submitted in TRAM? Paste the new TRAM ID here</div>
-      <input id="r_tramId" placeholder="e.g. NA202510048216S" autocomplete="off"
-             style="font-family:IBM Plex Mono,monospace;font-size:18px;letter-spacing:.06em;padding:10px 14px;width:100%;border:2px solid #6fdc8c;border-radius:0;outline:none"
-             oninput="this.style.borderColor=this.value.trim()?'#198038':'#6fdc8c';_rnwChecklistChanged()">
-      <div style="font-size:11px;color:#525252;margin-top:6px">Copy the new TRAM ID exactly as it appears after submitting. The app will embed it in the Excel file and the email subject.</div>
+    <div class="form-group">
+      <label>Business Justification ${req}</label>
+      <textarea id="rf_just" rows="3" placeholder="Enter the justification that goes into the TRAM Comments field" oninput="_rnwValidate()"></textarea>
     </div>
-    <div id="rnwStep1Error" style="display:none;color:#da1e28;font-size:12px;margin-top:6px;margin-bottom:4px;padding:6px 10px;background:#ffd7d9;border-radius:0"></div>`;
+
+    <div style="border:1px solid #e0e0e0;background:#f4f4f4;padding:12px 14px;margin-top:4px">
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer;margin-bottom:10px">
+        <input type="checkbox" id="rf_auth" style="width:16px;height:16px;margin-top:1px;flex-shrink:0;accent-color:#0f62fe" onchange="_rnwValidate()">
+        <span><b>Yes, I do.</b> I have the authority to approve this renewal.</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="rf_conf" style="width:16px;height:16px;margin-top:1px;flex-shrink:0;accent-color:#0f62fe" onchange="_rnwValidate()">
+        <span><b>Yes, I confirm</b> I reviewed the new information and any changes needed are applied to the process on the new TRAM.</span>
+      </label>
+    </div>
+    <div id="rnwFormMsg" style="font-size:12px;color:#6f6f6f;margin-top:10px"></div>`;
 
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" onclick="closeRenewalModal()">Cancel</button>
-    <button class="btn btn-primary" id="btnRnwNext1" onclick="_rnwStep1Next()" disabled>
-      Next: Fill Renewal Form →
-    </button>`;
+    <button class="btn btn-primary" id="btnSendTram" onclick="_rnwSendToTram()" disabled>Send to TRAM →</button>`;
+  _rnwValidate();
 }
 
-// Enable the Next button only once the TRAM ID is pasted (checklist is advisory, not blocking)
-function _rnwChecklistChanged() {
-  const tramId = (document.getElementById('r_tramId') || {}).value || '';
-  document.getElementById('btnRnwNext1').disabled = !tramId.trim();
-}
-
-function _rnwStep1Next() {
-  const val = (document.getElementById('r_tramId').value || '').trim();
-  if (!val) {
-    document.getElementById('rnwStep1Error').textContent = 'Please paste the new TRAM ID before continuing.';
-    document.getElementById('rnwStep1Error').style.display = 'block';
-    return;
-  }
-  renewalData.tramIdNew = val;
-  _rnwStep = 2;
-  _rnwRender();
-  document.getElementById('renewalModal').scrollTop = 0;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 2 — Renewal Form (Excel fields)
-// ══════════════════════════════════════════════════════════════════════════════
-function _rnwRenderStep2() {
-  const c = renewalData.c;
-  // JRS block based on prior validation result
-  const jrsResult  = c.jrsResult || {};
-  const jrsOutcome = jrsResult.outcome || (c.jrsStatus==='active'?'active':c.jrsStatus==='warn'?'one_replacement':'not_found');
-  const origJrs    = c.jrsTram || '';
-  let jrsBlock = '';
-  let jrsBlocked = false;
-
-  if (jrsOutcome === 'active') {
-    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#f4f4f4">
-      <div style="margin-top:4px"><span class="badge badge-green">✓ JRS Active — no change needed</span></div>`;
-  } else if (jrsOutcome === 'one_replacement') {
-    const prop = (jrsResult.replacements||[])[0] || '';
-    jrsBlock = `<input id="r_jrs" value="${prop}" style="border-color:#f1c21b">
-      <div style="margin-top:6px;padding:8px 10px;background:#fcf4d6;border:1px solid #f1c21b;border-radius:0;font-size:12px;color:#684e00">
-        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> <b>Replacement proposed:</b> <code>${origJrs}</code> → <code>${prop}</code><br>Review and edit if needed.</div>`;
-  } else if (jrsOutcome === 'multi_replacement') {
-    const opts = (jrsResult.replacements||[]).map(r=>`<option value="${r}">${r}</option>`).join('');
-    jrsBlock = `<select id="r_jrs" style="border-color:#f1c21b">
-      <option value="">— Select the correct replacement —</option>${opts}</select>
-      <div style="margin-top:6px;padding:8px 10px;background:#fcf4d6;border:1px solid #f1c21b;border-radius:0;font-size:12px;color:#684e00">
-        <svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> <b>Multiple replacements found</b> for <code>${origJrs}</code> — select the correct one above.</div>`;
-  } else {
-    jrsBlocked = true;
-    const escEmail = getSectorEmail(c.sector);
-    jrsBlock = `<input id="r_jrs" value="${origJrs}" readonly style="background:#fff1f1;border-color:#ff8389">
-      <div style="margin-top:6px;padding:8px 10px;background:#ffd7d9;border:1px solid #ff8389;border-radius:0;font-size:12px;color:#a2191f">
-        ✗ <b>JRS cannot be resolved</b> (outcome: ${jrsOutcome}).<br>
-        Escalate to CSP: <a href="mailto:${escEmail}" style="color:#a2191f">${escEmail}</a> before proceeding. Submission is blocked.</div>`;
-  }
-
-  const defaultEnd  = (()=>{try{const d=new Date(c.endDate);d.setMonth(d.getMonth()+3);return d.toISOString().slice(0,10);}catch{return '';}})();
-  const defaultStart = c.endDate || '';
-
-  document.getElementById('renewalModalBody').innerHTML = `
-    ${_rnwStepperHTML(2)}
-    ${_rnwContractorBar()}
-
-    <!-- ── Dates & Location ── -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Contract Period &amp; Location</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>New Start Date <span style="color:#da1e28">*</span></label>
-          <input id="r_newStart" type="date" value="${defaultStart}">
-        </div>
-        <div class="form-group">
-          <label>New End Date <span style="color:#da1e28">*</span></label>
-          <input id="r_newEnd" type="date" value="${defaultEnd}">
-        </div>
-        <div class="form-group">
-          <label>Work Location <span style="color:#da1e28">*</span></label>
-          <input id="r_location" value="${c.workLocation||''}" placeholder="e.g. Remote – US">
-        </div>
-        <div class="form-group">
-          <label>Contractor Phone <span style="color:#da1e28">*</span></label>
-          <input id="r_phone" type="tel" placeholder="e.g. +1 555 123 4567">
-        </div>
-        <div class="form-group" style="grid-column:span 2">
-          <label>Hiring Manager Email (U.S. Manager) <span style="color:#da1e28">*</span></label>
-          <input id="r_mgrEmail" type="email" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="manager@us.ibm.com">
-          <div style="font-size:11px;color:#525252;margin-top:3px">Excel col 1 — "Contractor's Hiring Manager (U.S. Manager Email)".</div>
-        </div>
-        <div class="form-group">
-          <label>Hiring/Bluepages Manager (TRAM) <span style="color:#da1e28">*</span></label>
-          <input id="r_hiringMgr" value="${c.bpManagerIntranetId||c.pmIntranetId||''}" placeholder="intranet ID, e.g. echaves">
-          <div style="font-size:11px;color:#525252;margin-top:3px">TRAM field — Hiring/Bluepages Manager. Leave unchanged to keep the imported value.</div>
-        </div>
-        <div class="form-group">
-          <label>Batch Review Date</label>
-          <input id="r_batchReview" type="date" value="${(()=>{const d=new Date();const diff=(5-d.getDay()+7)%7;d.setDate(d.getDate()+diff);return d.toISOString().slice(0,10);})()}">
-          <div style="font-size:11px;color:#525252;margin-top:3px">Closest Friday from today — auto-calculated. Override only if needed.</div>
-        </div>
-        <div class="form-group" style="grid-column:span 2">
-          <label>Supplier's Contact <span style="color:#da1e28">*</span></label>
-          <input id="r_supplierContact" type="text" placeholder="e.g. John Smith — vendor account manager name or email">
-          <div style="font-size:11px;color:#525252;margin-top:3px">Excel col 8 — your vendor / supplier point of contact for this contractor.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── JRS & Role ── -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">JR/S &amp; Role</div>
-      <div class="form-grid">
-        <div class="form-group" style="grid-column:span 2">
-          <label>JR/S (Job Role &amp; Specialty) <span style="color:#da1e28">*</span></label>
-          ${jrsBlock}
-        </div>
-        <div class="form-group">
-          <label>Band <span style="color:#da1e28">*</span></label>
-          <input id="r_band" value="${c.band||''}" placeholder="e.g. 7">
-        </div>
-        <div class="form-group">
-          <label>Niche Skills (3–5 keywords) <span style="color:#da1e28">*</span></label>
-          <input id="r_skills" value="${(c.skillDescription||'').slice(0,120)}" placeholder="e.g. SAP HANA, OT/IT convergence">
-        </div>
-        <div class="form-group" style="grid-column:span 2">
-          <label>Brief Scope of Work <span style="color:#da1e28">*</span></label>
-          <textarea id="r_scope" rows="2" placeholder="Describe the work this contractor performs on the engagement.">${c.skillDescription||''}</textarea>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Financials ── -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Financials</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Rate Cap ($/hr) <span style="color:#da1e28">*</span></label>
-          <input id="r_rateCap" type="number" min="0" step="0.01" placeholder="e.g. 125.00">
-        </div>
-        <div class="form-group">
-          <label>Bill Rate to Client ($/hr) <span style="color:#da1e28">*</span></label>
-          <input id="r_billRate" type="number" min="0" step="0.01" placeholder="e.g. 150.00">
-        </div>
-        <div class="form-group">
-          <label>Project GP% <span style="color:#da1e28">*</span></label>
-          <input id="r_gp" type="number" min="0" max="100" step="0.1" placeholder="e.g. 28.5">
-        </div>
-        <div class="form-group">
-          <label>Contract Type <span style="color:#da1e28">*</span></label>
-          <select id="r_contractType">
-            <option value="">— Select —</option>
-            <option>T&amp;M (Time &amp; Materials)</option>
-            <option>FP (Fixed Price)</option>
-            <option>Rate Card</option>
-            <option>Max Price</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Compliance ── -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Compliance &amp; Equipment</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>US Citizenship? <span style="color:#da1e28">*</span></label>
-          <select id="r_usCitizen">
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Security Technologies Access? <span style="color:#da1e28">*</span></label>
-          <select id="r_secAccess">
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Penetration Testing? <span style="color:#da1e28">*</span></label>
-          <select id="r_penTest">
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Requires Laptop? <span style="color:#da1e28">*</span></label>
-          <select id="r_laptop" onchange="_rnwToggleLaptop(this.value)">
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group" id="r_laptopOsGroup" style="display:none">
-          <label>Laptop OS</label>
-          <select id="r_laptopOs">
-            <option value="">— Select —</option>
-            <option>Windows</option>
-            <option>macOS</option>
-          </select>
-        </div>
-        <div class="form-group" id="r_laptopAddrGroup" style="display:none">
-          <label>Laptop Shipping Address</label>
-          <input id="r_laptopAddr" placeholder="Full shipping address">
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Business Justification ── -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;padding:14px;margin-bottom:14px;background:#f4f4f4">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252;margin-bottom:12px">Business Justification</div>
-      <div class="form-group">
-        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">1</span>
-          No Domestic / GD resources available <span style="color:#da1e28">*</span></label>
-        <textarea id="r_bj1" rows="2" placeholder="Internal bench review completed on [date]. No IBMers available with required skills."></textarea>
-      </div>
-      <div class="form-group">
-        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">2</span>
-          GP% explanation if below 25% <span style="color:#525252;font-size:11px">(required if GP &lt; 25%)</span></label>
-        <textarea id="r_bj2" rows="2" placeholder="e.g. Fixed-price contract. Client rate card limits margin."></textarea>
-      </div>
-      <div class="form-group">
-        <label><span style="background:#d0e2ff;color:#0043ce;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">3</span>
-          Justification for continuation <span style="color:#525252;font-size:11px">(if multi-year)</span></label>
-        <textarea id="r_bj3" rows="2" placeholder="e.g. Niche specialist needed only for project duration."></textarea>
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label><span style="background:#f4f4f4;color:#525252;border-radius:0;padding:1px 7px;font-size:11px;font-weight:700">4</span>
-          Additional context <span style="color:#525252;font-size:11px">(optional)</span></label>
-        <textarea id="r_bj4" rows="2" placeholder="e.g. Client requested contractor by name."></textarea>
-      </div>
-    </div>
-    <div id="rnwStep2Error" style="display:none;color:#da1e28;font-size:12px;margin-bottom:8px;padding:8px 12px;background:#ffd7d9;border-radius:0"></div>`;
-
-  document.getElementById('renewalModalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="_rnwBack(2)">← Back</button>
-    <button class="btn btn-primary" id="btnRnwNext2" onclick="_rnwStep2Next()" ${jrsBlocked?'disabled title="Resolve JRS issue first"':''}>
-      Review &amp; Submit →
-    </button>`;
-}
-
-function _rnwToggleLaptop(val) {
-  document.getElementById('r_laptopOsGroup').style.display   = val === 'Yes' ? '' : 'none';
-  document.getElementById('r_laptopAddrGroup').style.display = val === 'Yes' ? '' : 'none';
-}
-
-function _rnwStep2Next() {
-  const get = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  const required = [
-    ['r_newStart','New Start Date'],['r_newEnd','New End Date'],
-    ['r_location','Work Location'],['r_phone','Contractor Phone'],
-    ['r_mgrEmail','Hiring Manager Email'],
-    ['r_supplierContact','Supplier\'s Contact'],
-    ['r_jrs','JR/S'],['r_band','Band'],['r_skills','Niche Skills'],['r_scope','Scope of Work'],
-    ['r_rateCap','Rate Cap'],['r_billRate','Bill Rate'],['r_gp','GP%'],['r_contractType','Contract Type'],
-    ['r_usCitizen','US Citizenship'],['r_secAccess','Security Technologies Access'],
-    ['r_penTest','Penetration Testing'],['r_laptop','Requires Laptop'],
-    ['r_bj1','Business Justification #1'],
-  ];
-  const missing = required.filter(([id]) => !get(id));
-  if (missing.length) {
-    const errEl = document.getElementById('rnwStep2Error');
-    errEl.innerHTML = '<svg class="cds-ic" viewBox="0 0 32 32" fill="#b28600" aria-hidden="true"><path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14C30,8.3,23.7,2,16,2z M14.9,8h2.2v11h-2.2V8z M16,25 c-0.8,0-1.5-0.7-1.5-1.5S15.2,22,16,22c0.8,0,1.5,0.7,1.5,1.5S16.8,25,16,25z"/></svg> Please complete: <b>' + missing.map(([,l])=>l).join(', ') + '</b>';
-    errEl.style.display = 'block';
-    errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    return;
-  }
-  // Store form values in renewalData for Step 3 review
-  renewalData.form = {
-    newStart: get('r_newStart'), newEnd: get('r_newEnd'),
-    location: get('r_location'), phone: get('r_phone'),
-    mgrEmail: get('r_mgrEmail'),
-    hiringMgr: get('r_hiringMgr'),
-    batchReview: get('r_batchReview'),
-    supplierContact: get('r_supplierContact'),
-    jrs: get('r_jrs'), band: get('r_band'),
-    skills: get('r_skills'), scope: get('r_scope'),
-    rateCap: get('r_rateCap'), billRate: get('r_billRate'),
-    gp: get('r_gp'), contractType: get('r_contractType'),
-    usCitizen: get('r_usCitizen'), secAccess: get('r_secAccess'),
-    penTest: get('r_penTest'), laptop: get('r_laptop'),
-    laptopOs: get('r_laptopOs'), laptopAddr: get('r_laptopAddr'),
-    bj1: get('r_bj1'), bj2: get('r_bj2'), bj3: get('r_bj3'), bj4: get('r_bj4'),
+function _rnwFormValues() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  return {
+    start: g('rf_start').trim(), end: g('rf_end').trim(),
+    cost: g('rf_cost').trim(), bill: g('rf_bill').trim(),
+    gp: g('rf_gp').trim(), projectGp: g('rf_pgp').trim(),
+    jrs: g('rf_jrs').trim(), band: g('rf_band').trim(),
+    internalSearch: 'Yes', resourcesAvailable: 'No',
+    justification: g('rf_just').trim(),
+    authority: !!(document.getElementById('rf_auth')||{}).checked,
+    confirmed: !!(document.getElementById('rf_conf')||{}).checked,
   };
-  _rnwStep = 3;
-  _rnwRender();
-  document.getElementById('renewalModal').scrollTop = 0;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 3 — Review summary & Submit
-// ══════════════════════════════════════════════════════════════════════════════
-function _rnwRenderStep3() {
-  const c = renewalData.c;
-  const f = renewalData.form;
-  const tramIdNew = renewalData.tramIdNew;
-  const sectorEmail = getSectorEmailLabel(c.sector);
+// Enable "Send to TRAM" only when every field and both attestations are complete
+function _rnwValidate() {
+  const f = _rnwFormValues();
+  const labels = { start:'Start Date', end:'End Date', cost:'Cost Rate', bill:'Bill Rate', gp:'Resource GP%',
+                   projectGp:'Project GP%', jrs:'JR/S', band:'Band', justification:'Business Justification' };
+  const missing = Object.keys(labels).filter(k => !f[k]).map(k => labels[k]);
+  if (!f.authority) missing.push('authority attestation');
+  if (!f.confirmed) missing.push('review confirmation');
+  const btn = document.getElementById('btnSendTram');
+  if (btn) btn.disabled = missing.length > 0;
+  const msg = document.getElementById('rnwFormMsg');
+  if (msg) msg.textContent = missing.length ? 'Still required: ' + missing.join(', ') : 'Ready.';
+  return missing.length === 0;
+}
 
-  const row = (label, val) => val
-    ? `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f4f4f4;font-size:13px">
-        <span style="color:#525252;min-width:180px;flex-shrink:0">${label}</span>
-        <span style="font-weight:500;color:#161616">${val}</span>
-       </div>` : '';
-
+// TRAM connection is not enabled yet: capture the data and stop. Nothing is sent.
+function _rnwSendToTram() {
+  if (!_rnwValidate()) return;
+  const c = renewalData.c, f = _rnwFormValues();
+  renewalData.form = f;
+  const row = (l, v) => `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f4f4f4;font-size:13px"><span style="color:#525252;min-width:200px;flex-shrink:0">${l}</span><span style="font-weight:500">${_rnwEsc(v)}</span></div>`;
   document.getElementById('renewalModalBody').innerHTML = `
-    ${_rnwStepperHTML(3)}
-    ${_rnwContractorBar()}
-
-    <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#0e6027">
-      <b>✓ Ready to submit.</b> Click <b>Submit Renewal</b> below — the app will:<br>
-      <span style="display:inline-block;margin-top:4px">
-        1. Generate the Excel renewal file (Revisions tab) &nbsp;·&nbsp;
-        2. Prepare the email to <b>${sectorEmail}</b> with the Excel attached &nbsp;·&nbsp;
-        3. Record the audit trail and set the status to In Progress
-      </span>
+    <div style="background:#edf5ff;border:1px solid #a6c8ff;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#0043ce">
+      <b>Renewal information captured.</b> The TRAM connection is not enabled yet, so nothing was sent.
+      Once enabled, TRAM will import <code>${_rnwEsc(c.tramId||'the current request')}</code> and replace its data with the values below.
     </div>
-
-    <!-- Summary table -->
-    <div style="border:1px solid #e0e0e0;border-radius:0;overflow:hidden;margin-bottom:16px">
-      <div style="background:#f4f4f4;padding:8px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#525252">Review Summary</div>
-      <div style="padding:4px 14px 8px">
-        ${row('New TRAM ID', `<code style="font-family:IBM Plex Mono,monospace;font-size:14px;letter-spacing:.04em">${tramIdNew}</code>`)}
-        ${row('Old TRAM ID', c.tramId ? `<code>${c.tramId}</code>` : '')}
-        ${row('Contract Period', `${f.newStart} → ${f.newEnd}`)}
-        ${row('Batch Review Date', f.batchReview)}
-        ${row('Hiring Manager Email', f.mgrEmail)}
-        ${row('Hiring/Bluepages Mgr (TRAM)', f.hiringMgr)}
-        ${row('Supplier\'s Contact', f.supplierContact)}
-        ${row('Work Location', f.location)}
-        ${row('JR/S', `<code>${f.jrs}</code>`)}
-        ${row('Band', f.band)}
-        ${row('Rate Cap', `$${f.rateCap}/hr`)}
-        ${row('Bill Rate', `$${f.billRate}/hr`)}
-        ${row('GP%', `${f.gp}%`)}
-        ${row('Contract Type', f.contractType)}
-        ${row('US Citizenship', f.usCitizen)}
-        ${row('Security Access', f.secAccess)}
-        ${row('Pen Testing', f.penTest)}
-        ${row('Requires Laptop', f.laptop + (f.laptop==='Yes'&&f.laptopOs?' ('+f.laptopOs+')':''))}
-        ${row('Niche Skills', f.skills)}
-        ${row('BJ #1', f.bj1)}
-        ${f.bj2 ? row('BJ #2', f.bj2) : ''}
-        ${f.bj3 ? row('BJ #3', f.bj3) : ''}
-        ${f.bj4 ? row('BJ #4', f.bj4) : ''}
-      </div>
-    </div>
-    <div id="renewalSubmitStatus" style="margin-top:8px"></div>`;
-
-  document.getElementById('renewalModalFooter').innerHTML = `
-    <button class="btn btn-secondary" id="btnRnwBack3" onclick="_rnwBack(3)">← Back</button>
-    <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()">
-       Submit Renewal →
-    </button>`;
-}
-
-function _rnwBack(fromStep) {
-  _rnwStep = fromStep - 1;
-  _rnwRender();
-  document.getElementById('renewalModal').scrollTop = 0;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// SUBMIT — creates a TRAM job, Power Automate Desktop handles TRAM
-// ══════════════════════════════════════════════════════════════════════════════
-async function submitRenewal() {
-  const c = renewalData.c;
-  const f = renewalData.form;
-
-  const btn      = document.getElementById('btnSubmitRenewal');
-  const backBtn  = document.getElementById('btnRnwBack3');
-  const statusEl = document.getElementById('renewalSubmitStatus');
-  btn.disabled = true;
-  if (backBtn) backBtn.disabled = true;
-  btn.textContent = 'Generating Excel + email…';
-
-  // Prototype mode (no API_BASE)
-  if (!API_BASE) {
-    await new Promise(r => setTimeout(r, 1200));
-    showRenewalSuccess({
-      excel_filename: `${c.name.replace(/\W/g,'_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`,
-      final_jrs: f.jrs, tram_id_used: 'NA' + Date.now(),
-      email: { to: getSectorEmail(c.sector), subject: 'DEMO RENEWAL' },
-      email_error: null, submitted_at: new Date().toISOString(),
-      mailto_fallback: null, _prototype: true,
-    });
-    return;
-  }
-
-  try {
-    // Generate Excel + email draft + ledger/audit in one call
-    const resp = await apiFetch('/api/submit-renewal', {
-      method: 'POST',
-      body: JSON.stringify({
-        contractor_id:     c.serial,
-        tram_id_new:       renewalData.tramIdNew,
-        new_start_date:    f.newStart,
-        new_end_date:      f.newEnd,
-        rate_cap:          f.rateCap,
-        bill_rate:         f.billRate,
-        gp_pct:            f.gp,
-        confirmed_jrs:     f.jrs,
-        confirmed_band:    f.band,
-        work_location:     f.location,
-        manager_email:     f.mgrEmail,
-        supplier_contact:  f.supplierContact,
-        niche_skills:      f.skills,
-        scope_of_work:     f.scope,
-        us_citizenship:    f.usCitizen,
-        security_access:   f.secAccess,
-        pen_testing:       f.penTest,
-        requires_laptop:   f.laptop,
-        laptop_os:         f.laptopOs,
-        laptop_address:    f.laptopAddr,
-        contractor_phone:  f.phone,
-        contract_type:     f.contractType,
-        biz_just_1:        f.bj1,
-        biz_just_2:        f.bj2,
-        biz_just_3:        f.bj3,
-        biz_just_4:        f.bj4,
-      })
-    });
-    showRenewalSuccess(resp);
-  } catch (e) {
-    btn.disabled = false;
-    if (backBtn) backBtn.disabled = false;
-    btn.textContent = 'Submit Renewal →';
-    statusEl.innerHTML = `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> Submission failed: ${e.message}</div>`;
-  }
-}
-
-// Show the "Power Automate is working" waiting screen
-function _rnwShowPolling(jobId) {
-  document.getElementById('renewalModalBody').innerHTML = `
-    ${_rnwStepperHTML(3)}
-    ${_rnwContractorBar()}
-    <div style="text-align:center;padding:32px 0 16px">
-      <div style="font-size:48px;margin-bottom:16px;animation:spin 2s linear infinite;display:inline-block"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M27,16.76c0-.25,0-.5,0-.76s0-.51,0-.77l1.92-1.68A2,2,0,0,0,29.3,11L26.94,7a2,2,0,0,0-1.73-1,2,2,0,0,0-.64.1l-2.43.82a11.35,11.35,0,0,0-1.31-.75l-.51-2.52a2,2,0,0,0-2-1.61H13.64a2,2,0,0,0-2,1.61l-.51,2.52a11.48,11.48,0,0,0-1.32.75L7.43,6.06A2,2,0,0,0,6.79,6,2,2,0,0,0,5.06,7L2.7,11a2,2,0,0,0,.41,2.51L5,15.24c0,.25,0,.5,0,.76s0,.51,0,.77L3.11,18.45A2,2,0,0,0,2.7,21L5.06,25a2,2,0,0,0,1.73,1,2,2,0,0,0,.64-.1l2.43-.82a11.35,11.35,0,0,0,1.31.75l.51,2.52a2,2,0,0,0,2,1.61h4.72a2,2,0,0,0,2-1.61l.51-2.52a11.48,11.48,0,0,0,1.32-.75l2.42.82a2,2,0,0,0,.64.1,2,2,0,0,0,1.73-1L29.3,21a2,2,0,0,0-.41-2.51ZM25.21,24l-3.43-1.16a8.86,8.86,0,0,1-2.71,1.57L18.36,28H13.64l-.71-3.55a9.36,9.36,0,0,1-2.7-1.57L6.79,24,4.43,20l2.72-2.4a8.9,8.9,0,0,1,0-3.13L4.43,12,6.79,8l3.43,1.16a8.86,8.86,0,0,1,2.71-1.57L13.64,4h4.72l.71,3.55a9.36,9.36,0,0,1,2.7,1.57L25.21,8,27.57,12l-2.72,2.4a8.9,8.9,0,0,1,0,3.13L27.57,20Z M16,22a6,6,0,1,1,6-6A5.94,5.94,0,0,1,16,22Zm0-10a3.91,3.91,0,0,0-4,4,3.91,3.91,0,0,0,4,4,3.91,3.91,0,0,0,4-4A3.91,3.91,0,0,0,16,12Z"/></svg></div>
-      <div style="font-size:18px;font-weight:700;color:#0f62fe;margin-bottom:8px">Power Automate is filling TRAM…</div>
-      <div style="font-size:13px;color:#525252;margin-bottom:24px">
-        The desktop flow is navigating TRAM, filling all fields, and submitting.<br>
-        This usually takes <b>1–2 minutes</b>. Do not close this window.
-      </div>
-      <div style="background:#edf5ff;border:1px solid #a6c8ff;border-radius:0;padding:14px;font-size:13px;color:#0043ce;max-width:420px;margin:0 auto;text-align:left">
-        <div style="font-weight:700;margin-bottom:8px">What's happening right now:</div>
-        <div id="padStep1" style="padding:3px 0"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Opening TRAM in Chrome…</div>
-        <div id="padStep2" style="padding:3px 0;color:#6f6f6f">◦ Importing from prior request ${renewalData.c.tramId||''}</div>
-        <div id="padStep3" style="padding:3px 0;color:#6f6f6f">◦ Filling dates, rates, JRS, justification</div>
-        <div id="padStep4" style="padding:3px 0;color:#6f6f6f">◦ Submitting &amp; reading new TRAM ID</div>
-        <div id="padStep5" style="padding:3px 0;color:#6f6f6f">◦ Generating Excel + sending email</div>
-      </div>
-      <div style="margin-top:20px;font-size:12px;color:#6f6f6f">Job ID: <code>${jobId}</code></div>
+    <div style="border:1px solid #e0e0e0;padding:4px 14px 8px">
+      ${row('Current TRAM ID', c.tramId||'–')}
+      ${row('Start → End', f.start + ' → ' + f.end)}
+      ${row('Cost Rate / Bill Rate', '$' + f.cost + ' / $' + f.bill)}
+      ${row('Resource GP% / Project GP%', f.gp + '% / ' + f.projectGp + '%')}
+      ${row('JR/S', f.jrs)}
+      ${row('Band', f.band)}
+      ${row('Internal Search Performed', f.internalSearch)}
+      ${row('Resources available meeting requirements', f.resourcesAvailable)}
+      ${row('Business Justification', f.justification)}
+      ${row('Authority attested', 'Yes')}
+      ${row('Review confirmed', 'Yes')}
     </div>`;
-  document.getElementById('renewalModalFooter').innerHTML = `
-    <button class="btn btn-secondary" disabled>← Back</button>
-    <button class="btn btn-primary" disabled><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Waiting for Power Automate…</button>`;
+  document.getElementById('renewalModalFooter').innerHTML = `<button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
 }
 
-// Animate the step indicators while polling
-let _padAnimStep = 0;
-function _rnwAnimatePadSteps() {
-  const steps = ['padStep1','padStep2','padStep3','padStep4'];
-  _padAnimStep = (_padAnimStep + 1) % (steps.length + 1);
-  steps.forEach((id, i) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (i < _padAnimStep) el.style.color = '#0f62fe';
-    else el.style.color = '#6f6f6f';
-  });
-}
-
-// Poll the backend every 4s until the job is done or failed
-async function _rnwPoll(jobId, attempt = 0) {
-  if (attempt > 75) {  // 5 minute timeout
-    document.getElementById('renewalModalBody').innerHTML += `
-      <div class="dq-warn" style="margin-top:16px"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16,30A14,14,0,1,1,30,16,14,14,0,0,1,16,30ZM16,4A12,12,0,1,0,28,16,12,12,0,0,0,16,4Z M20.59 22L15 16.41 15 7 17 7 17 15.58 22 20.59 20.59 22z"/></svg> Timed out waiting for Power Automate.
-      Check that the desktop flow is running, then try again.</div>`;
-    return;
-  }
-  _rnwAnimatePadSteps();
-  try {
-    const job = await apiFetch(`/api/tram-jobs/${jobId}`);
-    if (job.status === 'done') {
-      showRenewalSuccess(job);
-      return;
-    }
-    if (job.status === 'failed') {
-      document.getElementById('renewalModalBody').innerHTML += `
-        <div class="dq-warn" style="margin-top:16px">
-          <svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> <b>Power Automate reported an error:</b><br>${job.error||'Unknown error'}<br><br>
-          You can <a href="https://tram.ibm.com" target="_blank">open TRAM manually</a>, submit,
-          and then paste the new TRAM ID to complete this renewal manually.
-        </div>`;
-      document.getElementById('renewalModalFooter').innerHTML = `
-        <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
-      return;
-    }
-    // Still pending/claimed — keep polling
-    setTimeout(() => _rnwPoll(jobId, attempt + 1), 4000);
-  } catch (e) {
-    setTimeout(() => _rnwPoll(jobId, attempt + 1), 4000);
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// SUCCESS SCREEN
-// ══════════════════════════════════════════════════════════════════════════════
-function showRenewalSuccess(resp) {
-  const c = renewalData.c;
-  c.renewal = 'Submitted';
-  const now = new Date(resp.submitted_at || Date.now()).toLocaleString();
-  const graphNotConfigured = resp.email_error && resp.email_error.includes('not configured');
-  const emailOk  = !resp.email_error && (resp.email || resp._prototype);
-  const realFail = !emailOk && !graphNotConfigured;
-
-  const isDraft = !!(resp.email && resp.email.status === 'draft');
-  if (isDraft) _autoDownloadEml(resp);
-  const emailLine = isDraft
-    ? _emlPanel(resp)
-    : emailOk
-    ? `<div class="confirm-row"><svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg> <b>Email sent automatically</b> to ${(resp.email||{}).to || getSectorEmail(renewalData.c.sector)}</div>`
-    : graphNotConfigured
-      ? `<div style="background:#edf5ff;border:1px solid #78a9ff;border-radius:0;padding:12px 14px;font-size:13px;color:#0043ce;margin-bottom:8px">
-           <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> <b>Open in Outlook to send the renewal email.</b><br>
-           Attach the Excel file and click Send — subject &amp; recipient are pre-filled.
-           ${resp.mailto_fallback ? `<br><a href="${resp.mailto_fallback}" target="_blank" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:10px;display:inline-flex"><svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg> Open in Outlook</a>` : ''}
-         </div>`
-      : `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> <b>Email failed:</b> ${resp.email_error||'Unknown error'}</div>`;
-
-  const dotEmail = emailOk ? 'green' : realFail ? 'red' : 'blue';
-  const txtEmail = emailOk
-    ? `Sent to ${(resp.email||{}).to || getSectorEmail(c.sector)}`
-    : graphNotConfigured ? 'Outlook mailto opened' : resp.email_error;
-
-  document.getElementById('renewalModalBody').innerHTML = `
-    <div style="text-align:center;padding:20px 0 12px">
-      <div style="font-size:48px;margin-bottom:8px">${emailOk ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#198038" aria-hidden="true"><path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2ZM14,21.5908l-5-5L10.5906,15,14,18.4092,21.41,11l1.5957,1.5859Z"/></svg>' : realFail ? '<svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg>' : '<svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M28,6H4A2,2,0,0,0,2,8V24a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM25.8,8,16,14.78,6.2,8ZM4,24V8.91l11.43,7.91a1,1,0,0,0,1.14,0L28,8.91V24Z"/></svg>'}</div>
-      <div style="font-size:22px;font-weight:700;color:${emailOk?'#0e6027':realFail?'#a2191f':'#0043ce'};margin-bottom:4px">
-        ${emailOk ? 'Renewal Successfully Submitted' : realFail ? 'Submission Error' : 'Renewal Submitted'}
-      </div>
-      <div style="font-size:13px;color:#525252">${now}</div>
-    </div>
-    <div class="confirm-row" style="margin-bottom:10px">
-      <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> <b>New TRAM ID:</b> <code style="font-size:16px;font-family:IBM Plex Mono,monospace;letter-spacing:.04em">${resp.tram_id_used || renewalData.tramIdNew || '–'}</code>
-    </div>
-    <div class="confirm-row" style="margin-bottom:10px">
-      <svg class="cds-ic" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M25.7,9.3l-7-7C18.5,2.1,18.3,2,18,2H8C6.9,2,6,2.9,6,4v24c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V10C26,9.7,25.9,9.5,25.7,9.3 z M18,4.4l5.6,5.6H18V4.4z M24,28H8V4h8v6c0,1.1,0.9,2,2,2h6V28z M10 22H22V24H10z M10 16H22V18H10z"/></svg> <b>Excel generated:</b> <b>${resp.excel_filename||'–'}</b>
-      ${resp.excel_sha256 ? `<br><span style="font-size:11px;color:#525252">SHA-256: ${resp.excel_sha256.slice(0,8)}…${resp.excel_sha256.slice(-4)}</span>` : ''}
-    </div>
-    ${emailLine}
-    <div class="section-title" style="margin-top:16px">Audit Trail</div>
-    <ul class="timeline">
-      ${(()=>{
-        const jr = resp.jrs_result||{};
-        const outcome = jr.outcome||'active';
-        const orig = jr.input || c.jrsTram || '–';
-        const final = resp.final_jrs || orig;
-        const dot = outcome==='active'?'green':'yellow';
-        let detail = `${outcome.toUpperCase()} · "${orig}"`;
-        if (final !== orig) detail += ` → "${final}"`;
-        return `<li><div class="tl-dot ${dot}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">JRS_VALIDATED</div><div class="tl-detail">${detail}</div></div></li>`;
-      })()}
-      <li><div class="tl-dot green"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EXCEL_GENERATED</div><div class="tl-detail">${resp.excel_filename||'–'} · ${resp.fields_written||'?'} fields</div></div></li>
-      <li><div class="tl-dot ${dotEmail}"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">EMAIL_${emailOk?'SENT':realFail?'FAILED':'OUTLOOK'}</div><div class="tl-detail">${txtEmail}</div></div></li>
-      <li><div class="tl-dot blue"></div><div class="tl-content"><div class="tl-time">${now}</div><div class="tl-action">RENEWAL_SUBMITTED</div><div class="tl-detail">TRAM: ${resp.tram_id_used||renewalData.tramIdNew||'–'}</div></div></li>
-    </ul>`;
-  document.getElementById('renewalModalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="closeRenewalModal()">Close</button>`;
-  postAudit('RENEWAL_SUBMITTED', c.serial,
-    `TRAM: ${resp.tram_id_used||renewalData.tramIdNew||'–'} · Excel: ${resp.excel_filename||'–'}`,
-    emailOk ? 'success' : 'warning');
-}
 // ── SECTOR → CSP EMAIL ROUTING ─────────────────────────────────────────
 // Confirmed routing rules:
 //   indcontr@cr.ibm.com   → Industrial sectors

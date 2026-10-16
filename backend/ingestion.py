@@ -698,6 +698,11 @@ def _build_contractor_records(
             # CMO workflow flags — drive the PM status (see ledger.apply_to_contractors)
             "offboardInProgress":  row.get("Offboard In Progress"),
             "renewalMetroTicket":  row.get("Renewal Metro Ticket Number"),
+            # Current rates / margins (prefill the renewal form; blank if absent)
+            "costRate":            row.get("Contr Pay Rate (USD) - Metro") or row.get("Candidate ST Rate - CSA"),
+            "billRate":            row.get("Bill Rate (USD) - Metro"),
+            "contrGp":             row.get("Contr GP% - Metro"),
+            "projectGp":           row.get("Project GP% - Metro"),
             # Role
             "band":               row.get("Actual Band"),
             "jrsTram":            row.get("JR/S (TRAM)"),
