@@ -636,6 +636,7 @@ def submit_renewal(req: SubmitRenewalRequest):
     fulfilment_email = SECTOR_EMAIL_MAP.get(sector_key, SECTOR_EMAIL_DEFAULT)
 
     pm_checklist = {
+        "original_jrs":     contractor.get("jrsTram", ""),
         "manager_email":    req.manager_email or contractor.get("pmIntranetId", ""),
         "fulfilment_email": fulfilment_email,                             # Col 2 — auto from sector
         "supplier_contact": req.supplier_contact,                         # Col 8 — PM provides
@@ -707,6 +708,10 @@ def submit_renewal(req: SubmitRenewalRequest):
             "excel":         excel_result["filename"],
         },
     )
+    # PM can only mark In Progress (50%); Renewed (100%) comes from the CMO ticket column
+    ledger_module.record_pm_status(req.contractor_id, "In Progress", {"tram_id_new": tram_id_for_subject})
+    contractor["pmStatus"], contractor["pmStatusPct"] = "In Progress", 50
+    contractor["renewal"] = "Submitted"
 
     _append_audit(
         user="current_user",

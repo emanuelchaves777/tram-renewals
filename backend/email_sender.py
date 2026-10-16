@@ -248,6 +248,18 @@ def _build_payload(
 
 # ── Subject / body builders ───────────────────────────────────────────────────
 
+def _po(contractor: dict) -> str:
+    """PO as plain digits (Excel gives 4700969454.0)."""
+    v = contractor.get("poNumber")
+    if v in (None, ""):
+        return "-"
+    try:
+        return str(int(float(v)))
+    except (TypeError, ValueError):
+        return str(v).strip()
+
+
+
 def _build_renewal_subject(contractor: dict, tram_id_new: str) -> str:
     """
     Confirmed format:
@@ -256,7 +268,7 @@ def _build_renewal_subject(contractor: dict, tram_id_new: str) -> str:
     parts = [
         tram_id_new                          or contractor.get("tramId", "–"),
         contractor.get("serial", "–"),
-        contractor.get("poNumber", "–"),
+        _po(contractor),
         contractor.get("name", "–"),
         contractor.get("client", "–"),
         "RENEWAL",
@@ -269,7 +281,7 @@ def _build_offboarding_subject(contractor: dict) -> str:
     parts = [
         contractor.get("tramId", "–"),
         contractor.get("serial", "–"),
-        contractor.get("poNumber", "–"),
+        _po(contractor),
         contractor.get("name", "–"),
         contractor.get("client", "–"),
         "OFFBOARDING",

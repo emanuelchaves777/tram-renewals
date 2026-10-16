@@ -2995,9 +2995,9 @@ function _rnwRenderStep3() {
     <div style="background:#defbe6;border:1px solid #6fdc8c;border-radius:0;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#0e6027">
       <b>✓ Ready to submit.</b> Click <b>Submit Renewal</b> below — the app will:<br>
       <span style="display:inline-block;margin-top:4px">
-        1. Send all data to Power Automate → PAD submits TRAM automatically &nbsp;·&nbsp;
-        2. Generate the Excel renewal file &nbsp;·&nbsp;
-        3. Send email to <b>${sectorEmail}</b> &nbsp;·&nbsp; 4. Record audit trail
+        1. Generate the Excel renewal file (Revisions tab) &nbsp;·&nbsp;
+        2. Prepare the email to <b>${sectorEmail}</b> with the Excel attached &nbsp;·&nbsp;
+        3. Record the audit trail and set the status to In Progress
       </span>
     </div>
 
@@ -3035,7 +3035,7 @@ function _rnwRenderStep3() {
   document.getElementById('renewalModalFooter').innerHTML = `
     <button class="btn btn-secondary" id="btnRnwBack3" onclick="_rnwBack(3)">← Back</button>
     <button class="btn btn-primary" id="btnSubmitRenewal" onclick="submitRenewal()">
-       Submit — Power Automate will handle TRAM →
+       Submit Renewal →
     </button>`;
 }
 
@@ -3057,13 +3057,11 @@ async function submitRenewal() {
   const statusEl = document.getElementById('renewalSubmitStatus');
   btn.disabled = true;
   if (backBtn) backBtn.disabled = true;
-  btn.textContent = 'Sending to Power Automate…';
+  btn.textContent = 'Generating Excel + email…';
 
   // Prototype mode (no API_BASE)
   if (!API_BASE) {
     await new Promise(r => setTimeout(r, 1200));
-    _rnwShowPolling('demo-job-id');
-    await new Promise(r => setTimeout(r, 2500));
     showRenewalSuccess({
       excel_filename: `${c.name.replace(/\W/g,'_')}_Renewal_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${c.serial}.xlsm`,
       final_jrs: f.jrs, tram_id_used: 'NA' + Date.now(),
@@ -3075,15 +3073,14 @@ async function submitRenewal() {
   }
 
   try {
-    // Create the job — backend queues it for Power Automate Desktop
-    const job = await apiFetch('/api/tram-jobs', {
+    // Generate Excel + email draft + ledger/audit in one call
+    const resp = await apiFetch('/api/submit-renewal', {
       method: 'POST',
       body: JSON.stringify({
         contractor_id:     c.serial,
+        tram_id_new:       renewalData.tramIdNew,
         new_start_date:    f.newStart,
         new_end_date:      f.newEnd,
-        batch_review_date: f.batchReview,
-        hiring_manager:    f.hiringMgr,
         rate_cap:          f.rateCap,
         bill_rate:         f.billRate,
         gp_pct:            f.gp,
@@ -3108,14 +3105,12 @@ async function submitRenewal() {
         biz_just_4:        f.bj4,
       })
     });
-    // Switch to polling UI — PAD is now handling TRAM
-    _rnwShowPolling(job.job_id);
-    _rnwPoll(job.job_id);
+    showRenewalSuccess(resp);
   } catch (e) {
     btn.disabled = false;
     if (backBtn) backBtn.disabled = false;
-    btn.textContent = 'Submit — Power Automate will handle TRAM →';
-    statusEl.innerHTML = `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> Failed to queue job: ${e.message}</div>`;
+    btn.textContent = 'Submit Renewal →';
+    statusEl.innerHTML = `<div class="dq-warn"><svg class="cds-ic" viewBox="0 0 32 32" fill="#da1e28" aria-hidden="true"><path d="M16,2A13.914,13.914,0,0,0,2,16,13.914,13.914,0,0,0,16,30,13.914,13.914,0,0,0,30,16,13.914,13.914,0,0,0,16,2Zm5.4449,21L9,10.5557,10.5557,9,23,21.4448Z"/></svg> Submission failed: ${e.message}</div>`;
   }
 }
 

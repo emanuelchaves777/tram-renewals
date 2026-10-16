@@ -3,8 +3,8 @@ excel_generation.py — Generates populated renewal and offboarding .xlsm files.
 
 Template is uploaded by the PM via the Setup panel (no Box required).
 
-Renewal spec:
-  Tab to populate: Onboardings  (headers row 1, data row 2)
+Renewal spec (confirmed from template inspection):
+  Tab to populate: Revisions  (headers row 6 cols D-P, data starts row 10)
   Output naming  : {Name}_Renewal_{YYYYMMDD}_{TalentID}.xlsm
 
 Offboarding spec (confirmed from template inspection):
@@ -26,42 +26,30 @@ import openpyxl
 
 # ── Template identity ─────────────────────────────────────────────────────────
 TEMPLATE_FILENAME = "Request Form Template_Contractor Team.xlsm"
-TEMPLATE_TAB      = "Onboardings"
-DATA_ROW          = 2   # row 1 = headers, row 2 = first data row
+TEMPLATE_TAB      = "Revisions"
+HEADER_ROW        = 6    # rows 6-9 are a merged header block
+DATA_ROW          = 10   # first data row (the template ships an example row here)
 
 # ── Column map: column index (1-based) → template header → data source key ───
-# Matches confirmed headers from OQ-18 exactly.
 COLUMN_MAP = [
-    # (col_index, header,                                          data_key)
-    (1,  "Contractor's Hiring Manager (U.S. Manager Email)",      "manager_email"),
-    (2,  "Fulfilment Specialist Email",                           "fulfilment_email"),   # auto-set = sector CSP email
-    (3,  "Contractor's Full Name",                                "contractor_name"),
-    (4,  "Start Date",                                            "start_date"),
-    (5,  "End Date",                                              "end_date"),
-    (6,  "Account/Client",                                        "client"),
-    (7,  "Supplier's Name",                                       "vendor"),
-    (8,  "Supplier's Contact",                                    "supplier_contact"),   # PM provides
-    (9,  "Open Seat #",                                           "tram_id_new"),
-    # Col 10 "Job Posting ID" — not applicable to renewals, left blank intentionally
-    (11, "TRAM",                                                  "tram_id_new"),
-    (12, "Does the contractor have US citizenship?",              "us_citizenship"),
-    (13, "Brief scope of work",                                   "scope_of_work"),
-    (14, "Will this candidate be working on/access to security technologies?", "security_access"),
-    (15, "Will the candidate be involved in penetration testing?","pen_testing"),
-    (16, "Requires Laptop?",                                      "requires_laptop"),
-    (17, "Windows, iOS",                                          "laptop_os"),
-    (18, "Laptop Shipping Address",                               "laptop_address"),
-    (19, "Contractor's Phone Number",                             "contractor_phone"),
-    (20, "Comments",                                              "comments"),
+    # (col_index, header,                      data_key)
+    (4,  "Sector",                            "sector"),
+    (5,  "Current PO",                        "current_po"),
+    (6,  "Serial",                            "serial"),
+    (7,  "JRS changed (yes/no)",              "jrs_changed"),
+    (8,  "New JRS",                           "new_jrs"),
+    (9,  "TRAM",                              "tram_id_new"),
+    (10, "New end date (mm/dd/yyyy)",         "end_date"),
+    (11, "Rate change (yes/no)",              "rate_change"),
+    (12, "ST Rate",                           "st_rate"),
+    (13, "OT Rate",                           "ot_rate"),
+    (14, "Expenses",                          "expenses"),
+    (15, "Work Number",                       "work_number"),
+    (16, "Alteration Description",            "comments"),
 ]
 
-# ── Mandatory fields (block generation if empty) ──────────────────────────────
-MANDATORY_KEYS = {
-    "manager_email", "contractor_name", "start_date", "end_date",
-    "client", "vendor", "tram_id_new", "us_citizenship",
-    "scope_of_work", "security_access", "pen_testing",
-    "requires_laptop", "contractor_phone", "supplier_contact", "comments",
-}
+# ── Mandatory fields (reported if empty) ──────────────────────────────────────
+MANDATORY_KEYS = {"sector", "current_po", "serial", "jrs_changed", "tram_id_new", "end_date"}
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -229,46 +217,48 @@ def generate_offboard_excel(
 
 # ── Data assembly ─────────────────────────────────────────────────────────────
 
+def _fmt_us_date(val: str) -> str:
+    """YYYY-MM-DD -> MM/DD/YYYY (leaves other formats untouched)."""
+    raw = (val or "").strip()
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").strftime("%m/%d/%Y")
+    except ValueError:
+        return raw
+
+
+def _fmt_po(val: Any) -> str:
+    """PO numbers arrive as floats from Excel (4701191353.0) - write them as plain text."""
+    if val in (None, ""):
+        return ""
+    try:
+        return str(int(float(val)))
+    except (TypeError, ValueError):
+        return str(val).strip()
+
+
 def _build_data_dict(contractor: dict, pm_checklist: dict) -> dict:
     """
     Merge contractor record and PM checklist into the flat data dict
-    keyed by COLUMN_MAP data_key values.
+    keyed by COLUMN_MAP data_key values (Revisions tab).
     """
-    name_parts   = (contractor.get("name") or "").split()
-    scope        = contractor.get("skillDescription") or ""
-    niche_skills = pm_checklist.get("niche_skills", "")
-    if niche_skills:
-        scope = scope + "\n\nNiche skills: " + niche_skills
-
-    biz_just = "\n".join([
-        f"1. {pm_checklist.get('biz_just_1', '')}",
-        f"2. {pm_checklist.get('biz_just_2', '')}",
-        f"3. {pm_checklist.get('biz_just_3', '')}",
-        f"4. {pm_checklist.get('biz_just_4', '')}",
-    ]).strip()
-
-    requires_laptop = pm_checklist.get("requires_laptop", "").lower()
+    original_jrs = (pm_checklist.get("original_jrs") or "").strip()
+    final_jrs    = (contractor.get("jrsTram") or "").strip()
+    jrs_changed  = bool(original_jrs) and final_jrs.lower() != original_jrs.lower()
 
     return {
-        "manager_email":    pm_checklist.get("manager_email")     or contractor.get("pmIntranetId", ""),
-        "fulfilment_email": pm_checklist.get("fulfilment_email", ""),   # ⏳ Pending CSP
-        "contractor_name":  contractor.get("name", ""),
-        "start_date":       pm_checklist.get("start_date", ""),
-        "end_date":         pm_checklist.get("end_date")           or contractor.get("endDate", ""),
-        "client":           contractor.get("client", ""),
-        "vendor":           contractor.get("vendor", ""),
-        "supplier_contact": pm_checklist.get("supplier_contact", ""),   # ⏳ Pending CSP
-        "tram_id_new":      pm_checklist.get("tram_id_new")        or contractor.get("tramId", ""),
-        "job_posting_id":   pm_checklist.get("job_posting_id", ""),     # ⏳ Pending
-        "us_citizenship":   pm_checklist.get("us_citizenship", ""),
-        "scope_of_work":    scope,
-        "security_access":  pm_checklist.get("security_access", ""),
-        "pen_testing":      pm_checklist.get("pen_testing", ""),
-        "requires_laptop":  pm_checklist.get("requires_laptop", ""),
-        "laptop_os":        pm_checklist.get("laptop_os", "") if requires_laptop == "yes" else "",
-        "laptop_address":   pm_checklist.get("laptop_address", "") if requires_laptop == "yes" else "",
-        "contractor_phone": pm_checklist.get("contractor_phone", ""),
-        "comments":         biz_just or pm_checklist.get("comments", ""),
+        "sector":      contractor.get("sector") or contractor.get("marketSector") or "",
+        "current_po":  _fmt_po(contractor.get("poNumber")),
+        "serial":      contractor.get("serial", ""),
+        "jrs_changed": "Yes" if jrs_changed else "No",
+        "new_jrs":     final_jrs if jrs_changed else "",
+        "tram_id_new": pm_checklist.get("tram_id_new") or contractor.get("tramId", ""),
+        "end_date":    _fmt_us_date(pm_checklist.get("end_date") or contractor.get("endDate", "")),
+        "rate_change": "No",
+        "st_rate":     "",
+        "ot_rate":     "",
+        "expenses":    "",
+        "work_number": "",
+        "comments":    pm_checklist.get("comments", ""),
     }
 
 
@@ -281,8 +271,8 @@ def _check_mandatory(data: dict) -> list[str]:
 
 def _populate_template(template_bytes: bytes, data: dict) -> bytes:
     """
-    Open the template .xlsm, write data into row 2 of the Onboardings tab,
-    and return the populated file as bytes.
+    Open the template .xlsm, write data into the first data row of the
+    Revisions tab, and return the populated file as bytes.
 
     Note: openpyxl preserves .xlsm format when keep_vba=True.
     """
@@ -306,13 +296,13 @@ def _populate_template(template_bytes: bytes, data: dict) -> bytes:
     else:
         ws = wb[TEMPLATE_TAB]
 
-    # Resolve headers from row 1 to confirm column positions
+    # Resolve headers from the header row to confirm column positions
     header_to_col = {}
-    for cell in ws[1]:
+    for cell in ws[HEADER_ROW]:
         if cell.value:
             header_to_col[str(cell.value).strip()] = cell.column
 
-    # Write data into row 2
+    # Write data into the first data row (overwrites the template's example row)
     for col_idx, header, key in COLUMN_MAP:
         value = data.get(key, "")
         if value is None:
